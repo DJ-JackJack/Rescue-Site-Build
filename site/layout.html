@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en" class="no-js">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>{{title}}</title>
+<meta name="description" content="{{description}}">
+{{robots}}
+<meta name="theme-color" content="#60429C">
+<script>document.documentElement.className="js";</script>
+{{config}}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:ital,wght@0,400;0,600;0,700;0,800;1,400&display=swap">
+<link rel="stylesheet" href="{{asset:site.css}}">
+<script src="{{asset:site.js}}" defer></script>
+</head>
+<body class="{{bodyclass}}">
+<a class="skip" href="#main">Skip to content</a>
+{{preview}}
+
+<header>
+  <div class="wrap hbar">
+    <a class="brand" href="{{base}}">TheTerr0rTw!ns<small>with tae</small></a>
+    <a class="hpartner" href="{{base}}partner/">Partner with me</a>
+    <button class="menubtn" type="button" aria-expanded="false" aria-controls="menu">Menu</button>
+  </div>
+  <!-- One list of pages, with the same names as the photo wall. -->
+  <nav class="menu" id="menu" aria-label="All pages">
+    <ul class="wrap">
+      <li><a data-nav="home" href="{{base}}">Home</a></li>
+      <li><a data-nav="willow" href="{{base}}willow-woods/">Willow Woods</a></li>
+      <li><a data-nav="rescues" href="{{base}}rescues/">Rescues</a></li>
+      <li><a data-nav="sniffari" href="{{base}}sniffari/">Rescues on Sniffari</a></li>
+      <li><a data-nav="goals" href="{{base}}shelter-goals/">Shelter Goals</a></li>
+      <li><a data-nav="flock" href="{{base}}meet-the-flock/">Meet the Flock</a></li>
+      <li><a data-nav="wildlife" href="{{base}}wildlife/">Wildlife</a></li>
+      <li><a data-nav="stories" href="{{base}}stories/">Stories</a></li>
+      <li><a data-nav="shop" href="{{base}}shop/">Shop</a></li>
+      <li><a data-nav="partner" href="{{base}}partner/">Partner With Me</a></li>
+      <li><a data-nav="help" href="{{base}}help/">Help Keeping Your Pet</a></li>
+      <li><a data-nav="animals" href="{{base}}animals/">Every Animal I've Helped</a></li>
+      <li><a data-nav="about" href="{{base}}about/">About tae</a></li>
+    </ul>
+  </nav>
+</header>
+
+<main id="main" tabindex="-1">
+{{content}}
+</main>
+
+<footer>
+  <div class="wrap">
+    <a class="brand" href="{{base}}">TheTerr0rTw!ns</a>
+    <p style="margin-top:6px">Rescue, education and dog day outs around Hampton Roads, Virginia.</p>
+    <div class="fgrid">
+      <div><h2>Explore</h2><ul>
+        <li><a href="{{base}}willow-woods/">Willow Woods</a></li>
+        <li><a href="{{base}}rescues/">Rescues</a></li>
+        <li><a href="{{base}}sniffari/">Rescues on Sniffari</a></li>
+        <li><a href="{{base}}shelter-goals/">Shelter Goals</a></li>
+        <li><a href="{{base}}partner/">Partner With Me</a></li>
+        <li><a href="{{base}}help/">Help Keeping Your Pet</a></li>
+        <li><a href="{{base}}animals/">Every Animal I've Helped</a></li>
+      </ul></div>
+      <div><h2>Follow along</h2><ul>
+        <li><a href="https://www.youtube.com/@terrortwyns" rel="noopener">YouTube @terrortwyns</a></li>
+        <li><a href="https://www.tiktok.com/@terrortwins89" rel="noopener">TikTok @terrortwins89</a></li>
+      </ul>
+      <p class="fnote">Patreon and the Facebook help pages get linked here once their names are confirmed.</p></div>
+      <div><h2>Say hello</h2>
+        <form class="form" data-form="footer">
+          <label>What's this about?<select name="topic">
+            <option value="partner">A shelter partnership</option>
+            <option value="help">Help keeping my pet</option>
+            <option value="dog">A dog I saw in a video</option>
+            <option value="sniffari">A Sniffari listing</option>
+            <option value="other">Something else</option>
+          </select></label>
+          <label>Your name<input name="name" autocomplete="name" maxlength="200"></label>
+          <label>Your email<input name="email" type="email" autocomplete="email" required maxlength="200"></label>
+          <label>Your message<textarea name="body" rows="3" maxlength="5000"></textarea></label>
+          <label class="sr">Leave this empty<input name="website" tabindex="-1" autocomplete="off"></label>
+          <button class="btn light" type="submit">Send</button>
+          <p class="formmsg" role="status" aria-live="polite"></p>
+        </form>
+      </div>
+    </div>
+    <p class="fine">Every donation goes directly to the shelter named on it. This site never handles money. Animal and rescue locations are kept private to keep them safe.</p>
+  </div>
+</footer>
+
+<dialog class="journey" id="journey" aria-labelledby="jname">
+  <button class="jclose" type="button" aria-label="Close">✕</button>
+  <div class="jhead"><div class="ph" id="jpic" aria-hidden="true"></div><div><h2 id="jname"></h2><span class="chip" id="jchip"></span></div></div>
+  <div class="jbody"><ol class="steps" id="jsteps"></ol></div>
+</dialog>
+</body>
+</html>

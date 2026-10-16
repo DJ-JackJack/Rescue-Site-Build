@@ -1,0 +1,71 @@
+<!--{"title":"Rescues on Sniffari","description":"Take a shelter dog out for the day: day-out programs at shelters around Hampton Roads, and day outs with tae's featured dogs.","nav":"sniffari","path":"sniffari/"}-->
+<div class="phead">
+  <div class="wrap">
+    <p class="eyebrow">Rescues on Sniffari</p>
+    <h1>Take a shelter dog out for the day.</h1>
+    <p class="lede">A Sniffari is a day out for a shelter dog: a walk, a car ride, a cup of whipped cream, a nap in the grass. It's the best day of their week, and it helps them get adopted. There are two ways to go:</p>
+    <div class="btns" style="margin-top:18px"><a class="btn royal" href="#programs">Shelter programs</a><a class="btn ghost" href="#featured">Day outs with my featured dogs</a></div>
+  </div>
+</div>
+
+<section id="programs">
+  <div class="wrap">
+    <p class="eyebrow">Way one</p>
+    <h2 class="h2">Shelter day-out programs around Hampton Roads</h2>
+    <p class="lede">Run by the shelters themselves. Sign up on their page, and follow their rules.</p>
+    <div class="sniff-filters" id="sniff-filters" role="group" aria-label="Filter programs">
+      <button aria-pressed="true" data-s="all">All programs</button>
+      <button aria-pressed="false" data-s="free">Free</button>
+      <button aria-pressed="false" data-s="half">Half-day option</button>
+      <button aria-pressed="false" data-s="kids">Kids welcome</button>
+      <button aria-pressed="false" data-s="first">Good for first-timers</button>
+    </div>
+    <p class="sr" id="sniff-count" aria-live="polite"></p>
+    <div class="slist" data-sniffari data-filters="#sniff-filters" data-live="#sniff-count" data-loading></div>
+  </div>
+</section>
+
+<section id="featured" style="padding-top:0">
+  <div class="wrap">
+    <p class="eyebrow">Way two</p>
+    <h2 class="h2">Day outs with dogs I'm featuring</h2>
+    <p class="lede">If you've applied to adopt or foster one of my featured dogs, you'll be able to ask to join a day out with them. It's a great way to get to know each other.</p>
+    <div class="cols">
+      <div class="box"><h3>How it will work</h3><ul><li>Apply to adopt or foster through the dog's rescue first.</li><li>Then ask to join a day out with that dog.</li><li>The rescue has the final say, every time.</li></ul></div>
+      <div class="box"><h3>Rules and safety come first</h3><ul><li>The full rules and safety guidelines go up here before the program opens.</li><li>You're never filmed or named without saying yes first.</li></ul></div>
+    </div>
+  </div>
+</section>
+
+<section style="padding-top:0">
+  <div class="wrap">
+    <p class="eyebrow">tae's Sniffari tips</p>
+    <h2 class="h2">A great day out doesn't cost much.</h2>
+    <p class="lede">Most of my day outs cost $6 to $10. Here's what makes them work.</p>
+    <div class="tips">
+      <div class="tip"><b>Go slow</b><span>Let them sniff everything. For a shelter dog, sniffing is the whole point.</span></div>
+      <div class="tip"><b>Pack light</b><span>Water, a bowl, poop bags, a few treats, and a towel for the car.</span></div>
+      <div class="tip"><b>Take photos</b><span>Good photos of a happy dog help them get adopted. Send them to the shelter.</span></div>
+      <div class="tip"><b>Follow their rules</b><span>Every shelter sets its own. Read theirs before you go, every time.</span></div>
+    </div>
+  </div>
+</section>
+
+<section style="padding-top:0">
+  <div class="wrap">
+    <div class="formcard">
+      <h2 class="h2" style="font-size:1.5rem">Run a shelter with a day-out program?</h2>
+      <p class="lede" style="margin-bottom:16px">Send the basics and it can be added. Every listing is confirmed with the shelter before it goes up.</p>
+      <form class="form" data-form="sniffari">
+        <label>Shelter or rescue name<input name="shelter" autocomplete="organization" required maxlength="200"></label>
+        <label>Program name<input name="program" maxlength="200"></label>
+        <label>City<input name="city" autocomplete="address-level2" maxlength="100"></label>
+        <label>Link to your sign-up page<input name="link" type="url" inputmode="url" placeholder="https://" maxlength="500"></label>
+        <label>Your email<input name="email" type="email" autocomplete="email" required maxlength="200"></label>
+        <label class="sr">Leave this empty<input name="website" tabindex="-1" autocomplete="off"></label>
+        <button class="btn royal" type="submit">Send program details</button>
+        <p class="formmsg" role="status" aria-live="polite"></p>
+      </form>
+    </div>
+  </div>
+</section>

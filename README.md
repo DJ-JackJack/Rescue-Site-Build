@@ -1,11 +1,29 @@
 # Rescue-Site-Build
 
-Planning materials for the rescue and wildlife website.
+The website for TheTerr0rTw!ns (tae): rescue features, shelter goals, dog day outs and education around Hampton Roads, Virginia.
 
-- `questionnaire/index.html` is the phone-friendly planning questionnaire. It is a single static page with no build step. Answers save in the browser on the device being used (localStorage) and also sync, about a second after each change, to the `questionnaire_responses` table in the Supabase project "rescue-site". The "Copy all my answers" button at the bottom is a backup for when syncing fails.
-- `supabase/migrations/` holds the SQL for that table. The page uses the public publishable key, which can only call the write-only `save_questionnaire` function; reading answers requires the Supabase dashboard (Table Editor, `questionnaire_responses`).
-- `questionnaire/Website_Planning_Questionnaire.pdf` is the same 50 questions as a fillable PDF, for use on a computer with Adobe Acrobat Reader.
-- `index.html` at the root redirects to the questionnaire, so the GitHub Pages address works on its own.
-- `tools/render-answers.mjs` turns rows pulled from Supabase into a readable transcript plus a list of checks (skipped questions, conflicting answers, privacy rules). See `docs/pulling-answers.md`.
-- `docs/site-brief-template.md` is the outline her answers get mapped onto before the mockup.
-- `responses/` is git-ignored. Her answers and the filled-in brief go there and are never committed, because this repo is public.
+## How it fits together
+
+- **`site/`** is the website. `node site/build.mjs` turns it into `_site/` (git-ignored). No packages to install.
+  - `site/pages/` has one file per page. The first line is a small JSON header (title, description, menu key, URL path).
+  - `site/layout.html` is the shared header, menu and footer.
+  - `site/assets/site.css` holds the styles; `site/assets/site.js` runs the menu, forms, the hanging photo wall and the live content.
+- **Live content** (shelter goals, the proof wall of animals, rescues, Sniffari programs) comes from the Supabase project **rescue-site**. The page reads it with the public key, which can only see published, approved rows. The tables and their rules are in `supabase/migrations/`.
+- **Forms** send to a private inbox (the `messages` table) through one checked, rate-limited function. The public can't read it.
+- **Publishing:** every push to `main` builds the site and publishes it to GitHub Pages (`.github/workflows/deploy-site.yml`).
+- **Preview mode** is on until launch: the site is hidden from search engines and shows a preview banner. To launch, set the repository variable `SITE_PREVIEW` to `0`.
+- **`questionnaire/`** is the original planning questionnaire. It still works at `/questionnaire/`, and its answers stay in the `questionnaire_responses` table.
+
+Updating goals, animals, rescues and programs: see `docs/updating-content.md`.
+
+## Rules the site is built around
+
+- Donations always go to the shelter's own page. The site never handles money.
+- No locations for rescues, wildlife or tae's home. The region (Hampton Roads) is fine; the city is not.
+- A rescue, shelter or Sniffari program appears only after it has said yes (`feature_ok` / `shelter_ok`).
+- Numbers are never invented. The adoption stat appears only once there are enough real records, and goals show "coming soon" until the shelter reports figures.
+
+## Planning material
+
+- `docs/site-brief-template.md`, `docs/pulling-answers.md` and `tools/render-answers.mjs` came from the planning stage.
+- `responses/` (git-ignored, never committed) holds her answers, the brief, the mockup and the review. This repo is public.
