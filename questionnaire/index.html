@@ -269,9 +269,18 @@ const FEATOK=["","Yes","No","I need to ask them"];
 const PAGES=[["Home","The front porch. A quick hello, your best stuff, and where to go next."],["About Me","Your story, your photo, and why you do this work."],["Rescue and Shelter Work","The organizations you work with and the animals you help."],["Wildlife","Your wildlife rehab, conservation, or education work."],["Content Hub","Your newest videos and posts from every platform in one spot."],["Stories or Blog","Longer posts: rescue stories, updates, behind the scenes."],["Gallery","Photos and videos to browse."],["Shop","Coloring books, prints, merch, or anything you sell."],["Work With Me","For brands: your audience, past partners, and how to hire you."],["Press","Interviews, articles, podcasts, and features about you."],["Support or Donate","Ways to help your causes, including donation links and wish lists."],["Events","Adoption days, fundraisers, appearances, and dates."],["Contact","How people reach you."],["FAQ","Answers to the questions people ask you all the time."]];
 const RATE=["Must have","Nice to have","Skip it"];
 const KEY="wpq.v1";
+/* Answers sync to a Supabase table through one write-only function. The key below is the
+   public "publishable" key: it can call save_questionnaire and nothing else. */
+const SB_URL="https://yysfgsdwlddeilktumza.supabase.co";
+const SB_KEY="sb_publishable_UtnxK1yVdvtQhj9pP608jA_mW9ZL5Ty";
 
 let S={};
-let db=null,ref=null,dbOK=false,timer=null,dirty=false;
+let timer=null,dirty=false;
+const DEVICE=(()=>{
+  const mk=()=>crypto.randomUUID?crypto.randomUUID():"10000000-1000-4000-8000-100000000000".replace(/[018]/g,c=>(c^crypto.getRandomValues(new Uint8Array(1))[0]&15>>c/4).toString(16));
+  try{ let d=localStorage.getItem("wpq.device"); if(!d){ d=mk(); localStorage.setItem("wpq.device",d); } return d; }
+  catch(e){ return mk(); }
+})();
 
 /* ---------- storage ---------- */
 function local(write){
@@ -289,13 +298,17 @@ async function flush(){
   if(!dirty) return;
   dirty=false;
   local(true);
-  if(dbOK&&ref){
-    try{ await ref.set({answers:S,updated:new Date().toISOString()}); chip("Saved",1); return; }
-    catch(e){ dbOK=false; }
-  }
+  if(await send(false)){ chip("Saved",1); return; }
   chip("Saved on this phone",1);
 }
-addEventListener("pagehide",()=>{ if(dirty) local(true); });
+function send(keepalive){
+  return fetch(SB_URL+"/rest/v1/rpc/save_questionnaire",{
+    method:"POST", keepalive,
+    headers:{"apikey":SB_KEY,"Content-Type":"application/json"},
+    body:JSON.stringify({p_device:DEVICE,p_answers:S})
+  }).then(r=>r.ok,()=>false);
+}
+addEventListener("pagehide",()=>{ if(dirty){ dirty=false; local(true); send(true); } });
 addEventListener("visibilitychange",()=>{ if(document.visibilityState==="hidden"&&dirty) flush(); });
 
 /* ---------- helpers ---------- */
@@ -430,8 +443,8 @@ function render(){
   hero.appendChild(el("div","eyebrow","Let's plan your website"));
   hero.appendChild(el("h2","","One home for your social media, your shelter and rescue work, and your wildlife work."));
   const p1=el("p"); p1.innerHTML="This is just the two of us figuring out your website together. Nobody else sees this. Your answers tell us what goes on the site, who it is for, and how it should look and feel, and then we turn that into a <b>mockup</b> (a picture of the finished website) for you to react to before anything gets built or paid for.";
-  const p2=el("p"); p2.innerHTML="There are no wrong answers, and you do not need to know anything about web design. <b>“Not sure” is always a fine answer</b>, and so is skipping anything that does not fit. <b>Everything saves by itself as you type</b>, so close this whenever you want and come back to it later on the same phone.";
-  const p3=el("p"); p3.innerHTML="Tap a section to open it. When you are done, use <b>Send your answers to Krys</b> at the bottom.";
+  const p2=el("p"); p2.innerHTML="There are no wrong answers, and you do not need to know anything about web design. <b>“Not sure” is always a fine answer</b>, and so is skipping anything that does not fit. <b>Everything saves by itself as you type</b>, so close this whenever you want and come back to it later on the same phone. Krys can see your answers as they save, so you do not need to send anything.";
+  const p3=el("p"); p3.innerHTML="Tap a section to open it. When the bar at the top says <b>Saved</b>, Krys has your latest answers.";
   hero.appendChild(p1); hero.appendChild(p2); hero.appendChild(p3);
   stack.appendChild(hero);
 
@@ -488,8 +501,8 @@ function render(){
   });
 
   const fin=el("div","fin");
-  const h=el("h2"); h.style.fontSize="1.25rem"; h.textContent="Send your answers to Krys";
-  const p=el("p","help","Tap the button, then paste it into a text or email. Do this whenever you like; you can keep editing and send an updated copy later.");
+  const h=el("h2"); h.style.fontSize="1.25rem"; h.textContent="Want a copy for yourself?";
+  const p=el("p","help","Your answers already reach Krys on their own. If the bar at the top ever says “Saved on this phone” instead of “Saved”, tap this button and paste the copy into a text to Krys so nothing gets lost.");
   const b1=el("button","btn"); b1.textContent="Copy all my answers";
   const ta=el("textarea"); ta.id="out"; ta.readOnly=true; ta.hidden=true;
   const msg=el("p","saveline"); msg.id="copymsg";
@@ -583,22 +596,8 @@ if(cached&&typeof cached==="object") S=cached;
 render(); paint();
 chip(Object.keys(S).length?"Saved on this phone":"Ready",Object.keys(S).length>0);
 
-(async()=>{
-  try{
-    const d=await (window.claude&&window.claude.use?window.claude.use("db"):null);
-    if(!d) return;
-    db=d; ref=d.doc("responses/main");
-    const snap=await ref.get();
-    const remote=snap.exists?(snap.data()||{}).answers:null;
-    if(remote&&typeof remote==="object"&&Object.keys(remote).length>Object.keys(S).length){
-      S=Object.assign({},remote,S);
-      document.getElementById("stack").innerHTML="";
-      render();
-    }
-    dbOK=true; paint();
-    chip(Object.keys(S).length?"Saved":"Ready",Object.keys(S).length>0);
-  }catch(e){ /* local storage carries it */ }
-})();
+// Push whatever is on this phone once at load, so answers from before the database existed sync too.
+if(Object.keys(S).length) send(false).then(ok=>chip(ok?"Saved":"Saved on this phone",1));
 </script>
 </body>
 </html>
