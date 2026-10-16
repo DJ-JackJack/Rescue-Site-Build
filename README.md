@@ -6,3 +6,6 @@ Planning materials for the rescue and wildlife website.
 - `supabase/migrations/` holds the SQL for that table. The page uses the public publishable key, which can only call the write-only `save_questionnaire` function; reading answers requires the Supabase dashboard (Table Editor, `questionnaire_responses`).
 - `questionnaire/Website_Planning_Questionnaire.pdf` is the same 50 questions as a fillable PDF, for use on a computer with Adobe Acrobat Reader.
 - `index.html` at the root redirects to the questionnaire, so the GitHub Pages address works on its own.
+- `tools/render-answers.mjs` turns rows pulled from Supabase into a readable transcript plus a list of checks (skipped questions, conflicting answers, privacy rules). See `docs/pulling-answers.md`.
+- `docs/site-brief-template.md` is the outline her answers get mapped onto before the mockup.
+- `responses/` is git-ignored. Her answers and the filled-in brief go there and are never committed, because this repo is public.
