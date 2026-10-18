@@ -3,7 +3,7 @@
   <div class="wrap">
     <p class="eyebrow">Help keeping your pet</p>
     <h1>Struggling to keep your pet? You're not alone.</h1>
-    <p class="lede">No judgement here. Most people who give up a pet never wanted to. Keeping animals in their homes through rough times is how shelters empty out, and it's some of the most important work I do.</p>
+    <p class="lede" data-text="help.intro" data-label="Help page: the opening line">No judgement here. Most people who give up a pet never wanted to. Keeping animals in their homes through rough times is how shelters empty out, and it's some of the most important work I do.</p>
   </div>
 </div>
 
@@ -16,14 +16,14 @@
     </div>
 
     <h2 class="h2" style="margin-top:36px">Local help, sorted by what you need</h2>
-    <p class="lede">A checked list of options around Hampton Roads is being put together, starting with these:</p>
+    <p class="lede" data-text="help.list" data-label="Help page: the line above the local help list">A checked list of options around Hampton Roads is being put together, starting with these:</p>
     <div class="cols">
-      <div class="need"><span class="ic" aria-hidden="true">🥫</span><h3>Food and supplies</h3><p class="small">Pet food pantries and supply help.</p></div>
-      <div class="need"><span class="ic" aria-hidden="true">🩺</span><h3>Vet bills</h3><p class="small">Low-cost clinics and vet bill assistance.</p></div>
-      <div class="need"><span class="ic" aria-hidden="true">🐕</span><h3>Behavior help</h3><p class="small">Free and low-cost training and behavior support.</p></div>
-      <div class="need"><span class="ic" aria-hidden="true">🏠</span><h3>Housing and pet deposits</h3><p class="small">Pet-friendly housing and deposit help.</p></div>
-      <div class="need"><span class="ic" aria-hidden="true">🔁</span><h3>Rehoming without a shelter</h3><p class="small">Ways to find a new home directly, or buy time.</p></div>
-      <div class="need"><span class="ic" aria-hidden="true">🐦</span><h3>Bird care</h3><p class="small">Care basics from my bird education work.</p></div>
+      <div class="need"><span class="ic" aria-hidden="true">🥫</span><h3>Food and supplies</h3><div data-help="food"><p class="small">Pet food pantries and supply help.</p></div></div>
+      <div class="need"><span class="ic" aria-hidden="true">🩺</span><h3>Vet bills</h3><div data-help="vet"><p class="small">Low-cost clinics and vet bill assistance.</p></div></div>
+      <div class="need"><span class="ic" aria-hidden="true">🐕</span><h3>Behavior help</h3><div data-help="behavior"><p class="small">Free and low-cost training and behavior support.</p></div></div>
+      <div class="need"><span class="ic" aria-hidden="true">🏠</span><h3>Housing and pet deposits</h3><div data-help="housing"><p class="small">Pet-friendly housing and deposit help.</p></div></div>
+      <div class="need"><span class="ic" aria-hidden="true">🔁</span><h3>Rehoming without a shelter</h3><div data-help="rehoming"><p class="small">Ways to find a new home directly, or buy time.</p></div></div>
+      <div class="need"><span class="ic" aria-hidden="true">🐦</span><h3>Bird care</h3><div data-help="birds"><p class="small">Care basics from my bird education work.</p></div></div>
     </div>
   </div>
 </section>
@@ -32,12 +32,12 @@
   <div class="wrap">
     <div class="formcard">
       <h2 class="h2" style="font-size:1.5rem">Ask for help</h2>
-      <form class="form" data-form="footer" style="margin-top:14px">
+      <form class="form" method="post" data-form="footer" style="margin-top:14px">
         <input type="hidden" name="topic" value="help">
         <label>Your first name<input name="name" autocomplete="given-name" maxlength="200"></label>
         <label>Your email<input name="email" type="email" autocomplete="email" required maxlength="200"></label>
         <label>What's going on?<textarea name="body" rows="4" maxlength="5000" required></textarea></label>
-        <label class="sr">Leave this empty<input name="website" tabindex="-1" autocomplete="off"></label>
+        <label class="sr" aria-hidden="true">Leave this empty<input name="website" tabindex="-1" autocomplete="off"></label>
         <button class="btn royal" type="submit">Send</button>
         <p class="formmsg" role="status" aria-live="polite"></p>
       </form>

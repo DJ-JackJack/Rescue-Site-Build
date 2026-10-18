@@ -32,6 +32,7 @@ jobs:
         run: node site/build.mjs
         env:
           SITE_BASE: ${{ steps.pages.outputs.base_path }}
+          SITE_URL: ${{ steps.pages.outputs.base_url }}
           SITE_PREVIEW: ${{ vars.SITE_PREVIEW || '1' }}
       - uses: actions/upload-pages-artifact@v3
         with:

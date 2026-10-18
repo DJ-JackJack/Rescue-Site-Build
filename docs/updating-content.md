@@ -1,8 +1,8 @@
 # Updating the site's content
 
-Goals, animals, rescues, events and Sniffari programs live in the Supabase project **rescue-site**. Changes show on the site straight away; no rebuild is needed.
+Goals, animals, rescues, events, Sniffari programs, the local help list and some page wording live in the Supabase project **rescue-site**. Changes show on the site straight away; no rebuild is needed.
 
-Until the simple editing page is built, make changes in the Supabase dashboard: **Table Editor**, pick the table, and edit the row. Or ask Claude in a session that has the Supabase connector, for example "set the hay round bales to 24, updated today".
+**The easy way is the edit page at `/edit/`.** See `docs/editing-guide.md`. This document explains what each setting does underneath, for anyone working in the Supabase dashboard (**Table Editor**) instead.
 
 ## Shelter goals
 
@@ -60,3 +60,16 @@ Where they show up:
 If a photo can't load, the emoji placeholder shows instead.
 
 The original files from the shared Drive folder are kept in `responses/drive-photos/` (private, never committed).
+
+## Local help list
+
+`help_resources`: `category` (food, vet, behavior, housing, rehoming, birds), `name`, `description`, `link_url`, `phone`, `area` (a city or "All of Hampton Roads", never a private address), `checked_on`, `sort`, `published`. Published rows show on the help page under their category; a category with none keeps its short description.
+
+## Page wording
+
+`site_text`: one row per editable piece of wording, by `key` (for example `home.intro`, `about.body`). An empty `body` means the page's own words. In a page file, `data-text="key" data-label="..."` marks wording as editable; the edit page picks it up on the next build.
+
+## Who can edit
+
+The `admins` table lists the email addresses allowed to edit. It can't be read or changed from the site; add a row in the Table Editor or with SQL. Accounts are made in Authentication → Users ("Allow new users to sign up" stays off).
+

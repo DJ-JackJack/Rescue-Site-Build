@@ -1,4 +1,4 @@
-<!--{"title":"Rescues on Sniffari","description":"Take a shelter dog out for the day: every shelter day-out program around Hampton Roads, with how to sign up.","nav":"sniffari","path":"sniffari/"}-->
+<!--{"title":"Rescues on Sniffari","description":"Take a shelter dog out for the day: shelter day-out programs around Hampton Roads, with how to sign up for each.","nav":"sniffari","path":"sniffari/"}-->
 <div class="phead">
   <div class="wrap">
     <p class="eyebrow">Rescues on Sniffari</p>
@@ -48,13 +48,13 @@
     <div class="formcard">
       <h2 class="h2" style="font-size:1.5rem">Run a shelter with a day-out program?</h2>
       <p class="lede" style="margin-bottom:16px">Send the basics and a link to your sign-up page, and it can be added to the list.</p>
-      <form class="form" data-form="sniffari">
+      <form class="form" method="post" data-form="sniffari">
         <label>Shelter or rescue name<input name="shelter" autocomplete="organization" required maxlength="200"></label>
         <label>Program name<input name="program" maxlength="200"></label>
         <label>City<input name="city" autocomplete="address-level2" maxlength="100"></label>
         <label>Link to your sign-up page<input name="link" type="url" inputmode="url" placeholder="https://" maxlength="500"></label>
         <label>Your email<input name="email" type="email" autocomplete="email" required maxlength="200"></label>
-        <label class="sr">Leave this empty<input name="website" tabindex="-1" autocomplete="off"></label>
+        <label class="sr" aria-hidden="true">Leave this empty<input name="website" tabindex="-1" autocomplete="off"></label>
         <button class="btn royal" type="submit">Send program details</button>
         <p class="formmsg" role="status" aria-live="polite"></p>
       </form>
