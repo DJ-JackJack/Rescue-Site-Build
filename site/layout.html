@@ -6,7 +6,11 @@
 <title>{{title}}</title>
 <meta name="description" content="{{description}}">
 {{robots}}
+{{social}}
 <meta name="theme-color" content="#60429C">
+<link rel="icon" href="{{asset:icon.svg}}" type="image/svg+xml">
+<link rel="icon" href="{{asset:icon-32.png}}" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="{{asset:apple-touch-icon.png}}">
 <script>document.documentElement.className="js";</script>
 {{config}}
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -71,7 +75,8 @@
       <p class="fnote">Patreon and the Facebook help pages get linked here once their links are confirmed.</p></div>
       <div><h2>Say hello</h2>
         <form class="form" data-form="footer">
-          <label>What's this about?<select name="topic">
+          <label>What's this about?<select name="topic" required>
+            <option value="" selected disabled>Pick a topic</option>
             <option value="partner">A shelter partnership</option>
             <option value="help">Help keeping my pet</option>
             <option value="dog">A dog I saw in a video</option>
