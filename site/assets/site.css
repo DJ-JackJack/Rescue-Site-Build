@@ -398,3 +398,4 @@ footer .formmsg.err{color:#FFB4AB}
 .res span{color:var(--ink2);font-size:.92rem}
 .res small{color:var(--ink2);font-size:.84rem}
 .res small a{font-weight:700}
+.callbox{max-width:66ch;margin-top:22px}

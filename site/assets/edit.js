@@ -144,7 +144,7 @@ const SPECIES = [["dog", "Dog"], ["cat", "Cat"], ["horse", "Horse"], ["bird", "B
 const EMOJI = { dog: "🐶", cat: "🐱", horse: "🐴", bird: "🐦", other: "🐾" };
 const KINDS = [["rescue", "Rescue"], ["shelter", "Shelter"], ["sanctuary", "Sanctuary"]];
 const TAGS = [["free", "Free"], ["half", "Half-day option"], ["kids", "Kids welcome"], ["first", "Good for first-timers"]];
-const HELPCATS = [["food", "Food and supplies"], ["vet", "Vet bills"], ["behavior", "Behavior help"], ["housing", "Housing and pet deposits"], ["rehoming", "Rehoming without a shelter"], ["birds", "Bird care"]];
+const HELPCATS = [["food", "Food and supplies"], ["vet", "Vet bills"], ["behavior", "Behavior help"], ["housing", "Housing and pet deposits"], ["rehoming", "Rehoming without a shelter"], ["birds", "Bird care"], ["wildlife", "Wild animal help (Wildlife page)"]];
 const TOPICS = { partner: "Partnership", help: "Help keeping a pet", dog: "About a dog", sniffari: "Day-out program", other: "Something else" };
 const RANK = { looking: 0, foster: 1, adopted: 2, sanctuary: 3, placed: 4 };
 const stale = (d, days) => d === null || d === undefined || daysAgo(d) >= days;
@@ -279,7 +279,7 @@ const SECTIONS = {
   },
   help: {
     table: "help_resources", title: "Local help list", one: "help listing", icon: "🤝",
-    intro: "Shown on the “Help keeping your pet” page, under each kind of help.",
+    intro: "Shown on the “Help keeping your pet” page under each kind of help. Wild animal help shows on the Wildlife page.",
     query: "select=*&order=category.asc,sort.asc,name.asc",
     titleOf: r => r.name,
     filters: [["all", "All"], ...HELPCATS],

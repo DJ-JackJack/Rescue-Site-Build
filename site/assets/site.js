@@ -412,7 +412,7 @@ async function renderText() {
   clearTimeout(slow); show();
 }
 
-/* ---------- local help, listed under each need on the help page ---------- */
+/* ---------- local help: under each need on the help page, and "who to call" on the Wildlife page ---------- */
 async function renderHelp() {
   const boxes = $$("[data-help]");
   if (!boxes.length) return;
@@ -427,6 +427,7 @@ async function renderHelp() {
         ${r.description ? `<span>${h(r.description)}</span>` : ""}
         ${r.area || r.phone ? `<small>${[r.area ? h(r.area) : "", r.phone ? `<a href="tel:${h(tel)}">${h(r.phone)}</a>` : ""].filter(Boolean).join(" · ")}</small>` : ""}</li>`;
     }).join("")}</ul>`;
+    box.closest("[data-help-wrap]")?.removeAttribute("hidden"); // a section that only shows once it has listings
   });
 }
 
