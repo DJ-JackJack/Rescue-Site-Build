@@ -5,7 +5,8 @@
 //   <!--{"title":"Shelter Goals","description":"...","nav":"goals","path":"shelter-goals/"}-->
 // The rest of the file is the page body. site/layout.html wraps it with the header,
 // menu and footer. In any file, {{base}} becomes the site's root URL and
-// {{asset:name}} becomes a cache-busted link to site/assets/name.
+// {{asset:name}} becomes a cache-busted link to site/assets/name, and {{owner}} / {{owner_first}}
+// become her published name (see OWNER below).
 //
 // Settings (environment variables):
 //   SITE_BASE      root path the site is served from. "/Rescue-Site-Build/" on GitHub Pages
@@ -24,9 +25,13 @@ const OUT = path.join(ROOT, "_site");
 const BASE = ("/" + (process.env.SITE_BASE || "/").replace(/^\/+|\/+$/g, "") + "/").replace("//", "/");
 const PREVIEW = process.env.SITE_PREVIEW !== "0";
 
+// The name she publishes under (a pen name). Change it here and every page follows.
+const OWNER = { full: "Taea Whelan", first: "Taea" };
+
 // Public on purpose: the publishable key can only read published rows and call submit_message.
 const CONFIG = {
   base: BASE,
+  ownerFirst: OWNER.first,
   supabaseUrl: "https://yysfgsdwlddeilktumza.supabase.co",
   supabaseKey: "sb_publishable_UtnxK1yVdvtQhj9pP608jA_mW9ZL5Ty",
 };
@@ -51,7 +56,9 @@ function fill(html) {
       if (!hashes[name]) throw new Error(`missing asset: ${name}`);
       return `${BASE}assets/${name}?v=${hashes[name]}`;
     })
-    .replace(/\{\{base\}\}/g, BASE);
+    .replace(/\{\{base\}\}/g, BASE)
+    .replace(/\{\{owner\}\}/g, OWNER.full)
+    .replace(/\{\{owner_first\}\}/g, OWNER.first);
 }
 
 const layout = fs.readFileSync(path.join(SRC, "layout.html"), "utf8");

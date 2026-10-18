@@ -1,4 +1,4 @@
-<!--{"title":"Home","description":"tae helps humans live in harmony with animals: rescue features, shelter goals, dog day outs and education around Hampton Roads, Virginia.","nav":"home","path":""}-->
+<!--{"title":"Home","description":"{{owner}} (TheTerr0rTw!ns) helps humans live in harmony with animals: rescue features, shelter goals, dog day outs and education around Hampton Roads, Virginia.","nav":"home","path":""}-->
 <div class="hero">
   <div class="wrap">
     <p class="eyebrow">Rescue · Education · Hampton Roads, Virginia</p>
@@ -28,7 +28,7 @@
       </div>
     </nav>
     <p class="wallhint">Tap a photo to open that part of the site.</p>
-    <p class="lede">I'm tae. I feature animals who need homes, I teach people how to keep the ones they have, and I follow every animal I help all the way to the end of their story.</p>
+    <p class="lede">I'm {{owner}}. I feature animals who need homes, I teach people how to keep the ones they have, and I follow every animal I help all the way to the end of their story.</p>
   </div>
 </div>
 
@@ -41,7 +41,7 @@
   </div>
 </section>
 
-<section>
+<section data-hide-empty>
   <div class="wrap" data-goals="featured" data-heading="h2" data-loading></div>
 </section>
 
@@ -52,14 +52,14 @@
       <div data-when="ready" hidden>
         <div class="big" data-stat="ratio"></div>
         <p>dogs I featured were adopted within three months of their video.</p>
-        <p class="how">How it's counted: every dog I featured at least three months ago. "Home" means adopted. Every animal is on the proof wall, so you can check.</p>
+        <p class="how">How it's counted: every dog I featured at least three months ago. "Home" means adopted. Every animal is on Happy Tails, so you can check.</p>
       </div>
       <div data-when="waiting">
         <div class="big" style="font-size:clamp(2.2rem,8vw,3.6rem)">3 months</div>
         <p>Most of the dogs I feature are home within three months of their video.</p>
-        <p class="how">Every animal I've helped is going up on the proof wall, so the numbers can speak for themselves.</p>
+        <p class="how">Every animal I've helped is going up on Happy Tails, so the numbers can speak for themselves.</p>
       </div>
-      <div class="btns"><a class="btn light" href="{{base}}partner/">Partner with me</a><a class="btn onDark" href="{{base}}animals/">See every animal</a></div>
+      <div class="btns"><a class="btn light" href="{{base}}partner/">Partner with me</a><a class="btn onDark" href="{{base}}animals/">See the animals</a></div>
     </div>
   </div>
 </section>
@@ -69,9 +69,9 @@
     <p class="eyebrow">Three ways to help</p>
     <h2 class="h2">Pick the one that fits you today.</h2>
     <div class="trio">
-      <a class="act" href="{{base}}rescues/"><span class="ic" aria-hidden="true">🏡</span><b>Adopt or foster</b><span>Meet the dogs I'm featuring, and the rescues caring for them.</span><span class="more">Meet them →</span></a>
-      <a class="act" href="{{base}}shelter-goals/"><span class="ic" aria-hidden="true">🌾</span><b>Give to a goal</b><span>Every goal is set by the shelter, and your gift goes straight to them.</span><span class="more">See the goals →</span></a>
-      <a class="act" href="{{base}}partner/"><span class="ic" aria-hidden="true">🤝</span><b>Partner with me</b><span>Run a shelter or rescue? Let's get your animals seen and home.</span><span class="more">How I work →</span></a>
+      <a class="act" href="{{base}}rescues/"><span class="ic" aria-hidden="true">🏡</span><b>Adopt or foster</b><span>Meet the animals I'm featuring, and the rescues caring for them.</span><span class="more">Meet them →</span></a>
+      <a class="act" href="{{base}}shelter-goals/"><span class="ic" aria-hidden="true">🌾</span><b>Donate to a rescue</b><span>Every goal is set by the shelter, and your gift goes straight to them.</span><span class="more">See the goals →</span></a>
+      <a class="act" href="#follow"><span class="ic" aria-hidden="true">📱</span><b>Follow along</b><span>New animals, day outs and updates, every week.</span><span class="more">Find me →</span></a>
     </div>
   </div>
 </section>
@@ -81,7 +81,7 @@
     <p class="eyebrow">Stories</p>
     <h2 class="h2">Cute on the outside. Serious underneath.</h2>
     <div class="cards">
-      <article class="card"><div class="ph g1" aria-hidden="true">🐴</div><div class="bd"><span class="tag">10 years this Halloween</span><h3>eBay, the horse who started a sanctuary</h3><p>Everything I do with Willow Woods traces back to him.</p><a class="more" href="{{base}}stories/#ebay">Read his story →</a></div></article>
+      <article class="card"><div class="ph g1" aria-hidden="true">🐴</div><div class="bd"><span class="tag">Ten years with Michelle this Halloween</span><h3>Ebay, the horse who started a sanctuary</h3><p>Michelle's first horse, and the reason Willow Woods exists.</p><a class="more" href="{{base}}stories/#ebay">Read his story →</a></div></article>
       <article class="card"><div class="ph g2" aria-hidden="true">🐶</div><div class="bd"><span class="tag">91.8% watched to the end</span><h3>The 10-puppy relay</h3><p>Two days, ten 8-week-old puppies, hand to hand across the state. Ten tiny lives and a chain of people who showed up.</p><a class="more" href="{{base}}stories/#relay">Read the relay →</a></div></article>
     </div>
   </div>
@@ -89,20 +89,21 @@
 
 <section style="padding-top:0">
   <div class="wrap">
-    <div class="help" style="background:var(--blush)">
-      <div><h2>Watch the work</h2><p>Years of videos live on YouTube: the dog features, the adoption stories, and the Willow Woods herds.</p></div>
-      <a class="btn royal" href="https://www.youtube.com/@terrortwyns" rel="noopener">YouTube @terrortwyns <span class="ext" aria-hidden="true">↗</span></a>
+    <div class="help" id="follow" style="background:var(--blush)">
+      <div><h2>Follow along</h2><p>The dog features, the adoption stories, and the Willow Woods herds.</p></div>
+      <div class="btns"><a class="btn royal" href="https://www.tiktok.com/@terrortwins89" rel="noopener">TikTok <span class="ext" aria-hidden="true">↗</span></a><a class="btn ghost" href="https://www.instagram.com/liladydrkwolf12/" rel="noopener">Instagram <span class="ext" aria-hidden="true">↗</span></a></div>
     </div>
   </div>
 </section>
 
 <section class="wallsec">
   <div class="wrap">
-    <p class="eyebrow">The proof wall</p>
-    <h2 class="h2">Every animal I've helped, and where they are now.</h2>
+    <p class="eyebrow">Happy Tails</p>
+    <h2 class="h2">Animals we've helped and where they are now.</h2>
+    <p class="lede">We try to follow every animal we feature from their trip to the end, wherever that may be.</p>
     <div class="counts" data-counts></div>
     <p class="lede">The newest ones are below. Tap any animal to see their journey.</p>
     <ul class="wall" data-wall="8"></ul>
-    <div class="btns" style="margin-top:18px"><a class="btn light" href="{{base}}animals/">See every animal</a></div>
+    <div class="btns" style="margin-top:18px"><a class="btn light" href="{{base}}animals/">See all the animals</a></div>
   </div>
 </section>

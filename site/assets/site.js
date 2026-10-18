@@ -34,7 +34,7 @@ async function q(table, params) {
 const cache = {};
 const once = (key, fn) => (cache[key] ??= fn());
 const getGoals = () => once("goals", () => q("goals", "select=id,title,why,price_note,donate_url,status,featured,figures_updated_at,met_on,sort,partner:partners(name,slug),bars:goal_bars(label,target,current,sort)&order=sort.asc"));
-const getAnimals = () => once("animals", () => q("animals", "select=id,name,species,status,featured_on,adopted_on,transport,note,listing_url,checked_on,photo_url,journey,created_at,partner:partners(name,slug)&order=featured_on.desc.nullslast,created_at.desc"));
+const getAnimals = () => once("animals", () => q("animals", "select=id,name,species,status,herd,sort,featured_on,adopted_on,transport,note,listing_url,checked_on,photo_url,journey,created_at,partner:partners(name,slug)&order=featured_on.desc.nullslast,created_at.desc"));
 const getPartners = () => once("partners", () => q("partners", "select=id,slug,name,kind,mission,website_url,adopt_url,donate_url,sort&order=sort.asc"));
 const getSniffari = () => once("sniffari", () => q("sniffari_programs", "select=id,shelter_name,program_name,city,signup_url,facts,tags,checked_on,sort&order=sort.asc"));
 
@@ -87,7 +87,7 @@ async function renderGoals(el) {
     if (!goals.length) {
       const wrap = el.closest("[data-hide-empty]");
       if (wrap) { wrap.hidden = true; return; }
-      el.innerHTML = `<p class="empty">No active goals right now.</p>`;
+      el.innerHTML = el.hasAttribute("data-empty") ? "" : `<p class="empty">No active goals right now.</p>`;
       return;
     }
     el.innerHTML = goals.map(g => goalHTML(g, { heading: el.dataset.heading || "h3", showAllLink: mode === "featured" })).join("");
@@ -96,7 +96,8 @@ async function renderGoals(el) {
 
 /* ---------- animals: counts, stat, walls, journey ---------- */
 const EMOJI = { dog: "🐶", cat: "🐱", horse: "🐴", bird: "🐦", other: "🐾" };
-const STATUS = { adopted: ["c-adopted", "Adopted"], placed: ["c-placed", "Placed"], sanctuary: ["c-sanct", "In sanctuary"], looking: ["c-wait", "Still looking"] };
+const STATUS = { adopted: ["c-adopted", "Adopted"], placed: ["c-placed", "Placed"], foster: ["c-foster", "In foster"], sanctuary: ["c-sanct", "In sanctuary"], looking: ["c-wait", "Still looking"] };
+const WHO = S.ownerFirst || "she";
 const BG = ["g1", "g2", "g3", "g4", "g5", "g6"];
 const daysToHome = a => (a.status === "adopted" && a.featured_on && a.adopted_on) ? daysBetween(asDate(a.featured_on), asDate(a.adopted_on)) : null;
 
@@ -109,7 +110,7 @@ function stats(animals) {
   const days = dogs.map(daysToHome).filter(d => d !== null).sort((a, b) => a - b);
   return { counted: counted.length, fast: fast.length, dogs: dogs.length, median: days.length ? days[Math.floor(days.length / 2)] : null };
 }
-const MIN_FOR_STAT = 5; // below this, show tae's own words, not a number
+const MIN_FOR_STAT = 5; // below this, show her own words, not a number
 
 async function renderStats() {
   const blocks = $$("[data-statblock]");
@@ -138,7 +139,8 @@ function petHTML(a, i) {
 }
 function countsHTML(animals) {
   const c = s => animals.filter(a => a.status === s).length;
-  return [["adopted", "adopted"], ["placed", "placed or released"], ["sanctuary", "in sanctuary"], ["looking", "still looking"]]
+  return [["adopted", "adopted"], ["foster", "in foster"], ["sanctuary", "in sanctuary"], ["placed", "placed or released"], ["looking", "still looking"]]
+    .filter(([s]) => s !== "placed" || c("placed"))
     .map(([s, l]) => `<div class="count"><b>${c(s)}</b><span>${l}</span></div>`).join("");
 }
 let ANIMALS = [];
@@ -146,13 +148,13 @@ async function renderAnimals() {
   const walls = $$("[data-wall]"), counts = $$("[data-counts]");
   if (!walls.length && !counts.length) return;
   try { ANIMALS = await getAnimals(); }
-  catch { walls.forEach(w => failed(w, "The proof wall")); return; }
+  catch { walls.forEach(w => failed(w, "Happy Tails")); return; }
   counts.forEach(c => c.innerHTML = countsHTML(ANIMALS));
   walls.forEach(w => {
     const limit = Number(w.dataset.wall) || Infinity;
     const draw = filter => {
       const list = ANIMALS.filter(a => filter === "all" || a.status === filter).slice(0, limit);
-      w.innerHTML = list.length ? list.map(petHTML).join("") : `<li class="empty">More animals are being added from tae's records.</li>`;
+      w.innerHTML = list.length ? list.map(petHTML).join("") : `<li class="empty">More animals are being added.</li>`;
       const live = $(w.dataset.live || "#none"); if (live) live.textContent = `Showing ${list.length} animals`;
     };
     draw("all");
@@ -199,8 +201,9 @@ async function renderRescues(el) {
     }
     el.innerHTML = list.map(p => {
       // dogs still looking come first, then the most recent adoptions
-      const dogs = animals.filter(a => a.partner?.slug === p.slug && (a.status === "looking" || a.status === "adopted"))
-        .sort((x, y) => (x.status === "looking" ? 0 : 1) - (y.status === "looking" ? 0 : 1)).slice(0, 6);
+      const order = { looking: 0, foster: 1, adopted: 2 };
+      const dogs = animals.filter(a => a.partner?.slug === p.slug && a.status in order)
+        .sort((x, y) => order[x.status] - order[y.status]).slice(0, 8);
       const adopt = safeUrl(p.adopt_url), donate = safeUrl(p.donate_url);
       return `<div class="rescue"><div class="top"><div class="logo" aria-hidden="true">${h(p.name.slice(0, 1))}</div><div><h3>${h(p.name)}</h3></div></div>
         <div class="bd">${p.mission ? `<p>${h(p.mission)}</p>` : ""}
@@ -210,20 +213,34 @@ async function renderRescues(el) {
             ${a.status === "looking" && a.checked_on ? `<small>Checked ${h(new Date(a.checked_on + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }))}</small>` : d !== null ? `<small>Home in ${d} days</small>` : ""}
             ${a.status === "looking" && live ? `<a href="${h(live)}" target="_blank" rel="noopener">Live listing ↗</a>` : ""}</div>`;
         }).join("")}</div>` : ""}
-        <div class="btns">${adopt ? `<a class="btn ocean" href="${h(adopt)}" target="_blank" rel="noopener">Adopt or foster from ${h(p.name)} <span class="ext" aria-hidden="true">↗</span></a>` : ""}${donate ? `<a class="btn ghost" href="${h(donate)}" target="_blank" rel="noopener">Donate on their page <span class="ext" aria-hidden="true">↗</span></a>` : ""}</div>
+        <div class="btns">${safeUrl(p.website_url) ? `<a class="btn ghost" href="${h(safeUrl(p.website_url))}" rel="noopener">Visit their site <span class="ext" aria-hidden="true">↗</span></a>` : ""}${adopt ? `<a class="btn ocean" href="${h(adopt)}" target="_blank" rel="noopener">Adopt or foster from ${h(p.name)} <span class="ext" aria-hidden="true">↗</span></a>` : ""}${donate ? `<a class="btn ghost" href="${h(donate)}" target="_blank" rel="noopener">Donate on their page <span class="ext" aria-hidden="true">↗</span></a>` : ""}</div>
         </div></div>`;
     }).join("");
   } catch { failed(el, "Rescues"); }
 }
 
-/* horses at a partner (Willow Woods page) */
+/* horses at a partner, grouped by herd (Willow Woods page) */
 async function renderHorses(el) {
   try {
     const horses = (await getAnimals()).filter(a => a.partner?.slug === el.dataset.horses && a.species === "horse");
-    el.innerHTML = horses.length
-      ? `<ul class="wall">${horses.map(petHTML).join("")}</ul>`
-      : `<p class="empty">Horse histories are being added.</p>`;
+    if (!horses.length) { el.innerHTML = `<p class="empty">The horses are being added.</p>`; return; }
+    const herds = [...new Set(horses.map(a => a.herd || ""))].sort((a, b) => (a === "") - (b === "") || a.localeCompare(b));
+    el.innerHTML = `<div class="herds">${herds.map(herd => `<div class="herd"><h3>${h(herd || "More horses")}</h3>
+      <ul class="wall" style="margin-top:12px">${horses.filter(a => (a.herd || "") === herd).sort((a, b) => (a.sort ?? 100) - (b.sort ?? 100)).map(petHTML).join("")}</ul></div>`).join("")}</div>`;
   } catch { failed(el, "The horses"); }
+}
+
+/* upcoming events for a partner (Willow Woods page) */
+const getEvents = () => once("events", () => q("events", "select=id,title,starts_on,time_text,place,link_url,partner:partners(slug)&order=starts_on.asc"));
+async function renderEvents(el) {
+  try {
+    const list = (await getEvents()).filter(e => !el.dataset.events || e.partner?.slug === el.dataset.events);
+    if (!list.length) { el.innerHTML = `<p class="empty">New events are shared here as they're announced.</p>`; return; }
+    el.innerHTML = `<ul class="events">${list.map(e => {
+      const d = asDate(e.starts_on), link = safeUrl(e.link_url);
+      return `<li><span class="when"><b>${d.toLocaleDateString("en-US", { month: "short" })}</b>${d.getDate()}</span><span class="what"><b>${link ? `<a href="${h(link)}" rel="noopener">${h(e.title)}</a>` : h(e.title)}</b><span>${h([d.toLocaleDateString("en-US", { weekday: "long" }), e.time_text, e.place].filter(Boolean).join(" · "))}</span></span></li>`;
+    }).join("")}</ul>`;
+  } catch { failed(el, "Events"); }
 }
 
 /* ---------- Sniffari programs ---------- */
@@ -236,6 +253,7 @@ async function renderSniffari(el) {
     el.innerHTML = list.length ? list.map(p => {
       const url = safeUrl(p.signup_url);
       return `<article class="sn"><h3>${h(p.shelter_name)}</h3>${p.program_name || p.city ? `<span class="prog">${h([p.program_name, p.city].filter(Boolean).join(" · "))}</span>` : ""}
+        ${p.address ? `<p class="small">${h(p.address)}</p>` : ""}
         ${(p.facts || []).length ? `<div class="facts">${p.facts.map(t => `<span>${h(t)}</span>`).join("")}</div>` : ""}
         ${p.checked_on ? `<p class="small">Details checked ${h(new Date(p.checked_on + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }))}</p>` : ""}
         ${url ? `<div class="btns"><a class="btn ocean" href="${h(url)}" target="_blank" rel="noopener">Sign up on their page <span class="ext" aria-hidden="true">↗</span></a></div>` : ""}</article>`;
@@ -245,6 +263,7 @@ async function renderSniffari(el) {
   draw("all");
   if (group) {
     if (!programs.length) group.hidden = true;
+    $$("button", group).forEach(b => { if (b.dataset.s !== "all" && !programs.some(p => (p.tags || []).includes(b.dataset.s))) b.hidden = true; });
     $$("button", group).forEach(b => b.addEventListener("click", () => { $$("button", group).forEach(x => x.setAttribute("aria-pressed", x === b)); draw(b.dataset.s); }));
   }
 }
@@ -272,13 +291,13 @@ $$("form[data-form]").forEach(form => form.addEventListener("submit", async e =>
     form.reset();
     msg.className = "formmsg ok";
     msg.innerHTML = topic === "help"
-      ? `Thanks, tae will see this. While you wait, the <a href="${S.base}help/">help page</a> has local resources sorted by need.`
-      : "Thanks! Your message reached tae. Replies can take a week or two.";
+      ? `Thanks, ${h(WHO)} will see this. While you wait, the <a href="${S.base}help/">help page</a> has local resources sorted by need.`
+      : `Thanks! Your message reached ${h(WHO)}. Replies can take a week or two.`;
   } catch (err) {
     msg.className = "formmsg err";
     msg.textContent = err.message === "slow" ? "That's a lot of messages from this email in the last hour. Please try again later."
       : err.message === "email" ? "That email address doesn't look right. Please check it."
-      : "Couldn't send right now. Please try again, or message tae on YouTube or TikTok.";
+      : `Couldn't send right now. Please try again, or message ${h(WHO)} on TikTok or Instagram.`;
   } finally { btn.disabled = false; }
 }));
 
@@ -375,5 +394,6 @@ renderStats();
 renderAnimals();
 $$("[data-rescues]").forEach(renderRescues);
 $$("[data-horses]").forEach(renderHorses);
+$$("[data-events]").forEach(renderEvents);
 $$("[data-sniffari]").forEach(renderSniffari);
 })();

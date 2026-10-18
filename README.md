@@ -19,8 +19,10 @@ Updating goals, animals, rescues and programs: see `docs/updating-content.md`.
 ## Rules the site is built around
 
 - Donations always go to the shelter's own page. The site never handles money.
-- No locations for rescues, wildlife or tae's home. The region (Hampton Roads) is fine; the city is not.
-- A rescue, shelter or Sniffari program appears only after it has said yes (`feature_ok` / `shelter_ok`).
+- No private addresses or locations: not her home, not wildlife rehab or release sites, nothing that could lead to a private residence or person. The region (Hampton Roads) is fine; her city is not. Public buildings (like a city shelter) can show their address.
+- A rescue or shelter appears once it has OK'd being featured (`feature_ok`). Animals are only filmed with their owner's or caretaker's consent, so an organization whose animals she has filmed counts as OK'd. A plain link to an organization's public website never needs permission.
+- Rescues on Sniffari lists publicly advertised day-out programs; no shelter OK is needed.
+- Her published name is a pen name, set once in `site/build.mjs` (`OWNER`).
 - Numbers are never invented. The adoption stat appears only once there are enough real records, and goals show "coming soon" until the shelter reports figures.
 
 ## Planning material
