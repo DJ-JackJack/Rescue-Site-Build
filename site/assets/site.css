@@ -352,8 +352,20 @@ footer .formmsg.err{color:#FFB4AB}
 .prose{max-width:66ch}
 .prose p{margin-top:12px;color:var(--ink2)}
 .prose h2{margin-top:28px}
-.pet .ph{position:relative;overflow:hidden}
-.pet .ph img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.pet .ph,.mini .ph,.jhead .ph,.card .ph,.book .cover{position:relative;overflow:hidden}
+.pet .ph img,.mini .ph img,.jhead .ph img,.card .ph img,.book .cover img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.goal .gpic{float:right;width:92px;height:92px;margin:0 0 10px 14px;border-radius:16px;overflow:hidden;background:var(--vivid)}
+.goal .gpic img{display:block;width:100%;height:100%;object-fit:cover}
+.photo{margin:0;border-radius:var(--r);overflow:hidden;box-shadow:var(--shadow);background:var(--soft)}
+.photo img{display:block;width:100%;height:auto}
+.photo figcaption{padding:10px 14px;font-size:.88rem;color:var(--ink2);background:#fff}
+.split{display:grid;gap:24px;align-items:center}
+@media (min-width:760px){.split{grid-template-columns:1.4fr 1fr}}
+.split .photo{max-width:420px;justify-self:center;width:100%}
+.gallery{list-style:none;margin:22px 0 0;padding:0;display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(min(100%,200px),1fr))}
+.gallery img{display:block;width:100%;height:auto;border-radius:16px;box-shadow:var(--shadow);background:var(--soft)}
+.gallery figcaption,.gallery li > span{display:block;margin-top:6px;font-size:.88rem;color:var(--ink2)}
+.pups{grid-template-columns:repeat(3,minmax(0,1fr));max-width:560px}
 .btn[aria-disabled="true"]{opacity:.8;cursor:default}
 .c-foster{background:#CDB2FD;color:#191333}
 .herd .wall{grid-template-columns:repeat(auto-fill,minmax(130px,1fr))}

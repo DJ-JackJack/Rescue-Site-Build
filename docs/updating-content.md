@@ -27,7 +27,7 @@ The homepage stat ("X of Y dogs I featured were home within 3 months") appears b
 
 ## Rescues and shelters
 
-In `partners`, an organization appears when both `feature_ok` and `published` are ticked. Filming an organization's animals (always done with consent) counts as OK to feature. Use the organization's proper full name. Add `website_url`, `adopt_url` and `donate_url` when you have them; `mission` only in their own words with their permission. Isle of Wight and Portsmouth Humane Society are in the table, hidden.
+In `partners`, an organization appears when both `feature_ok` and `published` are ticked. Filming an organization's animals (always done with consent) counts as OK to feature. Use the organization's proper full name. Add `website_url`, `adopt_url` and `donate_url` when you have them; `mission` only in their own words with their permission. Isle of Wight County Animal Services, Portsmouth Humane Society and Frankie's Friends Animal Rescue are in the table, hidden for now.
 
 ## Rescues on Sniffari
 
@@ -41,6 +41,22 @@ Add a row to `events` with the organization, `title`, `starts_on` (date), and op
 
 Every form on the site lands in `messages`, tagged by topic (`partner`, `help`, `dog`, `sniffari`, `other`). Tick `handled` once it's dealt with. Only signed-in admins can read this table; the public site can't.
 
-## Homepage wall photos
+## Photos
 
-Put a photo in `site/assets/photos/` (for example `willow-woods.jpg`, cropped to 4:5), then set that photo's `data-img` in `site/pages/index.html` to `assets/photos/willow-woods.jpg`. This one needs a push to `main`.
+Photos live in `site/assets/photos/` and go live with a push to `main`. Before adding one:
+
+- **Strip the hidden data.** Phone photos can carry GPS location. Run it through `convert in.jpg -auto-orient -strip -resize 1000x1000 -quality 80 out.jpg` (ImageMagick), or any tool that removes location data.
+- **Check the background.** No house, street, house number, license plate, mail or anything that points to a private home.
+- **Crop out phone screens.** Screenshots often have player buttons or menus over them; crop those off, or ask for the original.
+- Size: about 640×640 for animal cards, 480×600 (4:5) for the homepage wall, up to 1000 px for page photos.
+
+Where they show up:
+
+- **An animal's photo:** set `photo_url` on the row in `animals` to the path, for example `assets/photos/dog-zazu.jpg`. It shows on Happy Tails, the rescue cards and the journey popup. A full `https://` link to a photo elsewhere works too.
+- **A goal's photo:** set `photo_url` on the row in `goals` the same way.
+- **Homepage wall:** set the photo's `data-img` in `site/pages/index.html`, for example `assets/photos/wall-willow-woods.jpg`, cropped to 4:5.
+- **Other pages** (the book, Meet the Flock, the Spice litter, Sniffari) have their photos written into the page files in `site/pages/`.
+
+If a photo can't load, the emoji placeholder shows instead.
+
+The original files from the shared Drive folder are kept in `responses/drive-photos/` (private, never committed).

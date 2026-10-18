@@ -74,7 +74,7 @@ for (const file of fs.readdirSync(pagesDir).filter(f => f.endsWith(".html")).sor
     .replace("{{title}}", esc(meta.title === "Home" ? "TheTerr0rTw!ns · Rescue, education and dog day outs" : `${meta.title} · TheTerr0rTw!ns`))
     .replace("{{description}}", esc(meta.description || ""))
     .replace("{{robots}}", PREVIEW ? '<meta name="robots" content="noindex, nofollow">' : "")
-    .replace("{{preview}}", PREVIEW ? '<div class="preview" role="note"><b>PREVIEW</b> · This site isn\'t launched yet. Photos are on their way.</div>' : "")
+    .replace("{{preview}}", PREVIEW ? '<div class="preview" role="note"><b>PREVIEW</b> · This site isn\'t launched yet.</div>' : "")
     .replace("{{config}}", `<script>window.SITE=${JSON.stringify(CONFIG)};</script>`)
     .replace("{{bodyclass}}", esc(meta.bodyclass || ""))
     .replace("{{content}}", () => body);

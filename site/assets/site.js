@@ -10,6 +10,10 @@ const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
 const h = v => String(v ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const safeUrl = u => { try { const x = new URL(u); return /^https?:$/.test(x.protocol) ? x.href : ""; } catch { return ""; } };
+// Photos can be full links or paths inside the site, like "assets/photos/dog-zazu.jpg".
+const photoUrl = u => { try { return u ? safeUrl(new URL(u, new URL(S.base || "/", location.href)).href) : ""; } catch { return ""; } };
+// A photo that fails to load removes itself, so the emoji underneath shows instead.
+const photoTag = (u, cls = "") => { const p = photoUrl(u); return p ? `<img${cls ? ` class="${cls}"` : ""} src="${h(p)}" alt="" loading="lazy" onerror="this.remove()">` : ""; };
 const DAY = 864e5;
 const today = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; };
 const asDate = s => (s ? new Date(s + (s.length === 10 ? "T00:00:00" : "")) : null);
@@ -33,10 +37,10 @@ async function q(table, params) {
 }
 const cache = {};
 const once = (key, fn) => (cache[key] ??= fn());
-const getGoals = () => once("goals", () => q("goals", "select=id,title,why,price_note,donate_url,status,featured,figures_updated_at,met_on,sort,partner:partners(name,slug),bars:goal_bars(label,target,current,sort)&order=sort.asc"));
+const getGoals = () => once("goals", () => q("goals", "select=id,title,why,price_note,donate_url,photo_url,status,featured,figures_updated_at,met_on,sort,partner:partners(name,slug),bars:goal_bars(label,target,current,sort)&order=sort.asc"));
 const getAnimals = () => once("animals", () => q("animals", "select=id,name,species,status,herd,sort,featured_on,adopted_on,transport,note,listing_url,checked_on,photo_url,journey,created_at,partner:partners(name,slug)&order=featured_on.desc.nullslast,created_at.desc"));
 const getPartners = () => once("partners", () => q("partners", "select=id,slug,name,kind,mission,website_url,adopt_url,donate_url,sort&order=sort.asc"));
-const getSniffari = () => once("sniffari", () => q("sniffari_programs", "select=id,shelter_name,program_name,city,signup_url,facts,tags,checked_on,sort&order=sort.asc"));
+const getSniffari = () => once("sniffari", () => q("sniffari_programs", "select=id,shelter_name,program_name,city,address,signup_url,facts,tags,checked_on,sort&order=sort.asc"));
 
 function failed(el, what) {
   el.innerHTML = `<p class="empty">${h(what)} couldn't load right now. Please try again in a little while.</p>`;
@@ -65,7 +69,9 @@ function goalHTML(g, { heading = "h3", showAllLink = false } = {}) {
   const give = g.status === "met" ? "" : donate
     ? `<a class="btn light" href="${h(donate)}" target="_blank" rel="noopener">Give on ${h(partner)}'s page <span class="ext" aria-hidden="true">↗</span></a>`
     : '<p class="note" style="margin-top:0">Donation link coming soon.</p>';
+  const pic = photoTag(g.photo_url);
   return `<div class="goal feature">
+    ${pic ? `<span class="gpic" aria-hidden="true">${pic}</span>` : ""}
     <p class="who">${showAllLink ? "Shelter goal · " : ""}${h(partner)}</p>
     <${heading}>${h(g.title)}</${heading}>
     ${g.why ? `<p class="why">${h(g.why)}</p>` : ""}
@@ -133,8 +139,7 @@ function petHTML(a, i) {
   const [cls, label] = STATUS[a.status] || STATUS.placed;
   const d = daysToHome(a);
   const sub = a.note || (d !== null ? `Home in ${d} days` : a.status === "looking" ? "Still looking" : "");
-  const photo = safeUrl(a.photo_url);
-  const pic = photo ? `<img src="${h(photo)}" alt="" loading="lazy">` : EMOJI[a.species] || "🐾";
+  const pic = (EMOJI[a.species] || "🐾") + photoTag(a.photo_url);
   return `<li><button class="pet" type="button" data-id="${h(a.id)}"><span class="ph ${BG[i % 6]}" aria-hidden="true">${pic}</span><span class="bd"><b>${h(a.name)}</b><span class="chip ${cls}">${label}</span>${sub ? `<small>${h(sub)}</small>` : ""}</span></button></li>`;
 }
 function countsHTML(animals) {
@@ -172,7 +177,7 @@ document.addEventListener("click", e => {
   $("#jname").textContent = a.name;
   const [cls, label] = STATUS[a.status] || STATUS.placed;
   const chip = $("#jchip"); chip.className = "chip " + cls; chip.textContent = label;
-  const pic = $("#jpic"); pic.className = "ph " + BG[0]; pic.textContent = EMOJI[a.species] || "🐾";
+  const pic = $("#jpic"); pic.className = "ph " + BG[0]; pic.innerHTML = (EMOJI[a.species] || "🐾") + photoTag(a.photo_url);
   let steps = Array.isArray(a.journey) ? a.journey.filter(s => s && s.label) : [];
   if (!steps.length) {
     if (a.featured_on) steps.push({ label: "Featured", detail: `Video posted ${monthYear(a.featured_on)}` });
@@ -209,7 +214,7 @@ async function renderRescues(el) {
         <div class="bd">${p.mission ? `<p>${h(p.mission)}</p>` : ""}
         ${dogs.length ? `<div class="minis">${dogs.map((a, i) => {
           const live = safeUrl(a.listing_url), d = daysToHome(a);
-          return `<div class="mini"><div class="ph ${BG[i % 6]}" aria-hidden="true">${EMOJI[a.species] || "🐾"}</div><b>${h(a.name)}</b><span class="chip ${STATUS[a.status][0]}"${a.status === "looking" ? ' style="background:var(--wash)"' : ""}>${STATUS[a.status][1]}</span>
+          return `<div class="mini"><div class="ph ${BG[i % 6]}" aria-hidden="true">${EMOJI[a.species] || "🐾"}${photoTag(a.photo_url)}</div><b>${h(a.name)}</b><span class="chip ${STATUS[a.status][0]}"${a.status === "looking" ? ' style="background:var(--wash)"' : ""}>${STATUS[a.status][1]}</span>
             ${a.status === "looking" && a.checked_on ? `<small>Checked ${h(new Date(a.checked_on + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }))}</small>` : d !== null ? `<small>Home in ${d} days</small>` : ""}
             ${a.status === "looking" && live ? `<a href="${h(live)}" target="_blank" rel="noopener">Live listing ↗</a>` : ""}</div>`;
         }).join("")}</div>` : ""}
