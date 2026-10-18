@@ -393,7 +393,46 @@ if (hw) {
   layout();
 }
 
+/* ---------- wording changed on the edit page ----------
+   [data-text="key"] shows the page's built-in words until the edit page saves new ones in site_text.
+   Saved text is plain: a blank line starts a new paragraph, and a line starting with "## " is a heading. */
+const textHTML = (s, inline) => inline
+  ? h(s.trim()).replace(/\n+/g, "<br>")
+  : s.trim().split(/\n\s*\n/).map(b => b.startsWith("## ") ? `<h2 class="h2">${h(b.slice(3).trim())}</h2>` : `<p>${h(b.trim()).replace(/\n/g, "<br>")}</p>`).join("");
+async function renderText() {
+  const els = $$("[data-text]");
+  if (!els.length) return;
+  const show = () => els.forEach(el => el.classList.add("txt-ready"));
+  const slow = setTimeout(show, 1200); // never hide the built-in words for long
+  try {
+    const rows = await q("site_text", "select=key,body");
+    const by = Object.fromEntries(rows.map(r => [r.key, r.body]));
+    els.forEach(el => { const b = by[el.dataset.text]; if (b && b.trim()) el.innerHTML = textHTML(b, el.tagName === "P"); });
+  } catch {}
+  clearTimeout(slow); show();
+}
+
+/* ---------- local help, listed under each need on the help page ---------- */
+async function renderHelp() {
+  const boxes = $$("[data-help]");
+  if (!boxes.length) return;
+  let rows = [];
+  try { rows = await q("help_resources", "select=category,name,description,link_url,phone,area&order=sort.asc,name.asc"); } catch { return; }
+  boxes.forEach(box => {
+    const list = rows.filter(r => r.category === box.dataset.help);
+    if (!list.length) return;
+    box.innerHTML = `<ul class="res">${list.map(r => {
+      const link = safeUrl(r.link_url), tel = String(r.phone || "").replace(/[^\d+]/g, "");
+      return `<li>${link ? `<a href="${h(link)}" target="_blank" rel="noopener">${h(r.name)} <span class="ext" aria-hidden="true">↗</span></a>` : `<b>${h(r.name)}</b>`}
+        ${r.description ? `<span>${h(r.description)}</span>` : ""}
+        ${r.area || r.phone ? `<small>${[r.area ? h(r.area) : "", r.phone ? `<a href="tel:${h(tel)}">${h(r.phone)}</a>` : ""].filter(Boolean).join(" · ")}</small>` : ""}</li>`;
+    }).join("")}</ul>`;
+  });
+}
+
 /* ---------- start ---------- */
+renderText();
+renderHelp();
 $$("[data-goals]").forEach(renderGoals);
 renderStats();
 renderAnimals();

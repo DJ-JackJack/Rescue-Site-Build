@@ -388,3 +388,13 @@ footer .formmsg.err{color:#FFB4AB}
 .anniv .eyebrow{color:var(--cyan)}
 .anniv h2{font-size:1.6rem}
 .anniv p{color:#E6DCFF;margin-top:8px}
+/* wording from the edit page: hidden for a moment so the old words don't flash.
+   The animation shows it after 1.5s even if the script never runs. */
+@keyframes txtshow{to{visibility:visible}}
+.js [data-text]:not(.txt-ready){visibility:hidden;animation:txtshow 0s 1.5s forwards}
+.res{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column;gap:12px}
+.res li{display:flex;flex-direction:column;gap:2px;border-top:1px solid var(--wash);padding-top:10px}
+.res li:first-child{border-top:0;padding-top:0}
+.res span{color:var(--ink2);font-size:.92rem}
+.res small{color:var(--ink2);font-size:.84rem}
+.res small a{font-weight:700}

@@ -8,6 +8,9 @@
 // {{asset:name}} becomes a cache-busted link to site/assets/name, and {{owner}} / {{owner_first}}
 // become her published name (see OWNER below).
 //
+// site/edit.html is the private edit page, written to /edit/. It gets the same {{base}}/{{asset:}} filling,
+// plus {{config}}: the public settings and the built-in wording of every data-text block.
+//
 // Settings (environment variables):
 //   SITE_BASE      root path the site is served from. "/Rescue-Site-Build/" on GitHub Pages
 //                  today, "/" once a custom domain is set. Default "/".
@@ -61,6 +64,21 @@ function fill(html) {
     .replace(/\{\{owner_first\}\}/g, OWNER.first);
 }
 
+// Wording marked data-text="key" data-label="..." can be changed from the edit page. The page's own words
+// are the default, handed to the edit page as plain text ("## " starts a heading, a blank line a paragraph).
+const decode = s => s.replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim();
+const textDefaults = [];
+function collectText(html, page) {
+  for (const m of html.matchAll(/<(p|div)\b[^>]*\bdata-text="([^"]+)"[^>]*\bdata-label="([^"]+)"[^>]*>([\s\S]*?)<\/\1>/g)) {
+    const [, tag, key, label, inner] = m;
+    if (tag === "div" && /<div\b/.test(inner)) throw new Error(`${page}: data-text block "${key}" can't contain another <div>`);
+    if (textDefaults.some(t => t.key === key)) throw new Error(`${page}: data-text key "${key}" is used twice`);
+    const text = tag === "p" ? decode(inner)
+      : [...inner.matchAll(/<(h2|p)\b[^>]*>([\s\S]*?)<\/\1>/g)].map(([, t, s]) => (t === "h2" ? "## " : "") + decode(s)).join("\n\n");
+    textDefaults.push({ key, label: decode(label), page, block: tag === "div", text });
+  }
+}
+
 const layout = fs.readFileSync(path.join(SRC, "layout.html"), "utf8");
 const pagesDir = path.join(SRC, "pages");
 const built = [];
@@ -82,16 +100,29 @@ for (const file of fs.readdirSync(pagesDir).filter(f => f.endsWith(".html")).sor
   html = fill(html);
   const left = html.match(/\{\{[^}]*\}\}/);
   if (left) throw new Error(`${file}: unfilled placeholder ${left[0]}`);
+  collectText(html, "/" + (meta.path === "404" ? "404.html" : meta.path || ""));
   const outFile = meta.path === "404" ? path.join(OUT, "404.html") : path.join(OUT, meta.path || "", "index.html");
   fs.mkdirSync(path.dirname(outFile), { recursive: true });
   fs.writeFileSync(outFile, html);
   built.push("/" + (meta.path === "404" ? "404.html" : meta.path || ""));
 }
 
+// the edit page (/edit/): its own page, not linked from the site, never indexed
+{
+  textDefaults.sort((a, b) => (b.page === "/") - (a.page === "/")); // homepage first, then page order
+  const cfg = JSON.stringify({ ...CONFIG, textDefaults }).replace(/</g, "\\u003c");
+  let html = fill(fs.readFileSync(path.join(SRC, "edit.html"), "utf8")).replace("{{config}}", () => cfg);
+  const left = html.match(/\{\{[^}]*\}\}/);
+  if (left) throw new Error(`edit.html: unfilled placeholder ${left[0]}`);
+  fs.mkdirSync(path.join(OUT, "edit"), { recursive: true });
+  fs.writeFileSync(path.join(OUT, "edit", "index.html"), html);
+  built.push("/edit/ (private)");
+}
+
 // the planning questionnaire keeps working at /questionnaire/
 fs.cpSync(path.join(ROOT, "questionnaire"), path.join(OUT, "questionnaire"), { recursive: true });
 fs.writeFileSync(path.join(OUT, ".nojekyll"), "");
-if (!PREVIEW) fs.writeFileSync(path.join(OUT, "robots.txt"), "User-agent: *\nAllow: /\nDisallow: /questionnaire/\n");
+if (!PREVIEW) fs.writeFileSync(path.join(OUT, "robots.txt"), "User-agent: *\nAllow: /\nDisallow: /questionnaire/\nDisallow: /edit/\n");
 else fs.writeFileSync(path.join(OUT, "robots.txt"), "User-agent: *\nDisallow: /\n");
 
 console.log(`built ${built.length} pages into _site/ (base ${BASE}${PREVIEW ? ", preview" : ", launched"})`);
