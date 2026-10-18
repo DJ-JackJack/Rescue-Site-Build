@@ -91,7 +91,7 @@ function social(meta) {
   const img = hashes[`share/${name}.jpg`] ? `share/${name}.jpg` : "share/default.jpg";
   const title = meta.title === "Home" ? "TheTerr0rTw!ns" : `${meta.title} · TheTerr0rTw!ns`;
   return [
-    `<link rel="canonical" href="${esc(url)}">`,
+    meta.path === "404" ? "" : `<link rel="canonical" href="${esc(url)}">`,
     `<meta property="og:site_name" content="TheTerr0rTw!ns">`,
     `<meta property="og:type" content="website">`,
     `<meta property="og:title" content="${esc(title)}">`,
@@ -101,7 +101,7 @@ function social(meta) {
     `<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">`,
     `<meta property="og:image:alt" content="Snapshots of animals from TheTerr0rTw!ns">`,
     `<meta name="twitter:card" content="summary_large_image">`,
-  ].join("\n");
+  ].filter(Boolean).join("\n");
 }
 
 const layout = fs.readFileSync(path.join(SRC, "layout.html"), "utf8");
@@ -146,7 +146,7 @@ for (const file of fs.readdirSync(pagesDir).filter(f => f.endsWith(".html")).sor
   fs.writeFileSync(path.join(OUT, "edit", "manifest.webmanifest"), JSON.stringify({
     name: "TheTerr0rTw!ns site editor", short_name: "Site editor", start_url: "./", scope: "./", display: "standalone",
     background_color: "#FBF8FF", theme_color: "#352262",
-    icons: [192, 512].map(s => ({ src: `${BASE}assets/icon-${s}.png?v=${hashes[`icon-${s}.png`]}`, sizes: `${s}x${s}`, type: "image/png", purpose: "any maskable" })),
+    icons: [192, 512].map(s => ({ src: `${BASE}assets/icon-${s}.png?v=${hashes[`icon-${s}.png`]}`, sizes: `${s}x${s}`, type: "image/png", purpose: "any" })),
   }, null, 2));
   built.push("/edit/ (private)");
 }
@@ -156,7 +156,7 @@ fs.cpSync(path.join(ROOT, "questionnaire"), path.join(OUT, "questionnaire"), { r
 fs.writeFileSync(path.join(OUT, ".nojekyll"), "");
 fs.cpSync(path.join(SRC, "root"), OUT, { recursive: true }); // favicon.ico for the domain root
 fs.writeFileSync(path.join(OUT, "sitemap.xml"), `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${pageUrls.map(u => `  <url><loc>${esc(u)}</loc></url>`).join("\n")}\n</urlset>\n`);
-if (!PREVIEW) fs.writeFileSync(path.join(OUT, "robots.txt"), `User-agent: *\nAllow: /\nDisallow: /questionnaire/\nDisallow: /edit/\nSitemap: ${SITE_URL}sitemap.xml\n`);
+if (!PREVIEW) fs.writeFileSync(path.join(OUT, "robots.txt"), `User-agent: *\nAllow: /\nDisallow: ${BASE}questionnaire/\nDisallow: ${BASE}edit/\nSitemap: ${SITE_URL}sitemap.xml\n`);
 else fs.writeFileSync(path.join(OUT, "robots.txt"), "User-agent: *\nDisallow: /\n");
 
 console.log(`built ${built.length} pages into _site/ (base ${BASE}${PREVIEW ? ", preview" : ", launched"})`);

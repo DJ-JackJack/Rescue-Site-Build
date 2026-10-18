@@ -15,11 +15,12 @@
 {{config}}
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:ital,wght@0,400;0,600;0,700;0,800;1,400&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@600;700&family=Nunito:ital,wght@0,400;0,600;0,700;0,800;1,400&display=swap">
 <link rel="stylesheet" href="{{asset:site.css}}">
 <script src="{{asset:site.js}}" defer></script>
 </head>
 <body class="{{bodyclass}}">
+<noscript><p class="nojs-note">The animal lists, shelter goals and forms on this site need JavaScript turned on.</p></noscript>
 <a class="skip" href="#main">Skip to content</a>
 {{preview}}
 
@@ -71,10 +72,9 @@
         <li><a href="https://www.tiktok.com/@terrortwins89" rel="noopener">TikTok @terrortwins89</a></li>
         <li><a href="https://www.instagram.com/liladydrkwolf12/" rel="noopener">Instagram @liladydrkwolf12</a></li>
         <li><a href="https://www.youtube.com/@terrortwyns" rel="noopener">YouTube TerrorTwyns</a></li>
-      </ul>
-      <p class="fnote">Patreon and the Facebook help pages get linked here once their links are confirmed.</p></div>
+      </ul></div>
       <div><h2>Say hello</h2>
-        <form class="form" data-form="footer">
+        <form class="form" method="post" data-form="footer">
           <label>What's this about?<select name="topic" required>
             <option value="" selected disabled>Pick a topic</option>
             <option value="partner">A shelter partnership</option>
@@ -86,13 +86,13 @@
           <label>Your name<input name="name" autocomplete="name" maxlength="200"></label>
           <label>Your email<input name="email" type="email" autocomplete="email" required maxlength="200"></label>
           <label>Your message<textarea name="body" rows="3" maxlength="5000"></textarea></label>
-          <label class="sr">Leave this empty<input name="website" tabindex="-1" autocomplete="off"></label>
+          <label class="sr" aria-hidden="true">Leave this empty<input name="website" tabindex="-1" autocomplete="off"></label>
           <button class="btn light" type="submit">Send</button>
           <p class="formmsg" role="status" aria-live="polite"></p>
         </form>
       </div>
     </div>
-    <p class="fine">Every donation goes directly to the shelter named on it. This site never handles money. Animal and rescue locations are kept private to keep them safe.</p>
+    <p class="fine">Every donation goes directly to the shelter named on it. This site never handles money. Rehab sites, release spots and private homes are never shown, to keep animals and people safe.</p>
   </div>
 </footer>
 

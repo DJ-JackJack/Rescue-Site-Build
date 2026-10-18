@@ -32,12 +32,12 @@
   <div class="wrap">
     <div class="formcard">
       <h2 class="h2" style="font-size:1.5rem">Ask for help</h2>
-      <form class="form" data-form="footer" style="margin-top:14px">
+      <form class="form" method="post" data-form="footer" style="margin-top:14px">
         <input type="hidden" name="topic" value="help">
         <label>Your first name<input name="name" autocomplete="given-name" maxlength="200"></label>
         <label>Your email<input name="email" type="email" autocomplete="email" required maxlength="200"></label>
         <label>What's going on?<textarea name="body" rows="4" maxlength="5000" required></textarea></label>
-        <label class="sr">Leave this empty<input name="website" tabindex="-1" autocomplete="off"></label>
+        <label class="sr" aria-hidden="true">Leave this empty<input name="website" tabindex="-1" autocomplete="off"></label>
         <button class="btn royal" type="submit">Send</button>
         <p class="formmsg" role="status" aria-live="polite"></p>
       </form>

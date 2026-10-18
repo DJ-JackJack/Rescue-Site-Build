@@ -39,7 +39,7 @@
       </div>
       <div data-when="waiting">
         <div class="tiles">
-          <div class="tile"><b>3 months</b><span>most of the dogs I feature are home within three months of their video</span></div>
+          <div class="tile"><b>Most</b><span>of the dogs I feature are home within three months of their video</span></div>
           <div class="tile"><b>91.8%</b><span>watched my Relay Pupdate to the end</span></div>
         </div>
         <p class="how">Every animal I've helped is going up on <a href="{{base}}animals/" style="color:#fff">Animals We've Helped</a>, and the exact numbers will come from there.</p>
@@ -99,7 +99,7 @@
     <div class="formcard">
       <h2 class="h2" style="font-size:1.6rem">Start a conversation</h2>
       <p class="lede" style="margin-bottom:16px">I read every message. My field days are limited, so a reply can take a week or two.</p>
-      <form class="form" data-form="partner">
+      <form class="form" method="post" data-form="partner">
         <label>Shelter or rescue name<input name="shelter" autocomplete="organization" required maxlength="200"></label>
         <label>Your name and role<input name="name" autocomplete="name" maxlength="200"></label>
         <fieldset><legend>What would help most?</legend>
@@ -112,7 +112,7 @@
         </fieldset>
         <label>Your email<input name="email" type="email" autocomplete="email" required maxlength="200"></label>
         <label>Anything else<textarea name="body" rows="3" maxlength="5000"></textarea></label>
-        <label class="sr">Leave this empty<input name="website" tabindex="-1" autocomplete="off"></label>
+        <label class="sr" aria-hidden="true">Leave this empty<input name="website" tabindex="-1" autocomplete="off"></label>
         <button class="btn royal" type="submit">Send</button>
         <p class="formmsg" role="status" aria-live="polite"></p>
       </form>

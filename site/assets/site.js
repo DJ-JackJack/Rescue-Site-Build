@@ -24,9 +24,13 @@ const monthYear = s => asDate(s)?.toLocaleDateString("en-US", { month: "short", 
 const menu = $("#menu"), menubtn = $(".menubtn");
 if (menu && menubtn) {
   menubtn.addEventListener("click", () => { const o = menu.classList.toggle("open"); menubtn.setAttribute("aria-expanded", o); });
+  const close = () => { menu.classList.remove("open"); menubtn.setAttribute("aria-expanded", "false"); };
   document.addEventListener("keydown", e => {
-    if (e.key === "Escape" && menu.classList.contains("open")) { menu.classList.remove("open"); menubtn.setAttribute("aria-expanded", "false"); menubtn.focus(); }
+    if (e.key === "Escape" && menu.classList.contains("open")) { close(); menubtn.focus(); }
   });
+  // close it when a click or keyboard focus moves somewhere else on the page
+  document.addEventListener("click", e => { if (menu.classList.contains("open") && !menu.contains(e.target) && !menubtn.contains(e.target)) close(); });
+  menu.addEventListener("focusout", e => { if (e.relatedTarget && !menu.contains(e.relatedTarget) && e.relatedTarget !== menubtn) close(); });
 }
 
 /* ---------- Supabase reads ---------- */
@@ -113,7 +117,7 @@ function stats(animals) {
   const cutoff = today() - 90 * DAY;
   const counted = dogs.filter(a => asDate(a.featured_on) <= cutoff);
   const fast = counted.filter(a => { const d = daysToHome(a); return d !== null && d <= 90; });
-  const days = dogs.map(daysToHome).filter(d => d !== null).sort((a, b) => a - b);
+  const days = counted.map(daysToHome).filter(d => d !== null).sort((a, b) => a - b); // same dogs as the ratio
   return { counted: counted.length, fast: fast.length, dogs: dogs.length, median: days.length ? days[Math.floor(days.length / 2)] : null };
 }
 const MIN_FOR_STAT = 5; // below this, show her own words, not a number
@@ -138,9 +142,9 @@ async function renderStats() {
 function petHTML(a, i) {
   const [cls, label] = STATUS[a.status] || STATUS.placed;
   const d = daysToHome(a);
-  const sub = a.note || (d !== null ? `Home in ${d} days` : a.status === "looking" ? "Still looking" : "");
+  const sub = a.note || (d !== null ? `Home in ${d} days` : "");
   const pic = (EMOJI[a.species] || "🐾") + photoTag(a.photo_url);
-  return `<li><button class="pet" type="button" data-id="${h(a.id)}"><span class="ph ${BG[i % 6]}" aria-hidden="true">${pic}</span><span class="bd"><b>${h(a.name)}</b><span class="chip ${cls}">${label}</span>${sub ? `<small>${h(sub)}</small>` : ""}</span></button></li>`;
+  return `<li><button class="pet" type="button" aria-haspopup="dialog" data-id="${h(a.id)}"><span class="ph ${BG[i % 6]}" aria-hidden="true">${pic}</span><span class="bd"><b>${h(a.name)}</b><span class="chip ${cls}">${label}</span>${sub ? `<small>${h(sub)}</small>` : ""}</span></button></li>`;
 }
 function countsHTML(animals) {
   const c = s => animals.filter(a => a.status === s).length;
@@ -160,10 +164,11 @@ async function renderAnimals() {
     const draw = filter => {
       const list = ANIMALS.filter(a => filter === "all" || a.status === filter).slice(0, limit);
       w.innerHTML = list.length ? list.map(petHTML).join("") : `<li class="empty">More animals are being added.</li>`;
-      const live = $(w.dataset.live || "#none"); if (live) live.textContent = `Showing ${list.length} animals`;
+      const live = $(w.dataset.live || "#none"); if (live) live.textContent = `Showing ${list.length} ${list.length === 1 ? "animal" : "animals"}`;
     };
     draw("all");
     const group = $(w.dataset.filters || "#none");
+    if (group) $$("button[data-f]", group).forEach(b => { if (b.dataset.f !== "all") b.hidden = !ANIMALS.some(a => a.status === b.dataset.f); });
     if (group) $$("button", group).forEach(b => b.addEventListener("click", () => {
       $$("button", group).forEach(x => x.setAttribute("aria-pressed", x === b));
       draw(b.dataset.f);
@@ -183,7 +188,10 @@ document.addEventListener("click", e => {
     if (a.featured_on) steps.push({ label: "Featured", detail: `Video posted ${monthYear(a.featured_on)}` });
     const d = daysToHome(a);
     if (d !== null) steps.push({ label: "Adopted", detail: `Home ${d} days after the video` });
-    else if (a.status !== "adopted") steps.push({ label, detail: a.note || "" });
+    else {
+      const who = a.partner?.name, via = { looking: "With", foster: "With", sanctuary: "At" }[a.status] || "Through";
+      steps.push({ label, detail: [a.note, who ? `${via} ${who}` : ""].filter(Boolean).join(" · ") });
+    }
   }
   $("#jsteps").innerHTML = steps.length
     ? steps.map(s => `<li><b>${h(s.label)}</b><span>${h([s.detail, s.date ? monthYear(s.date) : ""].filter(Boolean).join(" · "))}</span></li>`).join("")
@@ -196,10 +204,11 @@ if (dlg) {
 }
 
 /* ---------- rescues and their featured dogs ---------- */
+const OWN_PAGE = { "willow-woods": "willow-woods/" }; // partners with their own page on this site
 async function renderRescues(el) {
   try {
     const [partners, animals] = await Promise.all([getPartners(), getAnimals()]);
-    const list = partners.filter(p => p.kind !== "sanctuary");
+    const list = partners;
     if (!list.length) {
       el.innerHTML = `<p class="empty">More rescues are on the way. Each one appears here once they've said yes to being featured.</p>`;
       return;
@@ -218,7 +227,7 @@ async function renderRescues(el) {
             ${a.status === "looking" && a.checked_on ? `<small>Checked ${h(new Date(a.checked_on + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }))}</small>` : d !== null ? `<small>Home in ${d} days</small>` : ""}
             ${a.status === "looking" && live ? `<a href="${h(live)}" target="_blank" rel="noopener">Live listing ↗</a>` : ""}</div>`;
         }).join("")}</div>` : ""}
-        <div class="btns">${safeUrl(p.website_url) ? `<a class="btn ghost" href="${h(safeUrl(p.website_url))}" rel="noopener">Visit their site <span class="ext" aria-hidden="true">↗</span></a>` : ""}${adopt ? `<a class="btn ocean" href="${h(adopt)}" target="_blank" rel="noopener">Adopt or foster from ${h(p.name)} <span class="ext" aria-hidden="true">↗</span></a>` : ""}${donate ? `<a class="btn ghost" href="${h(donate)}" target="_blank" rel="noopener">Donate on their page <span class="ext" aria-hidden="true">↗</span></a>` : ""}</div>
+        <div class="btns">${OWN_PAGE[p.slug] ? `<a class="btn royal" href="${S.base}${OWN_PAGE[p.slug]}">Meet the horses</a>` : ""}${safeUrl(p.website_url) ? `<a class="btn ghost" href="${h(safeUrl(p.website_url))}" rel="noopener">Visit their site <span class="ext" aria-hidden="true">↗</span></a>` : ""}${adopt ? `<a class="btn ocean" href="${h(adopt)}" target="_blank" rel="noopener">Adopt or foster from ${h(p.name)} <span class="ext" aria-hidden="true">↗</span></a>` : ""}${donate ? `<a class="btn ghost" href="${h(donate)}" target="_blank" rel="noopener">Donate on their page <span class="ext" aria-hidden="true">↗</span></a>` : ""}</div>
         </div></div>`;
     }).join("");
   } catch { failed(el, "Rescues"); }
@@ -263,7 +272,7 @@ async function renderSniffari(el) {
         ${p.checked_on ? `<p class="small">Details checked ${h(new Date(p.checked_on + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }))}</p>` : ""}
         ${url ? `<div class="btns"><a class="btn ocean" href="${h(url)}" target="_blank" rel="noopener">Sign up on their page <span class="ext" aria-hidden="true">↗</span></a></div>` : ""}</article>`;
     }).join("") : `<p class="empty">${programs.length ? "No programs match that yet." : "The first programs are being confirmed with the shelters. Run one? Use the form below."}</p>`;
-    if (live) live.textContent = `Showing ${list.length} programs`;
+    if (live) live.textContent = `Showing ${list.length} ${list.length === 1 ? "program" : "programs"}`;
   };
   draw("all");
   if (group) {
@@ -279,7 +288,7 @@ $$("form[data-form]").forEach(form => form.addEventListener("submit", async e =>
   e.preventDefault();
   const msg = $(".formmsg", form), btn = $("button[type=submit]", form);
   const fd = new FormData(form);
-  if (fd.get("website")) { form.reset(); msg.className = "formmsg ok"; msg.textContent = "Thanks! Your message is on its way."; return; } // bot trap
+  if (fd.get("website")) { form.reset(); msg.className = "formmsg is-ok"; msg.textContent = "Thanks! Your message is on its way."; return; } // bot trap
   const topic = TOPIC[form.dataset.form] || fd.get("topic") || "other";
   const details = {};
   for (const [k, v] of fd.entries()) if (!["topic", "name", "email", "body", "website"].includes(k) && v) details[k] = details[k] ? [].concat(details[k], v) : v;
@@ -294,12 +303,12 @@ $$("form[data-form]").forEach(form => form.addEventListener("submit", async e =>
       throw new Error(/slow down/.test(t) ? "slow" : /bad email/.test(t) ? "email" : "fail");
     }
     form.reset();
-    msg.className = "formmsg ok";
+    msg.className = "formmsg is-ok";
     msg.innerHTML = topic === "help"
-      ? `Thanks, ${h(WHO)} will see this. While you wait, the <a href="${S.base}help/">help page</a> has local resources sorted by need.`
+      ? `Thanks, ${h(WHO)} will see this. Replies can take a little while.`
       : `Thanks! Your message reached ${h(WHO)}. Replies can take a week or two.`;
   } catch (err) {
-    msg.className = "formmsg err";
+    msg.className = "formmsg is-err";
     msg.textContent = err.message === "slow" ? "That's a lot of messages from this email in the last hour. Please try again later."
       : err.message === "email" ? "That email address doesn't look right. Please check it."
       : `Couldn't send right now. Please try again, or message ${h(WHO)} on TikTok or Instagram.`;
@@ -403,7 +412,7 @@ async function renderText() {
   const els = $$("[data-text]");
   if (!els.length) return;
   const show = () => els.forEach(el => el.classList.add("txt-ready"));
-  const slow = setTimeout(show, 1200); // never hide the built-in words for long
+  const slow = setTimeout(show, 900); // never hide the built-in words for long
   try {
     const rows = await q("site_text", "select=key,body");
     const by = Object.fromEntries(rows.map(r => [r.key, r.body]));
