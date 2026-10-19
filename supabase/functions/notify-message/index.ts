@@ -14,6 +14,7 @@ const json = (s?: string) => { try { return JSON.parse(s || "{}"); } catch { ret
 const SECRET: string = json(Deno.env.get("SUPABASE_SECRET_KEYS")).default || Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const PUBLISHABLE: string = json(Deno.env.get("SUPABASE_PUBLISHABLE_KEYS")).default || Deno.env.get("SUPABASE_ANON_KEY")!;
 const CONTACT = "https://dj-jackjack.github.io/Rescue-Site-Build/"; // who push services can contact about these notifications
+const BRAND = "TheTerr0rTw!ns ·"; // starts every title, so it's clear the notification is about the site
 const TOPICS: Record<string, string> = { partner: "Partnership", help: "Help keeping a pet", dog: "About a dog", sniffari: "Day-out program", other: "Something else" };
 const PUSH_HOSTS = /(^|\.)(fcm\.googleapis\.com|push\.apple\.com|push\.services\.mozilla\.com|notify\.windows\.com)$/; // nowhere else
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS" };
@@ -64,10 +65,10 @@ async function announceNew() {
   const { messages = [], unhandled = 0 } = (await db("rpc/push_claim", { method: "POST", body: "{}" })) || {};
   if (!messages.length) return { sent: 0, messages: 0 };
   const last = messages[messages.length - 1];
-  const topic = TOPICS[last.topic] || "Message", who = last.name ? `From ${short(String(last.name), 60)}` : "No name given";
+  const what = `${TOPICS[last.topic] || "Message"}, ${last.name ? `from ${short(String(last.name), 60)}` : "no name given"}`;
   const data = messages.length === 1
-    ? { title: `New message: ${topic}`, body: who }
-    : { title: `${messages.length} new messages`, body: `Latest: ${topic}. ${who}` };
+    ? { title: `${BRAND} New message`, body: what }
+    : { title: `${BRAND} ${messages.length} new messages`, body: `Latest: ${what}` };
   const subs: Sub[] = await db("push_subscriptions?select=endpoint,p256dh,auth");
   return { sent: await deliver(subs, { ...data, count: unhandled, url: "./#/messages" }), messages: messages.length };
 }
@@ -79,7 +80,7 @@ async function sendTest(req: Request, endpoint: string) {
   if (!email || !(await db(`admins?select=email&email=eq.${encodeURIComponent(email)}`)).length) return reply(403, { error: "This account isn't on the editor list." });
   const subs: Sub[] = await db(`push_subscriptions?select=endpoint,p256dh,auth&endpoint=eq.${encodeURIComponent(endpoint)}`);
   if (!subs.length) return reply(404, { error: "This device isn't signed up for notifications. Turn them on first." });
-  const sent = await deliver(subs, { title: "Notifications are on ✓", body: "New messages from the site will show up like this.", url: "./#/messages" });
+  const sent = await deliver(subs, { title: `${BRAND} Notifications are on ✓`, body: "New messages from the site will show up like this.", url: "./#/messages" });
   return sent ? reply(200, { sent }) : reply(502, { error: "The test didn't go through. Try turning notifications off and on again." });
 }
 
