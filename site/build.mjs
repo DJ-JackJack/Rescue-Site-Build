@@ -151,12 +151,11 @@ for (const file of fs.readdirSync(pagesDir).filter(f => f.endsWith(".html")).sor
   built.push("/edit/ (private)");
 }
 
-// the planning questionnaire keeps working at /questionnaire/
-fs.cpSync(path.join(ROOT, "questionnaire"), path.join(OUT, "questionnaire"), { recursive: true });
+// questionnaire/ (the planning questionnaire) is no longer published; tools/render-answers.mjs still reads it.
 fs.writeFileSync(path.join(OUT, ".nojekyll"), "");
 fs.cpSync(path.join(SRC, "root"), OUT, { recursive: true }); // favicon.ico for the domain root
 fs.writeFileSync(path.join(OUT, "sitemap.xml"), `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${pageUrls.map(u => `  <url><loc>${esc(u)}</loc></url>`).join("\n")}\n</urlset>\n`);
-if (!PREVIEW) fs.writeFileSync(path.join(OUT, "robots.txt"), `User-agent: *\nAllow: /\nDisallow: ${BASE}questionnaire/\nDisallow: ${BASE}edit/\nSitemap: ${SITE_URL}sitemap.xml\n`);
+if (!PREVIEW) fs.writeFileSync(path.join(OUT, "robots.txt"), `User-agent: *\nAllow: /\nDisallow: ${BASE}edit/\nSitemap: ${SITE_URL}sitemap.xml\n`);
 else fs.writeFileSync(path.join(OUT, "robots.txt"), "User-agent: *\nDisallow: /\n");
 
 console.log(`built ${built.length} pages into _site/ (base ${BASE}${PREVIEW ? ", preview" : ", launched"})`);

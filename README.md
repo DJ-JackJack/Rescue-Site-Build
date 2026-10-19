@@ -14,7 +14,7 @@ The website for TheTerr0rTw!ns (tae): rescue features, shelter goals, dog day ou
 - **Link previews and icons:** each page gets a title, description and share image for Facebook, texts and TikTok links (`site/assets/share/<page>.jpg`, else `default.jpg`). The paw icon is `site/assets/icon.svg`, with PNG sizes beside it. A sitemap is written for search engines, and listed in `robots.txt` once the site launches.
 - **Publishing:** every push to `main` builds the site and publishes it to GitHub Pages (`.github/workflows/deploy-site.yml`).
 - **Preview mode** is on until launch: the site is hidden from search engines and shows a preview banner. To launch, set the repository variable `SITE_PREVIEW` to `0`.
-- **`questionnaire/`** is the original planning questionnaire. It still works at `/questionnaire/`, and its answers stay in the `questionnaire_responses` table.
+- **`questionnaire/`** is the original planning questionnaire. It's no longer on the site and can't take new answers; its saved answers stay in the `questionnaire_responses` table, and `tools/render-answers.mjs` still uses its question wording.
 
 **Editing:** the private edit page at `/edit/` (sign-in required) updates animals, goals, events, rescues, Sniffari programs, the local help list, page wording and photos. Plain-language guide: `docs/editing-guide.md`. What each setting does underneath: `docs/updating-content.md`.
 
