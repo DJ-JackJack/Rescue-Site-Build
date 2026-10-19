@@ -411,6 +411,8 @@ async function showHome() {
     ["visitors", "📈", "Visitors", week ? plural(week.days.reduce((a, d) => a + d[1], 0), "view") + " this week" : ""],
     ["deleted", "🗑️", "Recently deleted", ""],
   ];
+  badge(msgs.length);
+  recheckSub();
   render(`<h1>Hi! What needs updating?</h1>
     <h2 class="sub">Needs attention</h2>
     ${todo.length ? `<ul class="todo">${todo.join("")}</ul>` : `<p class="allgood">All caught up ✓</p>`}
@@ -713,6 +715,7 @@ async function showMessages(view) {
   const tabs = [["new", `New (${rows.filter(m => !m.handled).length})`], ["done", "Done"], ["all", "All"]];
   render(`<a class="back" href="#/">‹ Start</a><h1>Messages</h1>
     <p class="lede">Everything sent through the forms on the site.</p>
+    <div id="pushbox"></div>
     <div class="fchips" role="group" aria-label="Show">${tabs.map(([v, l]) => `<a href="#/messages/${v}" aria-current="${v === view}">${h(l)}</a>`).join("")}</div>
     ${list.length ? `<ul class="msgs">${list.map(m => {
       const mail = encodeURIComponent(m.email).replace(/%40/g, "@");
@@ -728,7 +731,75 @@ async function showMessages(view) {
           ${m.handled ? `<button class="btn ghost sm" type="button" data-act="msg-undo" data-id="${h(m.id)}">Move back to new</button>` : `<button class="btn ghost sm" type="button" data-act="msg-done" data-id="${h(m.id)}">Mark done</button>`}
           <button class="linkbtn" type="button" data-act="msg-delete" data-id="${h(m.id)}">Delete</button></div></li>`;
     }).join("")}</ul>` : `<p class="allgood">${view === "new" ? "No new messages ✓" : "Nothing here."}</p>`}`);
+  badge(rows.filter(m => !m.handled).length);
+  showPushBox();
 }
+
+/* ---------- notifications ---------- */
+// Phone notifications for new messages (Web Push). This device signs up with its browser's push service, the
+// sign-up is saved in push_subscriptions, and the notify-message function sends to it when a message comes in.
+// sw.js (next to this page) shows them. iPhones and iPads need the editor added to the Home Screen first.
+const NOTIFY = `${API}/functions/v1/notify-message`;
+const canPush = () => "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+const apple = () => /iPhone|iPad|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+const onHomeScreen = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+const keyBytes = s => Uint8Array.from(atob(s.replace(/-/g, "+").replace(/_/g, "/") + "=".repeat((4 - (s.length % 4)) % 4)), c => c.charCodeAt(0));
+const deviceName = () => { const u = navigator.userAgent; return /iPhone/.test(u) ? "iPhone" : apple() ? "iPad" : /Android/.test(u) ? "Android" : /Mac/.test(u) ? "Mac" : /Windows/.test(u) ? "Windows" : "Computer"; };
+async function notifyCall(body, signedIn) {
+  let r;
+  try { r = await fetch(NOTIFY, { method: "POST", headers: { "Content-Type": "application/json", ...(signedIn ? { Authorization: `Bearer ${await token()}` } : {}) }, body: JSON.stringify(body) }); }
+  catch { throw new Error("Can't reach the notification service. Check your connection and try again."); }
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || "The notification service had a problem. Please try again.");
+  return j;
+}
+const swReady = canPush() ? navigator.serviceWorker.register("sw.js", { scope: "./" }).catch(() => null) : Promise.resolve(null);
+async function currentSub() { const reg = await swReady; return (await reg?.pushManager.getSubscription()) || null; }
+async function keepSub(sub) {
+  const j = sub.toJSON();
+  await db("POST", "push_subscriptions?on_conflict=endpoint", { endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth, email: (session?.email || "").toLowerCase(), device: deviceName() }, "resolution=merge-duplicates,return=minimal");
+}
+let pushKey = null;
+async function turnOnPush() {
+  // asked straight away, while the tap still counts: phones only show the question in answer to a tap
+  const perm = await Notification.requestPermission();
+  if (perm !== "granted") throw new Error(perm === "denied" ? "Notifications are blocked for this site. Allow them in your phone's settings, then try again." : "Notifications weren't allowed. Tap Turn on again and choose Allow.");
+  const reg = await swReady;
+  if (!reg) throw new Error("This browser can't set up notifications here.");
+  pushKey ??= (await notifyCall({ action: "key" })).key;
+  const sub = (await reg.pushManager.getSubscription()) || (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(pushKey) }));
+  await keepSub(sub);
+}
+async function turnOffPush() {
+  const sub = await currentSub();
+  if (!sub) return;
+  await db("DELETE", `push_subscriptions?endpoint=eq.${encodeURIComponent(sub.endpoint)}`, undefined, "return=minimal");
+  await sub.unsubscribe();
+}
+async function showPushBox() {
+  const box = $("#pushbox", app);
+  if (!box) return;
+  const card = (title, text, buttons = "") => { box.innerHTML = `<div class="card pushbox"><h2>${title}</h2><p class="small">${text}</p>${buttons ? `<div class="btns">${buttons}</div>` : ""}</div>`; };
+  if (!canPush()) {
+    return apple() && !onHomeScreen()
+      ? card("🔔 Get notified about new messages", "On iPhone and iPad, first add the editor to your Home Screen: tap <b>Share</b>, then <b>Add to Home Screen</b>. Open the editor from that icon, come back here and turn notifications on.")
+      : card("🔔 Notifications", "This browser can't show notifications. Try Chrome, or Safari with the editor added to the Home Screen.");
+  }
+  if (Notification.permission === "denied") return card("🔔 Notifications are blocked", "This phone or computer has blocked notifications for this site. Allow them in its settings (under this browser, or the Site editor app), then come back here.");
+  const sub = await currentSub().catch(() => null);
+  if (sub && Notification.permission === "granted") {
+    return card("🔔 Notifications are on", "This device gets a notification when someone sends a message. It shows the topic and their name, never the message itself.",
+      `<button class="btn ghost sm" type="button" data-act="push-test">Send a test</button><button class="linkbtn" type="button" data-act="push-off">Turn off on this device</button>`);
+  }
+  card("🔔 Get notified about new messages", "Get a notification on this device whenever someone sends a message. It shows the topic and their name, never the message itself. Turn it on for each phone or computer you want them on.",
+    `<button class="btn royal sm" type="button" data-act="push-on">Turn on notifications</button>`);
+  if (!pushKey) notifyCall({ action: "key" }).then(j => { pushKey = j.key; }).catch(() => {}); // ready before the tap
+}
+// The number of new messages on the app icon, where the phone supports it.
+const badge = n => { try { (n ? navigator.setAppBadge?.(n) : navigator.clearAppBadge?.())?.catch?.(() => {}); } catch {} };
+navigator.serviceWorker?.addEventListener("message", e => { if (e.data?.go === "#/messages") go("#/messages"); });
+let subChecked = false; // once per visit, make sure this device's sign-up is still saved
+const recheckSub = () => { if (subChecked || !canPush()) return; subChecked = true; currentSub().then(s => s && Notification.permission === "granted" && keepSub(s)).catch(() => {}); };
 
 /* ---------- page wording ---------- */
 async function showText() {
@@ -850,7 +921,7 @@ async function showVisitors(range) {
 /* ---------- one-tap actions ---------- */
 app.addEventListener("click", async e => {
   const b = e.target.closest("[data-act]");
-  if (!b || !["checked", "adopted", "msg-done", "msg-undo", "msg-delete", "restore", "forget", "nocount", "clear-counts", "signout"].includes(b.dataset.act)) return;
+  if (!b || !["checked", "adopted", "msg-done", "msg-undo", "msg-delete", "restore", "forget", "nocount", "clear-counts", "push-on", "push-off", "push-test", "signout"].includes(b.dataset.act)) return;
   const id = b.dataset.id;
   try {
     switch (b.dataset.act) {
@@ -869,6 +940,13 @@ app.addEventListener("click", async e => {
         if (!r?.length) throw new Error(NOT_SAVED);
         toast("Removed for good"); break;
       }
+      case "push-on": b.disabled = true; await turnOnPush(); toast("Notifications are on ✓"); break;
+      case "push-off": await turnOffPush(); toast("Notifications are off on this device"); break;
+      case "push-test": {
+        const sub = await currentSub();
+        if (!sub) throw new Error("This device isn't signed up for notifications. Turn them on first.");
+        await notifyCall({ action: "test", endpoint: sub.endpoint }, true); toast("Test sent. It should show up in a few seconds."); return;
+      }
       case "nocount":
         try { localStorage.getItem(NOCOUNT) === "1" ? localStorage.removeItem(NOCOUNT) : localStorage.setItem(NOCOUNT, "1"); } catch {}
         break;
@@ -877,7 +955,7 @@ app.addEventListener("click", async e => {
         await db("POST", "rpc/clear_visitor_counts", {}); toast("Counts cleared"); break;
     }
     route();
-  } catch (err) { if (err instanceof SignedOut) return route(); toast(err.message, true); }
+  } catch (err) { b.disabled = false; if (err instanceof SignedOut) return route(); toast(err.message, true); }
 });
 
 /* ---------- start ---------- */

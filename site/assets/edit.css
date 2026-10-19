@@ -152,3 +152,7 @@
 .vtip{margin:16px 0}
 .vdev{margin-top:16px}
 .vdev h2{font-size:1.1rem;margin:0 0 6px}
+/* notifications */
+.pushbox{margin:12px 0 16px}
+.pushbox h2{font-size:1.1rem;margin:0 0 6px}
+.pushbox .btns{margin-top:10px;align-items:center}

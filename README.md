@@ -14,12 +14,13 @@ The website for TheTerr0rTw!ns (tae): rescue features, shelter goals, dog day ou
 - **Link previews and icons:** each page gets a title, description and share image for Facebook, texts and TikTok links (`site/assets/share/<page>.jpg`, else `default.jpg`). The paw icon is `site/assets/icon.svg`, with PNG sizes beside it. A sitemap is written for search engines, and listed in `robots.txt` once the site launches.
 - **Publishing:** every push to `main` builds the site and publishes it to GitHub Pages (`.github/workflows/deploy-site.yml`).
 - **Safety nets:** the database keeps 90 days of copies of anything edited or deleted (the edit page's "Recently deleted"), and `.github/workflows/backup.yml` saves the public content and uploaded photos every week. After every deploy, `.github/workflows/check-site.yml` checks the live site from the outside.
+- **Message notifications:** editors can turn on phone notifications for new messages from the edit page. A database trigger calls the Edge Function in `supabase/functions/notify-message/`, which sends an encrypted Web Push to each signed-up device.
 - **Visitor counts:** the site counts page views and where visits come from in its own database, with no cookies. Editors see them on the edit page.
 - **Keeping the database awake:** `.github/workflows/keep-awake.yml` reads a little public data twice a day so the free Supabase project doesn't pause. See `docs/updating-content.md`.
 - **Preview mode** is on until launch: the site is hidden from search engines and shows a preview banner. Launch day, with the custom domain, is step by step in `docs/launch-checklist.md`.
 - **`questionnaire/`** is the original planning questionnaire. It's no longer on the site and can't take new answers; its saved answers stay in the `questionnaire_responses` table, and `tools/render-answers.mjs` still uses its question wording.
 
-**Editing:** the private edit page at `/edit/` (sign-in required) updates animals, goals, events, rescues, Sniffari programs, the local help list, page wording and photos, restores recent deletes, and shows visitor counts. Plain-language guide: `docs/editing-guide.md`. What each setting does underneath: `docs/updating-content.md`.
+**Editing:** the private edit page at `/edit/` (sign-in required) updates animals, goals, events, rescues, Sniffari programs, the local help list, page wording and photos, restores recent deletes, shows visitor counts, and turns on notifications for new messages. Plain-language guide: `docs/editing-guide.md`. What each setting does underneath: `docs/updating-content.md`.
 
 ## Rules the site is built around
 
