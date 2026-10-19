@@ -171,6 +171,7 @@ const SECTIONS = {
       { name: "partner_id", type: "partner", label: "Rescue or shelter" },
       { name: "photo_url", type: "photo", label: "Photo", folder: "animals" },
       { name: "note", type: "textarea", rows: 2, max: 200, label: "Short note", help: "Shown under their name. Keep it to a line." },
+      { name: "journey", type: "journey", label: "Their journey", help: "The steps people see when they tap this animal on Happy Tails, in order. Leave it empty and the site uses the video and adoption dates." },
       { name: "listing_url", type: "url", label: "Link to their adoption listing", when: v => ["looking", "foster"].includes(v.status) },
       { name: "checked_on", type: "date", label: "Last checked that they're still available", today: "Checked today", dflt: today,
         help: "A dog who's still looking hides from the site 4 weeks after this date, so the site never shows a dog who's already gone.", when: v => v.status === "looking" },
@@ -459,6 +460,13 @@ const barRow = b => `<div class="bar-row" data-id="${h(b.id || "")}">
   <label>So far<input name="bar_current" type="number" inputmode="decimal" min="0" step="any" value="${h(b.current ?? "")}" placeholder="–"></label>
   <button type="button" class="xbtn" data-bar-remove aria-label="Remove this line">✕</button></div>`;
 
+// Keys in the order the database keeps them (jsonb sorts keys), so an unchanged journey compares equal.
+const stepRow = s => `<div class="step-row">
+  <label>What happened<input name="j_label" value="${h(s.label || "")}" maxlength="80" placeholder="Went to a foster home" autocomplete="off"></label>
+  <label>When<input name="j_date" type="date" value="${h(s.date || "")}"></label>
+  <label class="wide">Details<input name="j_detail" value="${h(s.detail || "")}" maxlength="200" placeholder="Learning to love car rides" autocomplete="off"></label>
+  <div class="step-btns"><button type="button" class="xbtn" data-step-up aria-label="Move this step up">↑</button><button type="button" class="xbtn" data-step-down aria-label="Move this step down">↓</button><button type="button" class="xbtn" data-step-remove aria-label="Remove this step">✕</button></div></div>`;
+
 function fieldHTML(f, v, ctx) {
   const id = fid(f.name), help = f.help ? `<p class="hint" id="${id}-h">${h(f.help)}</p>` : "";
   const desc = f.help ? ` aria-describedby="${id}-h"` : "", req = f.required ? " required" : "", max = f.max ? ` maxlength="${f.max}"` : "";
@@ -490,6 +498,9 @@ function fieldHTML(f, v, ctx) {
         <p class="hint">Photos are shrunk, and hidden data like location is removed, before they upload.</p></div>
         <input type="hidden" name="${f.name}" value="${h(v ?? "")}"></div>`);
     }
+    case "journey":
+      return wrap(`<span class="flabel">${h(f.label)}</span><div class="steps-ed">${(v || []).map(stepRow).join("")}</div>
+        <div class="btns"><button type="button" class="btn ghost sm" data-step-add>+ Add a step</button><button type="button" class="btn ghost sm" data-step-fill>Fill in from the dates</button></div>`);
     case "bars":
       return wrap(`<span class="flabel">${h(f.label)}</span><div class="bars">${[...(v || [])].sort((a, b) => a.sort - b.sort).map(barRow).join("")}</div><button type="button" class="btn ghost sm" data-bar-add>+ Add a line</button>`);
   }
@@ -513,6 +524,10 @@ function readForm(form, fields) {
         out[f.name] = s || null;
         break;
       }
+      case "journey": // empty rows are dropped
+        out[f.name] = $$(".step-row", form).map(r => ({ date: $("[name=j_date]", r).value || null, label: $("[name=j_label]", r).value.trim(), detail: $("[name=j_detail]", r).value.trim() || null }))
+          .filter(s => s.label || s.detail || s.date);
+        break;
       case "bars":
         out[f.name] = $$(".bar-row", form).map((r, i) => ({ id: r.dataset.id || null, label: $("[name=bar_label]", r).value.trim(), target: num($("[name=bar_target]", r).value), current: num($("[name=bar_current]", r).value), sort: i + 1 }));
         break;
@@ -531,6 +546,10 @@ function validate(form, fields, vals) {
     if (!box.hidden) {
       if (f.required && (v === null || v === "")) msg = "Please fill this in.";
       else if (f.type === "url" && v && !safeUrl(v)) msg = "That doesn't look like a web link. It should start with https://";
+      else if (f.type === "journey") {
+        $$(".step-row", box).forEach(r => r.classList.toggle("bad", !$("[name=j_label]", r).value.trim() && !!($("[name=j_detail]", r).value.trim() || $("[name=j_date]", r).value)));
+        if (v.some(s => !s.label)) msg = "Each step needs a “What happened”.";
+      }
       else if (f.type === "bars") {
         const rows = $$(".bar-row", box);
         v.forEach((b, i) => rows[i].classList.toggle("bad", !b.label || !(b.target > 0) || (b.current !== null && !(b.current >= 0))));
@@ -559,7 +578,7 @@ async function showForm(key, id) {
     render(`<a class="back" href="#/${key}">‹ ${h(S.title)}</a><h1>Not found</h1><p class="note">That one wasn't found. It may have been deleted.</p>`);
     return;
   }
-  const vals = row || Object.fromEntries(S.fields.map(f => [f.name, typeof f.dflt === "function" ? f.dflt() : f.dflt ?? (f.type === "toggle" ? false : f.type === "tags" || f.type === "lines" || f.type === "bars" ? [] : null)]));
+  const vals = row || Object.fromEntries(S.fields.map(f => [f.name, typeof f.dflt === "function" ? f.dflt() : f.dflt ?? (f.type === "toggle" ? false : f.type === "tags" || f.type === "lines" || f.type === "bars" || f.type === "journey" ? [] : null)]));
   const ctx = { partners };
   render(`<a class="back" href="#/${key}">‹ ${h(S.title)}</a>
     <h1>${isNew ? `Add ${h(S.one)}` : h(S.titleOf(row))}</h1>
@@ -591,6 +610,26 @@ async function showForm(key, id) {
     if (t.dataset.today) { form.elements[t.dataset.today].value = today(); dirty = true; return; }
     if (t.hasAttribute("data-bar-add")) { $(".bars", form).insertAdjacentHTML("beforeend", barRow({})); $(".bars .bar-row:last-child input", form).focus(); dirty = true; return; }
     if (t.hasAttribute("data-bar-remove")) { t.closest(".bar-row").remove(); dirty = true; return; }
+    if (t.hasAttribute("data-step-add")) { $(".steps-ed", form).insertAdjacentHTML("beforeend", stepRow({})); $(".steps-ed .step-row:last-child input", form).focus(); dirty = true; return; }
+    if (t.hasAttribute("data-step-remove")) { t.closest(".step-row").remove(); dirty = true; return; }
+    if (t.hasAttribute("data-step-up") || t.hasAttribute("data-step-down")) {
+      const r = t.closest(".step-row"), up = t.hasAttribute("data-step-up"), other = up ? r.previousElementSibling : r.nextElementSibling;
+      if (other) { up ? other.before(r) : other.after(r); t.focus(); dirty = true; }
+      return;
+    }
+    if (t.hasAttribute("data-step-fill")) {
+      // a starting point from the dates on the form; they can be edited or removed after
+      const el = form.elements, status = $('input[name="status"]:checked', form)?.value;
+      const who = el.partner_id?.value ? el.partner_id.selectedOptions[0].text.replace(/ \(hidden\)$/, "") : "";
+      const steps = [];
+      if (el.featured_on?.value) steps.push({ label: "Featured", detail: "Video posted", date: el.featured_on.value });
+      if (status === "adopted") steps.push({ label: "Adopted", detail: who ? `Through ${who}` : "", date: el.adopted_on?.value || "" });
+      else if (status) steps.push({ label: label(STATUS, status), detail: who ? `${{ looking: "With", foster: "With", sanctuary: "At" }[status] || "Through"} ${who}` : "" });
+      if (!steps.length) { toast("Add the video date or a status first."); return; }
+      $(".steps-ed", form).insertAdjacentHTML("beforeend", steps.map(stepRow).join(""));
+      dirty = true;
+      return;
+    }
     if (t.dataset.photoRemove) {
       const name = t.dataset.photoRemove;
       form.elements[name].value = "";

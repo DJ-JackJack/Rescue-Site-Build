@@ -36,6 +36,7 @@ Below that, **Everything** has a button for each part of the site.
 |---|---|
 | Add a dog I filmed | Animals → **+ Add animal**. Fill in the name, tap **Still looking**, pick the rescue, add a photo and the link to their listing, then tap **Add**. |
 | Mark a dog adopted | Open them, tap **Adopted** (today's date fills in by itself), then **Save changes**. Or use **Adopted!** on the start screen. |
+| Tell an animal's story | Open them and scroll to **Their journey**. Tap **Fill in from the dates** for a start, or **+ Add a step** for each thing that happened ("Went to a foster home", "Adopted"). The arrows change the order. People see these steps when they tap the animal on Happy Tails. Left empty, the site makes them from the video and adoption dates. |
 | Update a shelter goal | Shelter goals → the goal. Change the **So far** numbers and tap **Save changes**. The "updated" date on the site changes by itself. |
 | Finish a goal | Open it, tap **Goal met 🎉**, then save. It moves to "Goals met". |
 | Add an event | Events → **+ Add event**. Events disappear from the site by themselves the day after. |

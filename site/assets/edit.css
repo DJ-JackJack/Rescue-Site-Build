@@ -127,3 +127,13 @@
 .toast.show{transform:translate(-50%,0);visibility:visible;transition:transform .25s}
 .toast.bad{background:#B3261E}
 @media (prefers-reduced-motion:reduce){.toast{transition:none}}
+/* journey steps */
+.steps-ed{display:flex;flex-direction:column;gap:10px}
+.step-row{display:grid;grid-template-columns:minmax(0,1fr) 160px;gap:6px 8px;background:#fff;border:1.5px solid var(--midviolet);border-radius:14px;padding:10px}
+.form .step-row label{font-size:.8rem;gap:4px}
+.form .step-row input{padding:10px;min-height:44px}
+.step-row .wide{grid-column:1/-1}
+.step-btns{grid-column:1/-1;display:flex;gap:6px;justify-content:flex-end}
+.step-row.bad{border-color:#B3261E}
+.step-row.bad input[name=j_label]{border-color:#B3261E}
+@media (max-width:420px){.step-row{grid-template-columns:1fr}}

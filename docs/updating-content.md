@@ -22,6 +22,7 @@ Add a row to `animals`:
 - For a dog still looking: `listing_url` (the rescue's live listing) and `checked_on` (the date you last confirmed it's still available). If `checked_on` is more than 4 weeks old, the dog hides itself until it's re-checked.
 - `people_ok`: untick it if a person shown or named hasn't agreed yet. The animal stays hidden until it's ticked.
 - `published`: tick it to show the animal.
+- `journey`: the steps shown when someone taps the animal, in order, as a list like `[{"date": "2026-08-25", "label": "Featured", "detail": "Video posted"}]` (`date` and `detail` can be left out). Leave it `[]` and the site builds the steps from `featured_on` and `adopted_on`.
 
 The homepage stat ("X of Y dogs I featured were home within 3 months") appears by itself once at least 5 dogs were featured 3 or more months ago. Until then the site uses her own words.
 
@@ -73,3 +74,8 @@ The original files from the shared Drive folder are kept in `responses/drive-pho
 
 The `admins` table lists the email addresses allowed to edit. It can't be read or changed from the site; add a row in the Table Editor or with SQL. Accounts are made in Authentication → Users ("Allow new users to sign up" stays off).
 
+## Keeping the database awake
+
+Free Supabase projects pause after about a week with very little use, and a paused project stops the live content and the edit page. `.github/workflows/keep-awake.yml` reads a little public data twice a day so that doesn't happen. If it ever finds the project paused, the run fails and GitHub sends a failure email: open the Supabase dashboard and choose **Resume project**. It can also be run by hand from the Actions tab (Keep database awake → Run workflow).
+
+GitHub turns off scheduled workflows in a public repo after 60 days without a commit. It emails a warning first; the **Enable workflow** button on the Actions tab (or any commit) turns it back on.
