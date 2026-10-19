@@ -322,7 +322,7 @@ async function route() {
     if (!(await amEditor())) return showNotEditor();
     if (!sec) return await showHome();
     if (sec === "messages") return await showMessages(id || "new");
-    if (sec === "text") return await showText();
+    if (sec === "text") return await showText(id);
     if (sec === "deleted") return await showDeleted();
     if (sec === "visitors") return await showVisitors(id || "7");
     if (!SECTIONS[sec]) return go("#/");
@@ -802,40 +802,143 @@ let subChecked = false; // once per visit, make sure this device's sign-up is st
 const recheckSub = () => { if (subChecked || !canPush()) return; subChecked = true; currentSub().then(s => s && Notification.permission === "granted" && keepSub(s)).catch(() => {}); };
 
 /* ---------- page wording ---------- */
-async function showText() {
-  const rows = await api.list("site_text", "select=*");
-  const by = Object.fromEntries(rows.map(r => [r.key, r]));
-  const items = CFG.textDefaults || [];
-  render(`<a class="back" href="#/">‹ Start</a><h1>Page wording</h1>
-    <p class="lede">Change these words, then tap Save. The page shows the new words straight away.</p>
-    ${items.map(t => {
-      const mine = by[t.key]?.body?.trim();
-      return `<form class="card textform" data-key="${h(t.key)}" novalidate>
-        <h2>${h(t.label)}</h2>
-        <p class="small">On <a href="${h(CFG.base + t.page.replace(/^\//, ""))}" target="_blank" rel="noopener">${h(t.page)}</a> · ${mine ? `changed ${h(nice(by[t.key].updated_at.slice(0, 10)))}` : "the page's own words"}</p>
-        <label class="sr" for="t-${h(t.key)}">${h(t.label)}</label>
-        <textarea id="t-${h(t.key)}" name="body" rows="${t.block ? 12 : 4}" maxlength="6000">${h(mine || t.text)}</textarea>
-        ${t.block ? `<p class="hint">A blank line starts a new paragraph. Start a line with ## to make it a heading.</p>` : ""}
-        <div class="btns"><button class="btn royal sm" type="submit">Save</button>${mine ? `<button class="btn ghost sm" type="button" data-act="text-reset">Go back to the original words</button>` : ""}</div>
-      </form>`;
-    }).join("")}`);
-  const saveText = async (key, body) => {
-    await db("POST", "site_text?on_conflict=key", { key, body }, "resolution=merge-duplicates,return=minimal");
+// Every piece of wording on the site, listed by the build (CFG.textDefaults, see site/wording.mjs): page text,
+// photo descriptions and form hints, page titles and descriptions, longer blocks, and the phrases site.js writes
+// (js.*). Saved wording lives in site_text by key; an empty body means "use the original words".
+const WORDS = CFG.textDefaults || [], AREAS = CFG.areas || [];
+const PHRASE_GROUPS = {
+  goal: "Shelter goals", status: "Animal labels", count: "Animal counts", animal: "Happy Tails", stat: "The adoption number",
+  journey: "An animal's journey (the pop-up)", rescue: "Rescues", horse: "Willow Woods horses", event: "Events",
+  program: "Day-out programs", form: "Contact forms", failed: "When part of a page can't load",
+};
+const clip = (s, n = 60) => (s.length > n ? s.slice(0, n - 1) + "…" : s);
+const areaTitle = scope => AREAS.find(a => a.scope === scope)?.title || scope;
+const drafts = new Map(); // key → words typed but not saved yet
+
+function wordItem(w, saved, showArea) {
+  const cur = drafts.get(w.key) ?? saved[w.key]?.body ?? w.text, changed = !!saved[w.key];
+  const id = "w-" + w.key.replace(/[^a-z0-9-]/gi, "-");
+  const rows = w.multi ? 10 : Math.min(8, Math.max(1, Math.ceil(cur.length / 34)));
+  const where = [w.label || w.kind, w.ctx && `under “${clip(w.ctx, 50)}”`].filter(Boolean).join(", ");
+  return `<div class="witem${changed ? " changed" : ""}" data-key="${h(w.key)}">
+    <label class="wlab" for="${id}">${showArea ? `<b>${h(areaTitle(w.scope))}</b>` : ""}<span>${h(where)}</span>${changed ? `<span class="flag">Changed</span>` : ""}</label>
+    <textarea id="${id}" rows="${rows}" maxlength="6000" spellcheck="true">${h(cur)}</textarea>
+    ${w.part ? `<p class="hint">Part of: “${h(clip(w.part, 200))}”</p>` : ""}
+    ${/\{\w+\}/.test(w.text) ? `<p class="hint">Words in {curly brackets} are filled in by the site. Keep them where they should go.</p>` : ""}
+    ${w.multi ? `<p class="hint">A blank line starts a new paragraph. Start a line with ## to make it a heading.</p>` : ""}
+    ${changed ? `<p class="small worig">Original: “${h(clip(w.text, 200))}” <button class="linkbtn plain" type="button" data-orig="${h(w.key)}">Use the original</button></p>` : ""}
+  </div>`;
+}
+
+async function showText(scope) {
+  const rows = await api.list("site_text", "select=key,body,updated_at");
+  const saved = Object.fromEntries(rows.filter(r => r.body && r.body.trim()).map(r => [r.key, { ...r, body: r.body.trim() }]));
+  const area = scope && AREAS.find(a => a.scope === scope);
+  if (scope && !area) return go("#/text");
+  drafts.clear();
+  const known = new Set(WORDS.map(w => w.key));
+  const saveBar = `<div class="savebar wsave" hidden><button class="btn royal" type="button" data-act="w-save">Save changes</button></div>`;
+  if (!area) {
+    const orphans = Object.keys(saved).filter(k => !known.has(k));
+    render(`<div id="wscreen"><a class="back" href="#/">‹ Start</a><h1>Page wording</h1>
+      <p class="lede">Change any wording on the site. Pick a page, or search for the words you want to change.</p>
+      <label class="sr" for="wfind">Search all the wording</label><input class="search" id="wfind" type="search" placeholder="Search all the wording" autocomplete="off">
+      <div id="wresults" class="wlist"></div>
+      <ul class="rows warea">${AREAS.map(a => {
+        const all = WORDS.filter(w => w.scope === a.scope), c = all.filter(w => saved[w.key]).length;
+        return `<li><a class="row" href="#/text/${h(a.scope)}"><span class="rt"><b>${h(a.title)}</b><small>${plural(all.length, "piece")} of wording${c ? ` · ${c} changed` : ""}</small></span><span class="chev" aria-hidden="true">›</span></a></li>`;
+      }).join("")}</ul>
+      <p class="small">Animals, shelter goals, rescues, events, day-out programs and the help list are changed in their own sections on the start screen.</p>
+      ${orphans.length ? `<div class="card worphans"><h2>Saved wording that's no longer on the site</h2>
+        <p class="small">The words these replaced have since been changed on the site itself, so they don't show anywhere. Clear them, or copy the words to where they belong now.</p>
+        <ul>${orphans.map(k => `<li><span>“${h(clip(saved[k].body, 140))}”</span> <button class="linkbtn" type="button" data-act="w-clear" data-key="${h(k)}">Clear</button></li>`).join("")}</ul></div>` : ""}
+      ${saveBar}</div>`);
+    const box = $("#wresults"), find = $("#wfind");
+    let timer;
+    find.addEventListener("input", () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        const q = find.value.trim().toLowerCase();
+        if (q.length < 2) { box.innerHTML = ""; return; }
+        const hits = WORDS.filter(w => (drafts.get(w.key) ?? saved[w.key]?.body ?? w.text).toLowerCase().includes(q) || w.text.toLowerCase().includes(q));
+        box.innerHTML = hits.length
+          ? hits.slice(0, 40).map(w => wordItem(w, saved, true)).join("") + (hits.length > 40 ? `<p class="small">${hits.length - 40} more. Type a few more words to narrow it down.</p>` : "")
+          : `<p class="allgood">No wording matches “${h(find.value.trim())}”.</p>`;
+      }, 150);
+    });
+  } else {
+    let items = WORDS.filter(w => w.scope === scope);
+    const changedCount = items.filter(w => saved[w.key]).length;
+    let filter = "all";
+    try { filter = sessionStorage.getItem("wf") === "changed" && changedCount ? "changed" : "all"; } catch {}
+    const lede = scope === "js" ? "Words the site writes as pages load: labels, counts, empty lists and form replies."
+      : scope === "all" ? "The menu, footer and contact form. They're the same on every page." : "Everything on this page, from top to bottom.";
+    const list = () => {
+      const shown = filter === "changed" ? items.filter(w => saved[w.key]) : items;
+      let group = "";
+      return shown.map(w => {
+        if (scope !== "js") return wordItem(w, saved);
+        const g = w.key.split(".")[1], head = g !== group ? `<h2 class="sub">${h(PHRASE_GROUPS[g] || g)}</h2>` : "";
+        group = g;
+        return head + wordItem(w, saved);
+      }).join("");
+    };
+    render(`<div id="wscreen"><a class="back" href="#/text">‹ Page wording</a>
+      <div class="lhead"><h1>${h(area.title)}</h1>${area.path ? `<a class="btn ghost sm" href="${h(CFG.base + area.path.replace(/^\//, ""))}" target="_blank" rel="noopener">See the page <span class="ext" aria-hidden="true">↗</span></a>` : ""}</div>
+      <p class="lede">${h(lede)} Change what you like, then tap <b>Save changes</b>. To go back to the original words, empty the box.</p>
+      ${changedCount ? `<div class="fchips" role="group" aria-label="Show"><button type="button" data-wf="all" aria-pressed="${filter === "all"}">Everything</button><button type="button" data-wf="changed" aria-pressed="${filter === "changed"}">Changed (${changedCount})</button></div>` : ""}
+      <div class="wlist" id="wlist">${list()}</div>
+      ${saveBar}</div>`);
+    $$("[data-wf]", app).forEach(b => b.addEventListener("click", () => {
+      filter = b.dataset.wf;
+      try { sessionStorage.setItem("wf", filter); } catch {}
+      $$("[data-wf]", app).forEach(x => x.setAttribute("aria-pressed", x === b));
+      $("#wlist").innerHTML = list();
+    }));
+  }
+  // typing, "use the original", saving (listeners on this screen's own element, so they go when it does)
+  const root = $("#wscreen"), bar = $(".wsave", root);
+  const pending = () => {
+    const out = [];
+    for (const [key, v] of drafts) {
+      const w = WORDS.find(x => x.key === key);
+      if (!w) continue;
+      const body = !v.trim() || v.trim() === w.text.trim() ? "" : v.trim();
+      if (body !== (saved[key]?.body || "")) out.push({ key, body });
+    }
+    return out;
   };
-  $$(".textform", app).forEach(f => {
-    const t = items.find(x => x.key === f.dataset.key);
-    f.addEventListener("input", () => { dirty = true; });
-    f.addEventListener("submit", async e => {
-      e.preventDefault();
-      const body = f.elements.body.value.trim();
-      try { await saveText(t.key, body === t.text.trim() ? "" : body); dirty = false; toast("Saved ✓"); showText(); }
-      catch (err) { if (err instanceof SignedOut) return route(); toast(err.message, true); }
-    });
-    $('[data-act="text-reset"]', f)?.addEventListener("click", async () => {
-      if (!confirm("Put back the page's original words?")) return;
-      try { await saveText(t.key, ""); dirty = false; toast("Original words are back ✓"); showText(); }
-      catch (err) { if (err instanceof SignedOut) return route(); toast(err.message, true); }
-    });
+  const update = () => {
+    const n = pending().length;
+    dirty = n > 0;
+    bar.hidden = !n;
+    $("button", bar).textContent = n === 1 ? "Save 1 change" : `Save ${n} changes`;
+  };
+  root.addEventListener("input", e => {
+    const item = e.target.closest(".witem");
+    if (item && e.target.tagName === "TEXTAREA") { drafts.set(item.dataset.key, e.target.value); update(); }
+  });
+  root.addEventListener("click", e => {
+    const b = e.target.closest("[data-orig]");
+    if (!b) return;
+    const w = WORDS.find(x => x.key === b.dataset.orig), ta = $("textarea", b.closest(".witem"));
+    ta.value = w.text; drafts.set(w.key, w.text); update(); ta.focus();
+  });
+  bar.querySelector("button").addEventListener("click", async () => {
+    const out = pending();
+    if (!out.length) return;
+    const btn = bar.querySelector("button");
+    btn.disabled = true; btn.textContent = "Saving…";
+    try {
+      await db("POST", "site_text?on_conflict=key", out, "resolution=merge-duplicates,return=minimal");
+      dirty = false;
+      toast(out.length === 1 ? "Saved ✓ It's on the site now." : `Saved ${out.length} changes ✓ They're on the site now.`);
+      showText(scope);
+    } catch (err) {
+      if (err instanceof SignedOut) return route();
+      toast(err.message, true);
+      btn.disabled = false; update();
+    }
   });
 }
 
@@ -921,7 +1024,7 @@ async function showVisitors(range) {
 /* ---------- one-tap actions ---------- */
 app.addEventListener("click", async e => {
   const b = e.target.closest("[data-act]");
-  if (!b || !["checked", "adopted", "msg-done", "msg-undo", "msg-delete", "restore", "forget", "nocount", "clear-counts", "push-on", "push-off", "push-test", "signout"].includes(b.dataset.act)) return;
+  if (!b || !["checked", "adopted", "msg-done", "msg-undo", "msg-delete", "restore", "forget", "nocount", "clear-counts", "push-on", "push-off", "push-test", "w-clear", "signout"].includes(b.dataset.act)) return;
   const id = b.dataset.id;
   try {
     switch (b.dataset.act) {
@@ -947,6 +1050,10 @@ app.addEventListener("click", async e => {
         if (!sub) throw new Error("This device isn't signed up for notifications. Turn them on first.");
         await notifyCall({ action: "test", endpoint: sub.endpoint }, true); toast("Test sent. It should show up in a few seconds."); return;
       }
+      case "w-clear":
+        if (!confirm("Clear this saved wording? It isn't showing anywhere on the site.")) return;
+        await db("POST", "site_text?on_conflict=key", { key: b.dataset.key, body: "" }, "resolution=merge-duplicates,return=minimal");
+        toast("Cleared"); break;
       case "nocount":
         try { localStorage.getItem(NOCOUNT) === "1" ? localStorage.removeItem(NOCOUNT) : localStorage.setItem(NOCOUNT, "1"); } catch {}
         break;

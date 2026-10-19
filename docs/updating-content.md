@@ -68,7 +68,13 @@ The original files from the shared Drive folder are kept in `responses/drive-pho
 
 ## Page wording
 
-`site_text`: one row per editable piece of wording, by `key` (for example `home.intro`, `about.body`). An empty `body` means the page's own words. In a page file, `data-text="key" data-label="..."` marks wording as editable; the edit page picks it up on the next build.
+Every piece of wording on the site can be changed from the edit page (Page wording). Saved wording is in `site_text`, one row per `key`; an empty `body` means the original words.
+
+- **Keys come from the build** (`site/wording.mjs`). Each text on a page gets one: `w.<page>.<fingerprint>` for text, `a.<page>.<fingerprint>` for photo descriptions and form hints, `p.<page>.title` / `.description` for the page title and description. The shared header, menu, footer and contact form use the page name `all`. The fingerprint comes from the words themselves, so a saved change follows the words even if the page around them moves. If the original words are changed in the page file, the old saved change stops applying, and the edit page lists it under "Saved wording that's no longer on the site".
+- **Longer blocks** marked `data-text="key" data-label="..."` in a page file (like `home.intro`, `about.body`) are edited as one piece, with blank lines for paragraphs and `## ` for headings.
+- **The site's own phrases** (labels, counts, empty lists, form replies) are the `t("js.key", "Default words {name}")` calls in `site/assets/site.js`. The build lists them; `{name}` parts are filled in by the script.
+- **New text needs nothing extra:** anything added to a page is editable after the next build. Text the script writes live (counts, the journey pop-up, form replies) is skipped on the page and edited through its `t()` phrases.
+- **Built in, then kept fresh:** the build reads `site_text` and builds saved wording into the pages (`SITE_TEXT_FILE` swaps in a JSON file for tests). The deploy workflow runs on every push and every night at about 4 AM, so link previews and search engines see the latest. In between, `site.js` puts in anything saved since the last build, and puts the original back if a change was undone (`data-t-orig`).
 
 ## Who can edit
 

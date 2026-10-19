@@ -3,7 +3,8 @@
    - Live content (goals, animals, rescues, Sniffari programs) read from Supabase with the public key,
      which can only see published rows. Everything from the database is escaped before it is shown,
      and only http(s) links are used.
-   - Every live section has an honest fallback: nothing is invented when data is missing. */
+   - Every live section has an honest fallback: nothing is invented when data is missing.
+   - Wording saved on the edit page is put in as the page loads (see "wording" below). */
 (() => {
 const S = window.SITE || {};
 const $ = (sel, el = document) => el.querySelector(sel);
@@ -19,6 +20,12 @@ const today = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; };
 const asDate = s => (s ? new Date(s + (s.length === 10 ? "T00:00:00" : "")) : null);
 const daysBetween = (a, b) => Math.round((b - a) / DAY);
 const monthYear = s => asDate(s)?.toLocaleDateString("en-US", { month: "short", year: "numeric" }) || "";
+
+// Phrases this script writes itself (labels, empty lists, form replies). Each can be changed on the edit page
+// (Page wording → Messages and labels); {names} in curly brackets are filled in here. Saved versions come built
+// into the page (S.t), and anything saved since arrives with the rest of the wording below.
+const PHRASES = { ...(S.t || {}) };
+const t = (key, text, vars = {}) => (PHRASES[key] || text).replace(/\{(\w+)\}/g, (m, k) => (k in vars ? String(vars[k]) : m));
 
 /* ---------- menu ---------- */
 const menu = $("#menu"), menubtn = $(".menubtn");
@@ -41,18 +48,46 @@ async function q(table, params) {
 }
 const cache = {};
 const once = (key, fn) => (cache[key] ??= fn());
+
+/* ---------- wording saved on the edit page ----------
+   Every text on the page has a key (data-t, data-t-alt, data-t-ph, data-text: see site/wording.mjs). The page is
+   built with the wording saved at the time; anything saved or undone since is put right here. Saved text is
+   plain: in a block, a blank line starts a new paragraph and a line starting with "## " is a heading. */
+const blockHTML = (s, inline) => inline
+  ? h(s.trim()).replace(/\n+/g, "<br>")
+  : s.trim().split(/\n\s*\n/).map(b => b.startsWith("## ") ? `<h2 class="h2">${h(b.slice(3).trim())}</h2>` : `<p>${h(b.trim()).replace(/\n/g, "<br>")}</p>`).join("");
+const wordingLoaded = q("site_text", "select=key,body").then(rows => {
+  const by = {};
+  for (const r of rows) if (r.body && r.body.trim()) by[r.key] = r.body.trim();
+  $$("[data-text]").forEach(el => {
+    const b = by[el.dataset.text] ?? el.dataset.textOrig; // a change, or the original back if it was undone
+    if (b !== undefined && el.innerHTML !== blockHTML(b, el.tagName === "P")) el.innerHTML = blockHTML(b, el.tagName === "P");
+  });
+  $$("[data-t]").forEach(el => {
+    const b = by[el.dataset.t] ?? el.dataset.tOrig;
+    if (b !== undefined && !el.children.length && el.textContent.trim() !== b) el.textContent = b; // never over live content
+  });
+  $$("[data-t-alt]").forEach(el => { const b = by[el.dataset.tAlt] ?? el.dataset.tOrig; if (b !== undefined) el.alt = b; });
+  $$("[data-t-ph]").forEach(el => { const b = by[el.dataset.tPh] ?? el.dataset.tOrig; if (b !== undefined) el.placeholder = b; });
+  const title = by[`p.${S.scope}.title`] ?? S.titleOrig;
+  if (title) document.title = title;
+  for (const k of Object.keys(PHRASES)) if (!(k in by)) delete PHRASES[k];
+  for (const k in by) if (k.startsWith("js.")) PHRASES[k] = by[k];
+}).catch(() => {});
+// The live sections wait for it (at most a moment), so their phrases are the latest too.
+const wordingReady = Promise.race([wordingLoaded, new Promise(ok => setTimeout(ok, 1500))]);
 const getGoals = () => once("goals", () => q("goals", "select=id,title,why,price_note,donate_url,photo_url,status,featured,figures_updated_at,met_on,sort,partner:partners(name,slug),bars:goal_bars(label,target,current,sort)&order=sort.asc"));
 const getAnimals = () => once("animals", () => q("animals", "select=id,name,species,status,herd,sort,featured_on,adopted_on,transport,note,listing_url,checked_on,photo_url,journey,created_at,partner:partners(name,slug)&order=featured_on.desc.nullslast,created_at.desc"));
 const getPartners = () => once("partners", () => q("partners", "select=id,slug,name,kind,mission,website_url,adopt_url,donate_url,sort&order=sort.asc"));
 const getSniffari = () => once("sniffari", () => q("sniffari_programs", "select=id,shelter_name,program_name,city,address,signup_url,facts,tags,checked_on,sort&order=sort.asc"));
 
-function failed(el, what) {
-  el.innerHTML = `<p class="empty">${h(what)} couldn't load right now. Please try again in a little while.</p>`;
+function failed(el, message) {
+  el.innerHTML = `<p class="empty">${h(message)}</p>`;
 }
 
 /* ---------- shelter goals ---------- */
 function goalHTML(g, { heading = "h3", showAllLink = false } = {}) {
-  const partner = g.partner?.name || "the shelter";
+  const partner = g.partner?.name || t("js.goal.shelter", "the shelter");
   const bars = (g.bars || []).sort((a, b) => a.sort - b.sort);
   const reported = bars.some(b => b.current !== null && b.current !== undefined);
   const ago = g.figures_updated_at ? daysBetween(asDate(g.figures_updated_at), today()) : null;
@@ -60,36 +95,41 @@ function goalHTML(g, { heading = "h3", showAllLink = false } = {}) {
   let progress;
   if (!bars.length) progress = "";
   else if (!reported || stale) {
-    const goalText = bars.map(b => `${Number(b.target).toLocaleString()} ${h(b.label.toLowerCase())}`).join(" and ");
-    progress = `<p class="empty">Goal: ${goalText}. ${stale ? "An update is coming" : "Progress figures are coming soon"} from ${h(partner)}.</p>`;
+    const goal = bars.map(b => `${Number(b.target).toLocaleString()} ${b.label.toLowerCase()}`).join(" and ");
+    progress = `<p class="empty">${h(stale ? t("js.goal.update-coming", "Goal: {goal}. An update is coming from {shelter}.", { goal, shelter: partner })
+      : t("js.goal.figures-coming", "Goal: {goal}. Progress figures are coming soon from {shelter}.", { goal, shelter: partner }))}</p>`;
   } else {
     progress = bars.map(b => {
       const cur = Number(b.current || 0), tgt = Number(b.target), pct = Math.min(100, Math.round(cur / tgt * 100));
-      return `<div class="bar"><div class="lab"><span>${h(b.label)}</span><span>${cur.toLocaleString()} of ${tgt.toLocaleString()}</span></div><div class="track" role="img" aria-label="${cur} of ${tgt} ${h(b.label)}"><div class="fill" style="width:${pct}%"></div></div></div>`;
+      const of = t("js.goal.progress", "{now} of {goal}", { now: cur.toLocaleString(), goal: tgt.toLocaleString() });
+      return `<div class="bar"><div class="lab"><span>${h(b.label)}</span><span>${h(of)}</span></div><div class="track" role="img" aria-label="${h(of)} ${h(b.label)}"><div class="fill" style="width:${pct}%"></div></div></div>`;
     }).join("");
   }
-  const when = g.status === "met" ? `Met ${h(monthYear(g.met_on))}` : ago === null ? "" : stale ? "" : `Updated ${ago === 0 ? "today" : ago === 1 ? "yesterday" : ago + " days ago"}`;
+  const when = g.status === "met" ? t("js.goal.met", "Met {month}", { month: monthYear(g.met_on) })
+    : ago === null || stale ? "" : ago === 0 ? t("js.goal.updated-today", "Updated today") : ago === 1 ? t("js.goal.updated-yesterday", "Updated yesterday")
+    : t("js.goal.updated-days", "Updated {n} days ago", { n: ago });
   const donate = safeUrl(g.donate_url);
   const give = g.status === "met" ? "" : donate
-    ? `<a class="btn light" href="${h(donate)}" target="_blank" rel="noopener">Give on ${h(partner)}'s page <span class="ext" aria-hidden="true">↗</span></a>`
-    : '<p class="note" style="margin-top:0">Donation link coming soon.</p>';
+    ? `<a class="btn light" href="${h(donate)}" target="_blank" rel="noopener">${h(t("js.goal.give", "Give on {shelter}'s page", { shelter: partner }))} <span class="ext" aria-hidden="true">↗</span></a>`
+    : `<p class="note" style="margin-top:0">${h(t("js.goal.no-link", "Donation link coming soon."))}</p>`;
   const pic = photoTag(g.photo_url);
   return `<div class="goal feature">
     ${pic ? `<span class="gpic" aria-hidden="true">${pic}</span>` : ""}
-    <p class="who">${showAllLink ? "Shelter goal · " : ""}${h(partner)}</p>
+    <p class="who">${showAllLink ? h(t("js.goal.label", "Shelter goal")) + " · " : ""}${h(partner)}</p>
     <${heading}>${h(g.title)}</${heading}>
     ${g.why ? `<p class="why">${h(g.why)}</p>` : ""}
     ${g.price_note ? `<span class="price">${h(g.price_note)}</span>` : ""}
     ${progress}
-    <div class="meta">${reported ? `<span>Figures from ${h(partner)}</span>` : ""}${when ? `<span>${when}</span>` : ""}</div>
-    <div class="btns">${give}${showAllLink ? `<a class="btn onDark" href="${S.base}shelter-goals/">All shelter goals</a>` : ""}</div>
-    ${g.status === "met" ? "" : `<p class="note">Your gift goes straight to ${h(partner)}. This site never handles money.</p>`}
+    <div class="meta">${reported ? `<span>${h(t("js.goal.figures-from", "Figures from {shelter}", { shelter: partner }))}</span>` : ""}${when ? `<span>${h(when)}</span>` : ""}</div>
+    <div class="btns">${give}${showAllLink ? `<a class="btn onDark" href="${S.base}shelter-goals/">${h(t("js.goal.all", "All shelter goals"))}</a>` : ""}</div>
+    ${g.status === "met" ? "" : `<p class="note">${h(t("js.goal.straight-to", "Your gift goes straight to {shelter}. This site never handles money.", { shelter: partner }))}</p>`}
   </div>`;
 }
 async function renderGoals(el) {
   const mode = el.dataset.goals;
   try {
     let goals = await getGoals();
+    await wordingReady;
     if (mode === "featured") goals = goals.filter(g => g.featured && g.status === "active").slice(0, 1);
     else if (mode === "active") goals = goals.filter(g => g.status === "active");
     else if (mode === "met") goals = goals.filter(g => g.status === "met");
@@ -97,16 +137,20 @@ async function renderGoals(el) {
     if (!goals.length) {
       const wrap = el.closest("[data-hide-empty]");
       if (wrap) { wrap.hidden = true; return; }
-      el.innerHTML = el.hasAttribute("data-empty") ? "" : `<p class="empty">No active goals right now.</p>`;
+      el.innerHTML = el.hasAttribute("data-empty") ? "" : `<p class="empty">${h(t("js.goal.none", "No active goals right now."))}</p>`;
       return;
     }
     el.innerHTML = goals.map(g => goalHTML(g, { heading: el.dataset.heading || "h3", showAllLink: mode === "featured" })).join("");
-  } catch { failed(el, "Shelter goals"); }
+  } catch { failed(el, t("js.failed.goals", "Shelter goals couldn't load right now. Please try again in a little while.")); }
 }
 
 /* ---------- animals: counts, stat, walls, journey ---------- */
 const EMOJI = { dog: "🐶", cat: "🐱", horse: "🐴", bird: "🐦", other: "🐾" };
-const STATUS = { adopted: ["c-adopted", "Adopted"], placed: ["c-placed", "Placed"], foster: ["c-foster", "In foster"], sanctuary: ["c-sanct", "In sanctuary"], looking: ["c-wait", "Still looking"] };
+const STATUS = { adopted: "c-adopted", placed: "c-placed", foster: "c-foster", sanctuary: "c-sanct", looking: "c-wait" };
+const statusLabel = s => ({
+  adopted: t("js.status.adopted", "Adopted"), foster: t("js.status.foster", "In foster"), sanctuary: t("js.status.sanctuary", "In sanctuary"),
+  looking: t("js.status.looking", "Still looking"),
+}[s] || t("js.status.placed", "Placed"));
 const WHO = S.ownerFirst || "she";
 const BG = ["g1", "g2", "g3", "g4", "g5", "g6"];
 const daysToHome = a => (a.status === "adopted" && a.featured_on && a.adopted_on) ? daysBetween(asDate(a.featured_on), asDate(a.adopted_on)) : null;
@@ -127,6 +171,7 @@ async function renderStats() {
   if (!blocks.length) return;
   let st = null;
   try { st = stats(await getAnimals()); } catch {}
+  await wordingReady;
   blocks.forEach(b => {
     const ready = st && st.counted >= MIN_FOR_STAT;
     $$("[data-when=ready]", b).forEach(x => x.hidden = !ready);
@@ -134,37 +179,41 @@ async function renderStats() {
     if (!ready) return;
     $$("[data-stat]", b).forEach(x => {
       const k = x.dataset.stat;
-      x.textContent = k === "ratio" ? `${st.fast} of ${st.counted}` : k === "median" ? (st.median === null ? "n/a" : `${st.median} days`) : k === "dogs" ? String(st.dogs) : x.textContent;
+      x.textContent = k === "ratio" ? t("js.stat.ratio", "{fast} of {counted}", { fast: st.fast, counted: st.counted })
+        : k === "median" ? (st.median === null ? t("js.stat.none", "n/a") : t("js.stat.days", "{n} days", { n: st.median })) : k === "dogs" ? String(st.dogs) : x.textContent;
     });
   });
 }
 
 function petHTML(a, i) {
-  const [cls, label] = STATUS[a.status] || STATUS.placed;
+  const cls = STATUS[a.status] || STATUS.placed, label = statusLabel(a.status);
   const d = daysToHome(a);
-  const sub = a.note || (d !== null ? `Home in ${d} days` : "");
+  const sub = a.note || (d !== null ? t("js.animal.home-in", "Home in {n} days", { n: d }) : "");
   const pic = (EMOJI[a.species] || "🐾") + photoTag(a.photo_url);
-  return `<li><button class="pet" type="button" aria-haspopup="dialog" data-id="${h(a.id)}"><span class="ph ${BG[i % 6]}" aria-hidden="true">${pic}</span><span class="bd"><b>${h(a.name)}</b><span class="chip ${cls}">${label}</span>${sub ? `<small>${h(sub)}</small>` : ""}</span></button></li>`;
+  return `<li><button class="pet" type="button" aria-haspopup="dialog" data-id="${h(a.id)}"><span class="ph ${BG[i % 6]}" aria-hidden="true">${pic}</span><span class="bd"><b>${h(a.name)}</b><span class="chip ${cls}">${h(label)}</span>${sub ? `<small>${h(sub)}</small>` : ""}</span></button></li>`;
 }
 function countsHTML(animals) {
   const c = s => animals.filter(a => a.status === s).length;
-  return [["adopted", "adopted"], ["foster", "in foster"], ["sanctuary", "in sanctuary"], ["placed", "placed or released"], ["looking", "still looking"]]
+  return [["adopted", t("js.count.adopted", "adopted")], ["foster", t("js.count.foster", "in foster")], ["sanctuary", t("js.count.sanctuary", "in sanctuary")],
+    ["placed", t("js.count.placed", "placed or released")], ["looking", t("js.count.looking", "still looking")]]
     .filter(([s]) => s !== "placed" || c("placed"))
-    .map(([s, l]) => `<div class="count"><b>${c(s)}</b><span>${l}</span></div>`).join("");
+    .map(([s, l]) => `<div class="count"><b>${c(s)}</b><span>${h(l)}</span></div>`).join("");
 }
 let ANIMALS = [];
 async function renderAnimals() {
   const walls = $$("[data-wall]"), counts = $$("[data-counts]");
   if (!walls.length && !counts.length) return;
   try { ANIMALS = await getAnimals(); }
-  catch { walls.forEach(w => failed(w, "Happy Tails")); return; }
+  catch { await wordingReady; walls.forEach(w => failed(w, t("js.failed.animals", "Happy Tails couldn't load right now. Please try again in a little while."))); return; }
+  await wordingReady;
   counts.forEach(c => c.innerHTML = countsHTML(ANIMALS));
   walls.forEach(w => {
     const limit = Number(w.dataset.wall) || Infinity;
     const draw = filter => {
       const list = ANIMALS.filter(a => filter === "all" || a.status === filter).slice(0, limit);
-      w.innerHTML = list.length ? list.map(petHTML).join("") : `<li class="empty">More animals are being added.</li>`;
-      const live = $(w.dataset.live || "#none"); if (live) live.textContent = `Showing ${list.length} ${list.length === 1 ? "animal" : "animals"}`;
+      w.innerHTML = list.length ? list.map(petHTML).join("") : `<li class="empty">${h(t("js.animal.none", "More animals are being added."))}</li>`;
+      const live = $(w.dataset.live || "#none");
+      if (live) live.textContent = list.length === 1 ? t("js.animal.showing-one", "Showing 1 animal") : t("js.animal.showing", "Showing {n} animals", { n: list.length });
     };
     draw("all");
     const group = $(w.dataset.filters || "#none");
@@ -180,22 +229,24 @@ document.addEventListener("click", e => {
   const b = e.target.closest(".pet"); if (!b || !dlg) return;
   const a = ANIMALS.find(x => x.id === b.dataset.id); if (!a) return;
   $("#jname").textContent = a.name;
-  const [cls, label] = STATUS[a.status] || STATUS.placed;
+  const cls = STATUS[a.status] || STATUS.placed, label = statusLabel(a.status);
   const chip = $("#jchip"); chip.className = "chip " + cls; chip.textContent = label;
   const pic = $("#jpic"); pic.className = "ph " + BG[0]; pic.innerHTML = (EMOJI[a.species] || "🐾") + photoTag(a.photo_url);
   let steps = Array.isArray(a.journey) ? a.journey.filter(s => s && s.label) : [];
   if (!steps.length) {
-    if (a.featured_on) steps.push({ label: "Featured", detail: `Video posted ${monthYear(a.featured_on)}` });
+    if (a.featured_on) steps.push({ label: t("js.journey.featured", "Featured"), detail: t("js.journey.video", "Video posted {month}", { month: monthYear(a.featured_on) }) });
     const d = daysToHome(a);
-    if (d !== null) steps.push({ label: "Adopted", detail: `Home ${d} days after the video` });
+    if (d !== null) steps.push({ label: t("js.journey.adopted", "Adopted"), detail: t("js.journey.home-after", "Home {n} days after the video", { n: d }) });
     else {
-      const who = a.partner?.name, via = { looking: "With", foster: "With", sanctuary: "At" }[a.status] || "Through";
-      steps.push({ label, detail: [a.note, who ? `${via} ${who}` : ""].filter(Boolean).join(" · ") });
+      const name = a.partner?.name;
+      const via = !name ? "" : a.status === "looking" || a.status === "foster" ? t("js.journey.with", "With {name}", { name })
+        : a.status === "sanctuary" ? t("js.journey.at", "At {name}", { name }) : t("js.journey.through", "Through {name}", { name });
+      steps.push({ label, detail: [a.note, via].filter(Boolean).join(" · ") });
     }
   }
   $("#jsteps").innerHTML = steps.length
     ? steps.map(s => `<li><b>${h(s.label)}</b><span>${h([s.detail, s.date ? monthYear(s.date) : ""].filter(Boolean).join(" · "))}</span></li>`).join("")
-    : `<li><b>Their story is being written up</b><span>Check back soon.</span></li>`;
+    : `<li><b>${h(t("js.journey.soon-title", "Their story is being written up"))}</b><span>${h(t("js.journey.soon", "Check back soon."))}</span></li>`;
   dlg.showModal ? dlg.showModal() : dlg.setAttribute("open", "");
 });
 if (dlg) {
@@ -208,9 +259,10 @@ const OWN_PAGE = { "willow-woods": "willow-woods/" }; // partners with their own
 async function renderRescues(el) {
   try {
     const [partners, animals] = await Promise.all([getPartners(), getAnimals()]);
+    await wordingReady;
     const list = partners;
     if (!list.length) {
-      el.innerHTML = `<p class="empty">More rescues are on the way. Each one appears here once they've said yes to being featured.</p>`;
+      el.innerHTML = `<p class="empty">${h(t("js.rescue.none", "More rescues are on the way. Each one appears here once they've said yes to being featured."))}</p>`;
       return;
     }
     el.innerHTML = list.map(p => {
@@ -223,25 +275,26 @@ async function renderRescues(el) {
         <div class="bd">${p.mission ? `<p>${h(p.mission)}</p>` : ""}
         ${dogs.length ? `<div class="minis">${dogs.map((a, i) => {
           const live = safeUrl(a.listing_url), d = daysToHome(a);
-          return `<div class="mini"><div class="ph ${BG[i % 6]}" aria-hidden="true">${EMOJI[a.species] || "🐾"}${photoTag(a.photo_url)}</div><b>${h(a.name)}</b><span class="chip ${STATUS[a.status][0]}"${a.status === "looking" ? ' style="background:var(--wash)"' : ""}>${STATUS[a.status][1]}</span>
-            ${a.status === "looking" && a.checked_on ? `<small>Checked ${h(new Date(a.checked_on + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }))}</small>` : d !== null ? `<small>Home in ${d} days</small>` : ""}
-            ${a.status === "looking" && live ? `<a href="${h(live)}" target="_blank" rel="noopener">Live listing ↗</a>` : ""}</div>`;
+          return `<div class="mini"><div class="ph ${BG[i % 6]}" aria-hidden="true">${EMOJI[a.species] || "🐾"}${photoTag(a.photo_url)}</div><b>${h(a.name)}</b><span class="chip ${STATUS[a.status]}"${a.status === "looking" ? ' style="background:var(--wash)"' : ""}>${h(statusLabel(a.status))}</span>
+            ${a.status === "looking" && a.checked_on ? `<small>${h(t("js.rescue.checked", "Checked {date}", { date: new Date(a.checked_on + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }) }))}</small>` : d !== null ? `<small>${h(t("js.animal.home-in", "Home in {n} days", { n: d }))}</small>` : ""}
+            ${a.status === "looking" && live ? `<a href="${h(live)}" target="_blank" rel="noopener">${h(t("js.rescue.listing", "Live listing"))} ↗</a>` : ""}</div>`;
         }).join("")}</div>` : ""}
-        <div class="btns">${OWN_PAGE[p.slug] ? `<a class="btn royal" href="${S.base}${OWN_PAGE[p.slug]}">Meet the horses</a>` : ""}${safeUrl(p.website_url) ? `<a class="btn ghost" href="${h(safeUrl(p.website_url))}" rel="noopener">Visit their site <span class="ext" aria-hidden="true">↗</span></a>` : ""}${adopt ? `<a class="btn ocean" href="${h(adopt)}" target="_blank" rel="noopener">Adopt or foster from ${h(p.name)} <span class="ext" aria-hidden="true">↗</span></a>` : ""}${donate ? `<a class="btn ghost" href="${h(donate)}" target="_blank" rel="noopener">Donate on their page <span class="ext" aria-hidden="true">↗</span></a>` : ""}</div>
+        <div class="btns">${OWN_PAGE[p.slug] ? `<a class="btn royal" href="${S.base}${OWN_PAGE[p.slug]}">${h(t("js.rescue.horses", "Meet the horses"))}</a>` : ""}${safeUrl(p.website_url) ? `<a class="btn ghost" href="${h(safeUrl(p.website_url))}" rel="noopener">${h(t("js.rescue.site", "Visit their site"))} <span class="ext" aria-hidden="true">↗</span></a>` : ""}${adopt ? `<a class="btn ocean" href="${h(adopt)}" target="_blank" rel="noopener">${h(t("js.rescue.adopt", "Adopt or foster from {rescue}", { rescue: p.name }))} <span class="ext" aria-hidden="true">↗</span></a>` : ""}${donate ? `<a class="btn ghost" href="${h(donate)}" target="_blank" rel="noopener">${h(t("js.rescue.donate", "Donate on their page"))} <span class="ext" aria-hidden="true">↗</span></a>` : ""}</div>
         </div></div>`;
     }).join("");
-  } catch { failed(el, "Rescues"); }
+  } catch { failed(el, t("js.failed.rescues", "Rescues couldn't load right now. Please try again in a little while.")); }
 }
 
 /* horses at a partner, grouped by herd (Willow Woods page) */
 async function renderHorses(el) {
   try {
     const horses = (await getAnimals()).filter(a => a.partner?.slug === el.dataset.horses && a.species === "horse");
-    if (!horses.length) { el.innerHTML = `<p class="empty">The horses are being added.</p>`; return; }
+    await wordingReady;
+    if (!horses.length) { el.innerHTML = `<p class="empty">${h(t("js.horse.none", "The horses are being added."))}</p>`; return; }
     const herds = [...new Set(horses.map(a => a.herd || ""))].sort((a, b) => (a === "") - (b === "") || a.localeCompare(b));
-    el.innerHTML = `<div class="herds">${herds.map(herd => `<div class="herd"><h3>${h(herd || "More horses")}</h3>
+    el.innerHTML = `<div class="herds">${herds.map(herd => `<div class="herd"><h3>${h(herd || t("js.horse.more", "More horses"))}</h3>
       <ul class="wall" style="margin-top:12px">${horses.filter(a => (a.herd || "") === herd).sort((a, b) => (a.sort ?? 100) - (b.sort ?? 100)).map(petHTML).join("")}</ul></div>`).join("")}</div>`;
-  } catch { failed(el, "The horses"); }
+  } catch { failed(el, t("js.failed.horses", "The horses couldn't load right now. Please try again in a little while.")); }
 }
 
 /* upcoming events for a partner (Willow Woods page) */
@@ -249,30 +302,32 @@ const getEvents = () => once("events", () => q("events", "select=id,title,starts
 async function renderEvents(el) {
   try {
     const list = (await getEvents()).filter(e => !el.dataset.events || e.partner?.slug === el.dataset.events);
-    if (!list.length) { el.innerHTML = `<p class="empty">New events are shared here as they're announced.</p>`; return; }
+    await wordingReady;
+    if (!list.length) { el.innerHTML = `<p class="empty">${h(t("js.event.none", "New events are shared here as they're announced."))}</p>`; return; }
     el.innerHTML = `<ul class="events">${list.map(e => {
       const d = asDate(e.starts_on), link = safeUrl(e.link_url);
       return `<li><span class="when"><b>${d.toLocaleDateString("en-US", { month: "short" })}</b>${d.getDate()}</span><span class="what"><b>${link ? `<a href="${h(link)}" rel="noopener">${h(e.title)}</a>` : h(e.title)}</b><span>${h([d.toLocaleDateString("en-US", { weekday: "long" }), e.time_text, e.place].filter(Boolean).join(" · "))}</span></span></li>`;
     }).join("")}</ul>`;
-  } catch { failed(el, "Events"); }
+  } catch { failed(el, t("js.failed.events", "Events couldn't load right now. Please try again in a little while.")); }
 }
 
 /* ---------- Sniffari programs ---------- */
 async function renderSniffari(el) {
   const group = $(el.dataset.filters || "#none"), live = $(el.dataset.live || "#none");
   let programs;
-  try { programs = await getSniffari(); } catch { failed(el, "Day-out programs"); return; }
+  try { programs = await getSniffari(); } catch { await wordingReady; failed(el, t("js.failed.programs", "Day-out programs couldn't load right now. Please try again in a little while.")); return; }
+  await wordingReady;
   const draw = f => {
     const list = programs.filter(p => f === "all" || (p.tags || []).includes(f));
     el.innerHTML = list.length ? list.map(p => {
       const url = safeUrl(p.signup_url);
       return `<article class="sn"><h3>${h(p.shelter_name)}</h3>${p.program_name || p.city ? `<span class="prog">${h([p.program_name, p.city].filter(Boolean).join(" · "))}</span>` : ""}
         ${p.address ? `<p class="small">${h(p.address)}</p>` : ""}
-        ${(p.facts || []).length ? `<div class="facts">${p.facts.map(t => `<span>${h(t)}</span>`).join("")}</div>` : ""}
-        ${p.checked_on ? `<p class="small">Details checked ${h(new Date(p.checked_on + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }))}</p>` : ""}
-        ${url ? `<div class="btns"><a class="btn ocean" href="${h(url)}" target="_blank" rel="noopener">Sign up on their page <span class="ext" aria-hidden="true">↗</span></a></div>` : ""}</article>`;
-    }).join("") : `<p class="empty">${programs.length ? "No programs match that yet." : "The first programs are being confirmed with the shelters. Run one? Use the form below."}</p>`;
-    if (live) live.textContent = `Showing ${list.length} ${list.length === 1 ? "program" : "programs"}`;
+        ${(p.facts || []).length ? `<div class="facts">${p.facts.map(f => `<span>${h(f)}</span>`).join("")}</div>` : ""}
+        ${p.checked_on ? `<p class="small">${h(t("js.program.checked", "Details checked {date}", { date: new Date(p.checked_on + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) }))}</p>` : ""}
+        ${url ? `<div class="btns"><a class="btn ocean" href="${h(url)}" target="_blank" rel="noopener">${h(t("js.program.signup", "Sign up on their page"))} <span class="ext" aria-hidden="true">↗</span></a></div>` : ""}</article>`;
+    }).join("") : `<p class="empty">${h(programs.length ? t("js.program.no-match", "No programs match that yet.") : t("js.program.none", "The first programs are being confirmed with the shelters. Run one? Use the form below."))}</p>`;
+    if (live) live.textContent = list.length === 1 ? t("js.program.showing-one", "Showing 1 program") : t("js.program.showing", "Showing {n} programs", { n: list.length });
   };
   draw("all");
   if (group) {
@@ -288,30 +343,29 @@ $$("form[data-form]").forEach(form => form.addEventListener("submit", async e =>
   e.preventDefault();
   const msg = $(".formmsg", form), btn = $("button[type=submit]", form);
   const fd = new FormData(form);
-  if (fd.get("website")) { form.reset(); msg.className = "formmsg is-ok"; msg.textContent = "Thanks! Your message is on its way."; return; } // bot trap
+  const thanks = () => t("js.form.thanks", "Thanks! Your message reached {name}. Replies can take a week or two.", { name: WHO });
+  if (fd.get("website")) { form.reset(); msg.className = "formmsg is-ok"; msg.textContent = thanks(); return; } // bot trap
   const topic = TOPIC[form.dataset.form] || fd.get("topic") || "other";
   const details = {};
   for (const [k, v] of fd.entries()) if (!["topic", "name", "email", "body", "website"].includes(k) && v) details[k] = details[k] ? [].concat(details[k], v) : v;
-  btn.disabled = true; msg.className = "formmsg"; msg.textContent = "Sending…";
+  btn.disabled = true; msg.className = "formmsg"; msg.textContent = t("js.form.sending", "Sending…");
   try {
     const r = await fetch(`${S.supabaseUrl}/rest/v1/rpc/submit_message`, {
       method: "POST", headers: { apikey: S.supabaseKey, "Content-Type": "application/json" },
       body: JSON.stringify({ p_topic: topic, p_email: fd.get("email"), p_name: fd.get("name") || null, p_body: fd.get("body") || null, p_details: details, p_page: location.pathname.slice(0, 200) }),
     });
     if (!r.ok) {
-      const t = await r.text();
-      throw new Error(/slow down/.test(t) ? "slow" : /bad email/.test(t) ? "email" : "fail");
+      const why = await r.text();
+      throw new Error(/slow down/.test(why) ? "slow" : /bad email/.test(why) ? "email" : "fail");
     }
     form.reset();
     msg.className = "formmsg is-ok";
-    msg.innerHTML = topic === "help"
-      ? `Thanks, ${h(WHO)} will see this. Replies can take a little while.`
-      : `Thanks! Your message reached ${h(WHO)}. Replies can take a week or two.`;
+    msg.textContent = topic === "help" ? t("js.form.thanks-help", "Thanks, {name} will see this. Replies can take a little while.", { name: WHO }) : thanks();
   } catch (err) {
     msg.className = "formmsg is-err";
-    msg.textContent = err.message === "slow" ? "That's a lot of messages from this email in the last hour. Please try again later."
-      : err.message === "email" ? "That email address doesn't look right. Please check it."
-      : `Couldn't send right now. Please try again, or message ${h(WHO)} on TikTok or Instagram.`;
+    msg.textContent = err.message === "slow" ? t("js.form.slow", "That's a lot of messages from this email in the last hour. Please try again later.")
+      : err.message === "email" ? t("js.form.email", "That email address doesn't look right. Please check it.")
+      : t("js.form.failed", "Couldn't send right now. Please try again, or message {name} on TikTok or Instagram.", { name: WHO });
   } finally { btn.disabled = false; }
 }));
 
@@ -329,7 +383,10 @@ if (hw) {
   hangs.forEach(li => {
     const a = $(".snap", li), label = a.textContent.trim(), d = li.dataset;
     const img = d.img ? `<img src="${h(S.base + d.img)}" alt="" onerror="this.remove()">` : "";
-    a.innerHTML = `<span class="pic ${h(d.g)}" aria-hidden="true">${d.e}${img}</span><span class="lab">${h(label)}</span>`;
+    // the label keeps the link's wording key, so saved wording still finds it
+    const key = a.dataset.t ? ` data-t="${h(a.dataset.t)}"${a.dataset.tOrig ? ` data-t-orig="${h(a.dataset.tOrig)}"` : ""}` : "";
+    a.removeAttribute("data-t"); a.removeAttribute("data-t-orig");
+    a.innerHTML = `<span class="pic ${h(d.g)}" aria-hidden="true">${d.e}${img}</span><span class="lab"${key}>${h(label)}</span>`;
     li.insertAdjacentHTML("afterbegin", '<span class="clip" aria-hidden="true"></span>');
   });
   let lastW = 0;
@@ -398,27 +455,8 @@ if (hw) {
   });
   // coming back with the browser's Back button: clear the finished swing
   addEventListener("pageshow", () => hangs.forEach(li => li.classList.remove("swing")));
-  let t; addEventListener("resize", () => { clearTimeout(t); t = setTimeout(() => { if (hw.clientWidth !== lastW) layout(); }, 120); });
+  let resizing; addEventListener("resize", () => { clearTimeout(resizing); resizing = setTimeout(() => { if (hw.clientWidth !== lastW) layout(); }, 120); });
   layout();
-}
-
-/* ---------- wording changed on the edit page ----------
-   [data-text="key"] shows the page's built-in words until the edit page saves new ones in site_text.
-   Saved text is plain: a blank line starts a new paragraph, and a line starting with "## " is a heading. */
-const textHTML = (s, inline) => inline
-  ? h(s.trim()).replace(/\n+/g, "<br>")
-  : s.trim().split(/\n\s*\n/).map(b => b.startsWith("## ") ? `<h2 class="h2">${h(b.slice(3).trim())}</h2>` : `<p>${h(b.trim()).replace(/\n/g, "<br>")}</p>`).join("");
-async function renderText() {
-  const els = $$("[data-text]");
-  if (!els.length) return;
-  const show = () => els.forEach(el => el.classList.add("txt-ready"));
-  const slow = setTimeout(show, 900); // never hide the built-in words for long
-  try {
-    const rows = await q("site_text", "select=key,body");
-    const by = Object.fromEntries(rows.map(r => [r.key, r.body]));
-    els.forEach(el => { const b = by[el.dataset.text]; if (b && b.trim()) el.innerHTML = textHTML(b, el.tagName === "P"); });
-  } catch {}
-  clearTimeout(slow); show();
 }
 
 /* ---------- local help: under each need on the help page, and "who to call" on the Wildlife page ---------- */
@@ -470,8 +508,13 @@ function countView() {
   }).catch(() => {});
 }
 
+/* ---------- for signed-in editors: a shortcut to this page's wording ---------- */
+try {
+  if (localStorage.getItem("tt-editor-session") && S.scope)
+    document.body.insertAdjacentHTML("beforeend", `<a class="editfab" href="${h(S.base)}edit/#/text/${h(S.scope)}">✏️ Edit this page's wording</a>`);
+} catch {}
+
 /* ---------- start ---------- */
-renderText();
 renderHelp();
 $$("[data-goals]").forEach(renderGoals);
 renderStats();

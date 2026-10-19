@@ -9,7 +9,11 @@
 // become her published name (see OWNER below).
 //
 // site/edit.html is the private edit page, written to /edit/. It gets the same {{base}}/{{asset:}} filling,
-// plus {{config}}: the public settings and the built-in wording of every data-text block.
+// plus {{config}}: the public settings and every piece of wording on the site, for its Page wording screen.
+//
+// Wording: every text on the pages gets a key (site/wording.mjs), and wording saved from the edit page (the
+// site_text table) is built into the pages, so link previews and search engines see it and nothing flickers.
+// site.js also applies anything saved since the last build; the deploy workflow rebuilds nightly to catch up.
 //
 // Settings (environment variables):
 //   SITE_BASE      root path the site is served from. "/Rescue-Site-Build/" on GitHub Pages
@@ -18,11 +22,14 @@
 //                  GitHub Pages' address, which follows a custom domain once one is set.
 //   SITE_PREVIEW   "1" (default) = not launched: hidden from search engines, shows a preview banner.
 //                  "0" = launched.
+//   SITE_TEXT_FILE a JSON file of saved wording ({"key": "words"}) to build with instead of reading site_text,
+//                  for tests ({} builds the pages' own words).
 
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
+import { annotate, blockHTML, esc as escText, scriptPhrases } from "./wording.mjs";
 
 const SRC = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(SRC, "..");
@@ -43,6 +50,25 @@ const CONFIG = {
 };
 
 const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+// Wording saved from the edit page. If it can't be read, the pages are built with their own words, and
+// site.js still puts the saved wording in when the page loads.
+async function savedWording() {
+  let rows;
+  if (process.env.SITE_TEXT_FILE) rows = Object.entries(JSON.parse(fs.readFileSync(process.env.SITE_TEXT_FILE, "utf8"))).map(([key, body]) => ({ key, body }));
+  else {
+    try {
+      const r = await fetch(`${CONFIG.supabaseUrl}/rest/v1/site_text?select=key,body`, { headers: { apikey: CONFIG.supabaseKey }, signal: AbortSignal.timeout(15000) });
+      if (!r.ok) throw new Error(`status ${r.status}`);
+      rows = await r.json();
+    } catch (e) {
+      console.warn(`! saved wording not loaded (${e.message}); building with the pages' own words`);
+      rows = [];
+    }
+  }
+  return Object.fromEntries(rows.filter(r => typeof r.body === "string" && r.body.trim()).map(r => [r.key, r.body.trim()]));
+}
+const saved = await savedWording();
 
 fs.rmSync(OUT, { recursive: true, force: true });
 fs.mkdirSync(OUT, { recursive: true });
@@ -70,32 +96,35 @@ function fill(html) {
 // Wording marked data-text="key" data-label="..." can be changed from the edit page. The page's own words
 // are the default, handed to the edit page as plain text ("## " starts a heading, a blank line a paragraph).
 const decode = s => s.replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim();
-const textDefaults = [];
-function collectText(html, page) {
-  for (const m of html.matchAll(/<(p|div)\b[^>]*\bdata-text="([^"]+)"[^>]*\bdata-label="([^"]+)"[^>]*>([\s\S]*?)<\/\1>/g)) {
-    const [, tag, key, label, inner] = m;
+// Returns the HTML with any saved wording built in, and fills in the block's entry in items.
+const blockKeys = new Set();
+function collectText(html, page, items) {
+  return html.replace(/(<(p|div)\b[^>]*\bdata-text="([^"]+)"[^>]*\bdata-label="([^"]+)"[^>]*>)([\s\S]*?)(<\/\2>)/g, (all, open, tag, key, label, inner, close) => {
     if (tag === "div" && /<div\b/.test(inner)) throw new Error(`${page}: data-text block "${key}" can't contain another <div>`);
-    if (textDefaults.some(t => t.key === key)) throw new Error(`${page}: data-text key "${key}" is used twice`);
+    if (blockKeys.has(key)) throw new Error(`${page}: data-text key "${key}" is used twice`);
+    blockKeys.add(key);
     const text = tag === "p" ? decode(inner)
       : [...inner.matchAll(/<(h2|p)\b[^>]*>([\s\S]*?)<\/\1>/g)].map(([, t, s]) => (t === "h2" ? "## " : "") + decode(s)).join("\n\n");
-    textDefaults.push({ key, label: decode(label), page, block: tag === "div", text });
-  }
+    const item = items.find(i => i.key === key);
+    if (!item) throw new Error(`${page}: data-text block "${key}" wasn't found in the page's wording`);
+    Object.assign(item, { kind: tag === "div" ? "A few paragraphs" : "Paragraph", label: decode(label), multi: tag === "div", text });
+    return saved[key] ? open.replace(/>$/, ` data-text-orig="${escText(text)}">`) + blockHTML(saved[key], tag === "p") + close : all;
+  });
 }
 
 // Link previews (Facebook, texts, TikTok bio links): each page's title and description, and a share image
 // from assets/share/ named after the page (willow-woods.jpg), or default.jpg.
 const pageUrls = [], pageNames = []; // pageNames: for the edit page's Visitors screen
-function social(meta) {
+function social(meta, title, description) {
   const url = SITE_URL + (meta.path === "404" ? "" : meta.path || "");
   const name = (meta.path || "").replace(/\/$/, "");
   const img = hashes[`share/${name}.jpg`] ? `share/${name}.jpg` : "share/default.jpg";
-  const title = meta.title === "Home" ? "TheTerr0rTw!ns" : `${meta.title} · TheTerr0rTw!ns`;
   return [
     meta.path === "404" ? "" : `<link rel="canonical" href="${esc(url)}">`,
     `<meta property="og:site_name" content="TheTerr0rTw!ns">`,
     `<meta property="og:type" content="website">`,
-    `<meta property="og:title" content="${esc(title)}">`,
-    `<meta property="og:description" content="${esc(meta.description || "")}">`,
+    `<meta property="og:title" content="${escText(title)}">`,
+    `<meta property="og:description" content="${escText(description)}">`,
     `<meta property="og:url" content="${esc(url)}">`,
     `<meta property="og:image" content="${esc(SITE_URL + "assets/" + img + "?v=" + hashes[img])}">`,
     `<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">`,
@@ -104,29 +133,49 @@ function social(meta) {
   ].filter(Boolean).join("\n");
 }
 
-const layout = fs.readFileSync(path.join(SRC, "layout.html"), "utf8");
+// The phrases site.js writes as pages load (labels, empty lists, form replies), from its t("js.key", "...") calls.
+// Saved versions go to every page in window.SITE.t, so they're right from the start.
+const phrases = scriptPhrases(fs.readFileSync(path.join(SRC, "assets", "site.js"), "utf8"));
+const scriptItems = [...phrases].map(([key, text]) => ({ key, scope: "js", kind: "Written by the site as the page loads", text }));
+const scriptSaved = Object.fromEntries([...phrases.keys()].filter(k => saved[k]).map(k => [k, saved[k]]));
+
+// The shared header, menu, footer and contact form are one set of wording for every page ("all").
+const layoutItems = [];
+const layout = annotate(fill(fs.readFileSync(path.join(SRC, "layout.html"), "utf8")), "all", saved, layoutItems);
 const pagesDir = path.join(SRC, "pages");
-const built = [];
+const built = [], pageItems = [], areas = [];
 for (const file of fs.readdirSync(pagesDir).filter(f => f.endsWith(".html")).sort()) {
   const raw = fs.readFileSync(path.join(pagesDir, file), "utf8");
   const m = raw.match(/^<!--(\{.*?\})-->\n/);
   if (!m) throw new Error(`${file}: first line must be a <!--{json}--> header`);
   const meta = JSON.parse(m[1]);
-  const body = raw.slice(m[0].length);
+  const scope = meta.path === "404" ? "404" : (meta.path || "").replace(/\/$/, "") || "home";
+  const page = "/" + (meta.path === "404" ? "404.html" : meta.path || "");
+  // title and description, for the browser tab, search results and link previews
+  const tab = meta.title === "Home" ? "TheTerr0rTw!ns · Rescue, education and dog day outs" : `${fill(meta.title)} · TheTerr0rTw!ns`;
+  const items = [
+    { key: `p.${scope}.title`, scope, kind: "Page title (browser tab, Google and link previews)", text: tab },
+    { key: `p.${scope}.description`, scope, kind: "Page description (Google and link previews)", text: fill(meta.description || "") },
+  ];
+  const title = saved[items[0].key] || tab, description = saved[items[1].key] || items[1].text;
+  const preview = saved[items[0].key] || (meta.title === "Home" ? "TheTerr0rTw!ns" : tab);
+  const body = annotate(fill(raw.slice(m[0].length)), scope, saved, items);
+  const site = JSON.stringify({ ...CONFIG, page: "/" + (meta.path === "404" ? "404" : meta.path || ""), scope, t: scriptSaved, ...(saved[items[0].key] ? { titleOrig: tab } : {}) }).replace(/</g, "\\u003c");
   let html = layout
-    .replace("{{title}}", esc(meta.title === "Home" ? "TheTerr0rTw!ns · Rescue, education and dog day outs" : `${meta.title} · TheTerr0rTw!ns`))
-    .replace("{{description}}", esc(meta.description || ""))
+    .replace("{{title}}", escText(title))
+    .replace("{{description}}", escText(description))
     .replace("{{robots}}", PREVIEW ? '<meta name="robots" content="noindex, nofollow">' : "")
-    .replace("{{social}}", () => social(meta))
+    .replace("{{social}}", () => social(meta, preview, description))
     .replace("{{preview}}", PREVIEW ? '<div class="preview" role="note"><b>PREVIEW</b> · This site isn\'t launched yet.</div>' : "")
-    .replace("{{config}}", `<script>window.SITE=${JSON.stringify({ ...CONFIG, page: "/" + (meta.path === "404" ? "404" : meta.path || "") })};</script>`)
+    .replace("{{config}}", () => `<script>window.SITE=${site};</script>`)
     .replace("{{bodyclass}}", esc(meta.bodyclass || ""))
     .replace("{{content}}", () => body);
   if (meta.nav) html = html.replaceAll(`data-nav="${meta.nav}"`, `data-nav="${meta.nav}" aria-current="page"`);
-  html = fill(html);
   const left = html.match(/\{\{[^}]*\}\}/);
   if (left) throw new Error(`${file}: unfilled placeholder ${left[0]}`);
-  collectText(html, "/" + (meta.path === "404" ? "404.html" : meta.path || ""));
+  html = collectText(html, page, items);
+  pageItems.push(...items);
+  areas.push({ scope, title: meta.title === "Home" ? "Home" : fill(meta.title), path: meta.path === "404" ? null : "/" + (meta.path || "") });
   const outFile = meta.path === "404" ? path.join(OUT, "404.html") : path.join(OUT, meta.path || "", "index.html");
   fs.mkdirSync(path.dirname(outFile), { recursive: true });
   fs.writeFileSync(outFile, html);
@@ -136,8 +185,12 @@ for (const file of fs.readdirSync(pagesDir).filter(f => f.endsWith(".html")).sor
 
 // the edit page (/edit/): its own page, not linked from the site, never indexed
 {
-  textDefaults.sort((a, b) => (b.page === "/") - (a.page === "/")); // homepage first, then page order
-  const cfg = JSON.stringify({ ...CONFIG, siteUrl: SITE_URL, pages: pageNames, textDefaults }).replace(/</g, "\\u003c");
+  // every piece of wording, page by page (homepage first, the page-not-found page last), then the shared parts
+  const order = a => (a.scope === "home" ? -1 : a.scope === "404" ? 1 : 0);
+  areas.sort((a, b) => order(a) - order(b));
+  areas.push({ scope: "all", title: "On every page (menu, footer and contact form)", path: "/" }, { scope: "js", title: "Messages and labels the site writes", path: null });
+  const textDefaults = areas.flatMap(a => (a.scope === "all" ? layoutItems : a.scope === "js" ? scriptItems : pageItems.filter(i => i.scope === a.scope)));
+  const cfg = JSON.stringify({ ...CONFIG, siteUrl: SITE_URL, pages: pageNames, areas, textDefaults }).replace(/</g, "\\u003c");
   let html = fill(fs.readFileSync(path.join(SRC, "edit.html"), "utf8")).replace("{{config}}", () => cfg);
   const left = html.match(/\{\{[^}]*\}\}/);
   if (left) throw new Error(`edit.html: unfilled placeholder ${left[0]}`);
