@@ -10,6 +10,7 @@ import dns from "node:dns/promises";
 const args = process.argv.slice(2), dnsOnly = args.includes("--dns");
 const site = new URL(args.find(a => !a.startsWith("--")) || process.env.SITE_URL || "https://dj-jackjack.github.io/Rescue-Site-Build/");
 if (!site.pathname.endsWith("/")) site.pathname += "/";
+if (site.protocol === "http:" && !/^(localhost|127\.)/.test(site.hostname)) site.protocol = "https:"; // GitHub says http:// until HTTPS is enforced
 const OLD = "https://dj-jackjack.github.io/Rescue-Site-Build/";
 const custom = !site.hostname.endsWith(".github.io");
 
@@ -56,7 +57,11 @@ if (dnsOnly) done();
 // the homepage decides which mode the site is in
 const homeRes = await get(site.href);
 const home = await homeRes.text();
-check(homeRes.status === 200, "homepage loads", `${homeRes.status} ${site.href}`);
+check(homeRes.status === 200, "homepage loads", `${homeRes.status || homeRes.error?.cause?.code || homeRes.error?.message} ${site.href}`);
+if (homeRes.status !== 200) {
+  if (custom && !homeRes.status) console.log("  If Enforce HTTPS is still greyed out in the repo's Settings → Pages, GitHub is still making the certificate. Run this again in a while.");
+  done();
+}
 const preview = /<meta name="robots" content="noindex/.test(home);
 console.log(`  mode: ${preview ? "preview (hidden from search engines)" : "launched"}`);
 
