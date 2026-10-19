@@ -1,0 +1,43 @@
+# Checks the published site from the outside after every deploy (tools/check-site.mjs): pages load,
+# link previews point at the right address, preview mode is consistent, the edit page stays hidden.
+# Can also be run by hand from the Actions tab, for example on launch day.
+name: Check live site
+on:
+  workflow_run:
+    workflows: ["Deploy site"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      url:
+        description: "Address to check (leave empty for the site's current address)"
+        required: false
+permissions:
+  contents: read
+  pages: read
+jobs:
+  check:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Find the site's address
+        id: site
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_URL: ${{ inputs.url }}
+        run: |
+          url="$INPUT_URL"
+          if [ -z "$url" ]; then url=$(gh api "repos/${{ github.repository }}/pages" --jq .html_url); fi
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "Checking $url"
+      - name: Give the new version a moment to reach every server
+        if: github.event_name == 'workflow_run'
+        run: sleep 30
+      - name: Check the site
+        env:
+          SITE_URL: ${{ steps.site.outputs.url }}
+        run: node tools/check-site.mjs "$SITE_URL"

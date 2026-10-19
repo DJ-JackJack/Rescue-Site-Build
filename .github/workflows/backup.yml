@@ -1,0 +1,33 @@
+# Weekly copy of the site's public content and uploaded photos, kept for 90 days.
+# To get one: Actions tab > Back up site content > a run > "site-content-..." under Artifacts.
+# Only what visitors can already see is copied (see tools/backup-content.mjs), so it's fine that anyone
+# signed in to GitHub can download it from this public repo.
+name: Back up site content
+on:
+  schedule:
+    - cron: "41 10 * * 1"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Copy the content
+        env:
+          SUPABASE_URL: https://yysfgsdwlddeilktumza.supabase.co
+          SUPABASE_KEY: sb_publishable_UtnxK1yVdvtQhj9pP608jA_mW9ZL5Ty # public on purpose: reads published rows only
+        run: node tools/backup-content.mjs backup
+      - id: day
+        run: echo "day=$(date -u +%F)" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: site-content-${{ steps.day.outputs.day }}
+          path: backup
+          retention-days: 90
+          if-no-files-found: error

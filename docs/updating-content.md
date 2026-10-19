@@ -74,6 +74,19 @@ The original files from the shared Drive folder are kept in `responses/drive-pho
 
 The `admins` table lists the email addresses allowed to edit. It can't be read or changed from the site; add a row in the Table Editor or with SQL. Accounts are made in Authentication → Users ("Allow new users to sign up" stays off).
 
+## Recently deleted and backups
+
+- **In the database:** every change or delete to the site's content keeps a copy of the row as it was, for 90 days, in `content_history` (only editors can read it). Deleted messages are kept the same way. The edit page's **Recently deleted** screen restores deleted rows (`restore_deleted`), together with anything deleted at the same time, like a goal's lines. **Remove for good** deletes every saved copy of it. Earlier versions of an edited row aren't on the edit page; they can be put back with SQL from `content_history` (`op = 'update'`).
+- **Off-site, weekly:** `.github/workflows/backup.yml` runs `tools/backup-content.mjs` every Monday. It saves the public content (every table the site shows) and the photos uploaded from the edit page, and keeps each copy for 90 days: Actions tab → **Back up site content** → a run → the `site-content-...` file under Artifacts. It uses the public key, so hidden rows and messages aren't in it; that's what makes it safe in a public repo. It can also be run by hand (Run workflow).
+
+## Visitor counts
+
+The site counts page views itself, with no cookies and nothing about the visitor: `count_view` adds 1 to today's row in `page_views` (page + day) and, when someone arrives from outside the site, to `visit_sources` (TikTok, google, direct, or the other site's name). `?from=tiktok` on a link sets the source and is taken off the address. A day holds at most 60 pages and 40 sources, so junk can't pile up. Bots, and devices signed in to the edit page (or set to skip), aren't counted. Only editors can read the numbers, through `visitor_summary` on the **Visitors** screen; **Start the counts fresh** (`clear_visitor_counts`) empties them, for launch day.
+
+## Checking the live site
+
+`.github/workflows/check-site.yml` runs `tools/check-site.mjs` after every deploy: every page in the sitemap loads, link previews point at the site's address and their images load, preview mode is the same on every page, the edit page is hidden from search engines, missing pages get the 404 page, and the database answers. With a custom domain it also checks HTTPS, the `www.` address and the old github.io links. A failure shows red on the Actions tab, and GitHub sends its usual failure email. Run it by hand from the Actions tab any time.
+
 ## Keeping the database awake
 
 Free Supabase projects pause after about a week with very little use, and a paused project stops the live content and the edit page. `.github/workflows/keep-awake.yml` reads a little public data twice a day so that doesn't happen. If it ever finds the project paused, the run fails and GitHub sends a failure email: open the Supabase dashboard and choose **Resume project**. It can also be run by hand from the Actions tab (Keep database awake → Run workflow).

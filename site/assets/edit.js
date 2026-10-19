@@ -66,6 +66,8 @@ function friendly(j, status) {
   const m = (j && (j.message || j.hint)) || "";
   if (j?.code === "42501" || status === 403) return "This account isn't allowed to make that change.";
   if (j?.code === "23505") return "That one already exists.";
+  if (j?.code === "23503") return "It belonged to something that's been deleted too. Restore that first.";
+  if (j?.code === "P0001" && m) return m;
   if (/animals_check/.test(m)) return "The adoption date can't be before the video date.";
   if (j?.code === "23514") return "One of the answers isn't allowed. Check the form and try again.";
   if (j?.code === "23502") return "Something required is missing.";
@@ -321,6 +323,8 @@ async function route() {
     if (!sec) return await showHome();
     if (sec === "messages") return await showMessages(id || "new");
     if (sec === "text") return await showText();
+    if (sec === "deleted") return await showDeleted();
+    if (sec === "visitors") return await showVisitors(id || "7");
     if (!SECTIONS[sec]) return go("#/");
     return id ? await showForm(sec, id) : await showList(sec);
   } catch (e) {
@@ -367,13 +371,14 @@ function showNotEditor() {
 }
 
 async function showHome() {
-  const [msgs, animals, goals, progs, help, events] = await Promise.all([
+  const [msgs, animals, goals, progs, help, events, week] = await Promise.all([
     api.list("messages", "select=id&handled=is.false"),
     api.list("animals", "select=id,name,status,published,checked_on"),
     api.list("goals", "select=id,title,status,published,figures_updated_at,bars:goal_bars(id)"),
     api.list("sniffari_programs", "select=id,program_name,shelter_name,published,checked_on"),
     api.list("help_resources", "select=id,name,published,checked_on"),
     api.list("events", `select=id&starts_on=gte.${today()}`),
+    db("POST", "rpc/visitor_summary", { p_days: 7 }).catch(e => { if (e instanceof SignedOut) throw e; return null; }),
   ]);
   const todo = [];
   if (msgs.length) todo.push(`<li><b>${plural(msgs.length, "new message")}</b><div class="btns"><a class="btn royal sm" href="#/messages">Read ${msgs.length === 1 ? "it" : "them"}</a></div></li>`);
@@ -403,6 +408,8 @@ async function showHome() {
     ["sniffari", "🦮", "Day-out programs", plural(progs.length, "program")],
     ["help", "🤝", "Local help list", plural(help.length, "listing")],
     ["text", "✏️", "Page wording", ""],
+    ["visitors", "📈", "Visitors", week ? plural(week.days.reduce((a, d) => a + d[1], 0), "view") + " this week" : ""],
+    ["deleted", "🗑️", "Recently deleted", ""],
   ];
   render(`<h1>Hi! What needs updating?</h1>
     <h2 class="sub">Needs attention</h2>
@@ -687,7 +694,7 @@ async function showForm(key, id) {
   });
 
   $('[data-act="delete"]', app)?.addEventListener("click", async () => {
-    if (!confirm(`Delete “${S.titleOf(row)}” for good?\n\nTurning off “Show on the site” hides it instead and keeps everything.`)) return;
+    if (!confirm(`Delete “${S.titleOf(row)}”?\n\nYou can bring it back from Recently deleted for 90 days. To just hide it, turn off “Show on the site” instead.`)) return;
     try { await api.drop(S.table, row.id); dirty = false; toast("Deleted"); go(`#/${key}`); }
     catch (err) { if (err instanceof SignedOut) return route(); toast(err.message, true); }
   });
@@ -761,10 +768,89 @@ async function showText() {
   });
 }
 
+/* ---------- recently deleted ---------- */
+// Every delete keeps a copy for 90 days (public.content_history). Restore puts back the row and anything
+// deleted with it, like a goal's lines.
+const KIND = {
+  animals: ["Animal", r => r.name], goals: ["Shelter goal", r => r.title], goal_bars: ["Line on a shelter goal", r => r.label],
+  events: ["Event", r => r.title], partners: ["Rescue or shelter", r => r.name], sniffari_programs: ["Day-out program", r => r.program_name || r.shelter_name],
+  help_resources: ["Help listing", r => r.name], messages: ["Message", r => (r.name ? `From ${r.name}` : `From ${r.email}`)],
+};
+async function showDeleted() {
+  const rows = await api.list("content_history", "select=id,at,tx,tbl,row_key,data,by_email&op=eq.delete&restored_at=is.null&order=at.desc&limit=300");
+  const groups = new Map();
+  for (const r of rows.filter(r => KIND[r.tbl])) { if (!groups.has(r.tx)) groups.set(r.tx, []); groups.get(r.tx).push(r); }
+  const order = Object.keys(KIND), items = [...groups.values()].map(g => g.sort((a, b) => order.indexOf(a.tbl) - order.indexOf(b.tbl)));
+  render(`<a class="back" href="#/">‹ Start</a><h1>Recently deleted</h1>
+    <p class="lede">Anything deleted in the last 90 days. Restore puts it back just as it was.</p>
+    ${items.length ? `<ul class="msgs">${items.map(([m, ...rest]) => {
+      const [kind, name] = KIND[m.tbl];
+      const extra = !rest.length ? "" : rest.every(x => x.tbl === "goal_bars") ? ` with its ${rest.length === 1 ? "line" : plural(rest.length, "line")}` : ` and ${plural(rest.length, "other thing")}`;
+      return `<li class="msg del"><div class="mtop"><span class="chip c-topic">${h(kind)}</span><time datetime="${h(m.at)}">${h(when(m.at))}</time></div>
+        <h2>${h(name(m.data) || "Untitled")}</h2>
+        <p class="small">Deleted${extra}${m.by_email ? ` by ${h(m.by_email)}` : ""}</p>
+        <div class="btns"><button class="btn royal sm" type="button" data-act="restore" data-id="${h(m.id)}">Restore</button>
+          <button class="linkbtn" type="button" data-act="forget" data-keys="${h([m, ...rest].map(x => x.row_key).join(","))}">Remove for good</button></div></li>`;
+    }).join("")}</ul>` : `<p class="allgood">Nothing deleted lately ✓</p>`}`);
+}
+
+/* ---------- visitors ---------- */
+// Counts kept by the site itself (public.page_views, public.visit_sources): a page, a day and a number.
+// No cookies, and nothing about who visited.
+const SOURCES = { tiktok: "TikTok", facebook: "Facebook", instagram: "Instagram", youtube: "YouTube", google: "Google", bing: "Bing", duckduckgo: "DuckDuckGo",
+  x: "X (Twitter)", reddit: "Reddit", pinterest: "Pinterest", linktree: "Linktree", direct: "Direct (typed in, bookmarks, some apps)" };
+const RANGES = [["7", "7 days"], ["30", "30 days"], ["365", "12 months"]];
+const NOCOUNT = "tt-no-count";
+function barList(rows, name) {
+  const max = Math.max(1, ...rows.map(r => r[1]));
+  return `<ul class="vlist">${rows.map(([k, n]) => `<li><span class="vname">${h(name(k))}</span><b>${n.toLocaleString("en-US")}</b><i data-w="${Math.round(n / max * 100)}"></i></li>`).join("")}</ul>`;
+}
+async function showVisitors(range) {
+  if (!RANGES.some(r => r[0] === range)) range = "7";
+  const days = Number(range), s = await db("POST", "rpc/visitor_summary", { p_days: days });
+  const views = s.days.reduce((a, d) => a + d[1], 0), visits = s.sources.reduce((a, d) => a + d[1], 0);
+  const by = Object.fromEntries(s.days), bars = [];
+  const start = new Date(s.from + "T00:00:00"), end = new Date(today() + "T00:00:00");
+  if (days <= 31) {
+    for (const d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) bars.push([d.toLocaleDateString("en-US", { month: "short", day: "numeric" }), by[d.toLocaleDateString("en-CA")] || 0]);
+  } else {
+    const months = {};
+    for (const [d, n] of s.days) months[d.slice(0, 7)] = (months[d.slice(0, 7)] || 0) + n;
+    for (const d = new Date(start.getFullYear(), start.getMonth(), 1); d <= end; d.setMonth(d.getMonth() + 1))
+      bars.push([d.toLocaleDateString("en-US", { month: "short" }), months[d.toLocaleDateString("en-CA").slice(0, 7)] || 0]);
+  }
+  const max = Math.max(1, ...bars.map(b => b[1]));
+  const pageName = p => (CFG.pages || []).find(x => x.path === p)?.title || (p === "/404" ? "Page not found" : p);
+  let off = false;
+  try { off = localStorage.getItem(NOCOUNT) === "1"; } catch {}
+  render(`<a class="back" href="#/">‹ Start</a><h1>Visitors</h1>
+    <p class="lede">How often each page is viewed and where visitors come from. No cookies, and nothing about who visited is kept.</p>
+    <div class="fchips" role="group" aria-label="Show">${RANGES.map(([v, l]) => `<a href="#/visitors/${v}" aria-current="${v === range}">${h(l)}</a>`).join("")}</div>
+    <div class="vstats"><p><b>${views.toLocaleString("en-US")}</b> page ${views === 1 ? "view" : "views"}</p><p><b>${visits.toLocaleString("en-US")}</b> ${visits === 1 ? "visit" : "visits"}</p></div>
+    <div class="card vcard">
+      <div class="vchart" role="img" aria-label="${h(`Page views per ${days <= 31 ? "day" : "month"}: ${bars.map(([l, n]) => `${l}, ${n}`).join("; ")}`)}">${bars.map(([l, n]) => `<span title="${h(l)}: ${n}" data-h="${Math.round(n / max * 100)}"></span>`).join("")}</div>
+      <div class="vaxis" aria-hidden="true"><span>${h(bars[0]?.[0] || "")}</span><span>${h(bars.at(-1)?.[0] || "")}</span></div>
+    </div>
+    <h2 class="sub">Pages</h2>
+    ${s.pages.length ? barList(s.pages, pageName) : `<p class="allgood">No views yet.</p>`}
+    <h2 class="sub">Where visits came from</h2>
+    ${s.sources.length ? barList(s.sources, k => SOURCES[k] || k) : `<p class="allgood">No visits yet.</p>`}
+    <p class="hint vtip">Visits from inside the TikTok and Instagram apps often show as Direct. To count them, add <b>?from=tiktok</b> to the link in your bio, like <b>${h((CFG.siteUrl || "") + "?from=tiktok")}</b> (or ?from=instagram, ?from=youtube).</p>
+    <div class="card vdev">
+      <h2>This phone or computer</h2>
+      <p class="small">Visits from a device that's signed in here never count. ${off ? "This one is also skipped when signed out." : "When signed out, this one counts like any visitor."}</p>
+      <div class="btns"><button class="btn ghost sm" type="button" data-act="nocount">${off ? "Count it again when signed out" : "Also skip it when signed out"}</button>
+        <button class="linkbtn" type="button" data-act="clear-counts">Start the counts fresh</button></div>
+    </div>`);
+  // the page's security policy allows no inline styles, so sizes are set here
+  $$(".vchart span", app).forEach(el => { el.style.height = Math.max(Number(el.dataset.h), 1) + "%"; });
+  $$(".vlist i", app).forEach(el => { el.style.width = el.dataset.w + "%"; });
+}
+
 /* ---------- one-tap actions ---------- */
 app.addEventListener("click", async e => {
   const b = e.target.closest("[data-act]");
-  if (!b || !["checked", "adopted", "msg-done", "msg-undo", "msg-delete", "signout"].includes(b.dataset.act)) return;
+  if (!b || !["checked", "adopted", "msg-done", "msg-undo", "msg-delete", "restore", "forget", "nocount", "clear-counts", "signout"].includes(b.dataset.act)) return;
   const id = b.dataset.id;
   try {
     switch (b.dataset.act) {
@@ -774,8 +860,21 @@ app.addEventListener("click", async e => {
       case "msg-done": await api.save("messages", id, { handled: true }); toast("Marked done ✓"); break;
       case "msg-undo": await api.save("messages", id, { handled: false }); toast("Moved back to new"); break;
       case "msg-delete":
-        if (!confirm("Delete this message for good?")) return;
+        if (!confirm("Delete this message?\n\nYou can bring it back from Recently deleted for 90 days.")) return;
         await api.drop("messages", id); toast("Deleted"); break;
+      case "restore": await db("POST", "rpc/restore_deleted", { p_id: Number(id) }); toast("Restored ✓"); break;
+      case "forget": {
+        if (!confirm("Remove this for good?\n\nIt can't be brought back after this.")) return;
+        const r = await db("DELETE", `content_history?row_key=in.(${b.dataset.keys})&select=id`, undefined, "return=representation");
+        if (!r?.length) throw new Error(NOT_SAVED);
+        toast("Removed for good"); break;
+      }
+      case "nocount":
+        try { localStorage.getItem(NOCOUNT) === "1" ? localStorage.removeItem(NOCOUNT) : localStorage.setItem(NOCOUNT, "1"); } catch {}
+        break;
+      case "clear-counts":
+        if (!confirm("Clear all the visitor counts and start from zero?\n\nUse this on launch day, so visits during the preview don't count.")) return;
+        await db("POST", "rpc/clear_visitor_counts", {}); toast("Counts cleared"); break;
     }
     route();
   } catch (err) { if (err instanceof SignedOut) return route(); toast(err.message, true); }

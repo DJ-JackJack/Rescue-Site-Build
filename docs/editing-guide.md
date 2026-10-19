@@ -44,11 +44,15 @@ Below that, **Everything** has a button for each part of the site.
 | Add local help | Local help list → **+ Add**. It shows on the "Help keeping your pet" page under its kind of help. |
 | Change wording | Page wording. Edit the words and tap **Save**. "Go back to the original words" undoes it. |
 | Answer a message | Messages → **Reply by email** opens your email app. Then tap **Mark done**. |
+| Undo a delete | **Recently deleted** → **Restore**. Anything deleted in the last 90 days comes back just as it was. |
+| See how many people visit | **Visitors**. Page views for the last 7 days, 30 days or 12 months, which pages are popular, and where visitors came from. |
 
 ## Good to know
 
 - **Changes show on the site straight away.** Refresh the page to see them.
-- **Hide, don't delete.** Turning off "Show on the site" hides something and keeps everything. Delete is permanent.
+- **Hide, don't delete.** Turning off "Show on the site" hides something and keeps everything. If you do delete something by mistake, it stays in **Recently deleted** for 90 days.
+- **Links in your bios:** add `?from=tiktok` (or `?from=instagram`, `?from=youtube`) to the site link, so Visitors can tell where people came from. Visits from inside those apps often show as "Direct" otherwise.
+- **Your own visits don't count** while you're signed in here. On the Visitors screen you can also skip a phone or computer when it's signed out.
 - **Photos:** pick any photo from your phone. The edit page shrinks it and strips hidden data (like where it was taken) before uploading. Still check the background: no house, street, plates or mail.
 - **Private stuff never goes in:** no home addresses, no wildlife release spots, no names of people who haven't said yes.
 - **Messages** are only visible to signed-in editors.
