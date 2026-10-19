@@ -1,0 +1,40 @@
+# Points the domain at GitHub Pages through Porkbun's API (tools/setup-dns.mjs), run by hand from the Actions tab.
+# Needs the repository secrets PORKBUN_API_KEY and PORKBUN_SECRET_KEY, and API Access turned on for the domain
+# at Porkbun. Unless "Make the changes" is ticked, it only shows what it would change.
+name: Set up domain DNS
+on:
+  workflow_dispatch:
+    inputs:
+      domain:
+        description: "Domain"
+        default: terrortwinsflock.com
+        required: true
+      verification_code:
+        description: "GitHub's domain verification code (optional)"
+        required: false
+      apply:
+        description: "Make the changes (leave unticked to only see what would change)"
+        type: boolean
+        default: false
+permissions:
+  contents: read
+jobs:
+  dns:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Set up the records
+        env:
+          PORKBUN_API_KEY: ${{ secrets.PORKBUN_API_KEY }}
+          PORKBUN_SECRET_KEY: ${{ secrets.PORKBUN_SECRET_KEY }}
+          DOMAIN: ${{ inputs.domain }}
+          CODE: ${{ inputs.verification_code }}
+          APPLY: ${{ inputs.apply && '--apply' || '' }}
+        run: |
+          set -- "$DOMAIN" $APPLY
+          if [ -n "$CODE" ]; then set -- "$@" --verify "$CODE"; fi
+          node tools/setup-dns.mjs "$@"
