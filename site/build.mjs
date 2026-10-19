@@ -84,7 +84,7 @@ function collectText(html, page) {
 
 // Link previews (Facebook, texts, TikTok bio links): each page's title and description, and a share image
 // from assets/share/ named after the page (willow-woods.jpg), or default.jpg.
-const pageUrls = [];
+const pageUrls = [], pageNames = []; // pageNames: for the edit page's Visitors screen
 function social(meta) {
   const url = SITE_URL + (meta.path === "404" ? "" : meta.path || "");
   const name = (meta.path || "").replace(/\/$/, "");
@@ -119,7 +119,7 @@ for (const file of fs.readdirSync(pagesDir).filter(f => f.endsWith(".html")).sor
     .replace("{{robots}}", PREVIEW ? '<meta name="robots" content="noindex, nofollow">' : "")
     .replace("{{social}}", () => social(meta))
     .replace("{{preview}}", PREVIEW ? '<div class="preview" role="note"><b>PREVIEW</b> · This site isn\'t launched yet.</div>' : "")
-    .replace("{{config}}", `<script>window.SITE=${JSON.stringify(CONFIG)};</script>`)
+    .replace("{{config}}", `<script>window.SITE=${JSON.stringify({ ...CONFIG, page: "/" + (meta.path === "404" ? "404" : meta.path || "") })};</script>`)
     .replace("{{bodyclass}}", esc(meta.bodyclass || ""))
     .replace("{{content}}", () => body);
   if (meta.nav) html = html.replaceAll(`data-nav="${meta.nav}"`, `data-nav="${meta.nav}" aria-current="page"`);
@@ -131,13 +131,13 @@ for (const file of fs.readdirSync(pagesDir).filter(f => f.endsWith(".html")).sor
   fs.mkdirSync(path.dirname(outFile), { recursive: true });
   fs.writeFileSync(outFile, html);
   built.push("/" + (meta.path === "404" ? "404.html" : meta.path || ""));
-  if (meta.path !== "404") pageUrls.push(SITE_URL + (meta.path || ""));
+  if (meta.path !== "404") { pageUrls.push(SITE_URL + (meta.path || "")); pageNames.push({ path: "/" + (meta.path || ""), title: fill(meta.title) }); }
 }
 
 // the edit page (/edit/): its own page, not linked from the site, never indexed
 {
   textDefaults.sort((a, b) => (b.page === "/") - (a.page === "/")); // homepage first, then page order
-  const cfg = JSON.stringify({ ...CONFIG, textDefaults }).replace(/</g, "\\u003c");
+  const cfg = JSON.stringify({ ...CONFIG, siteUrl: SITE_URL, pages: pageNames, textDefaults }).replace(/</g, "\\u003c");
   let html = fill(fs.readFileSync(path.join(SRC, "edit.html"), "utf8")).replace("{{config}}", () => cfg);
   const left = html.match(/\{\{[^}]*\}\}/);
   if (left) throw new Error(`edit.html: unfilled placeholder ${left[0]}`);

@@ -440,6 +440,36 @@ async function renderHelp() {
   });
 }
 
+/* ---------- visitor counts ---------- */
+// One count per page view, kept in the site's own database (count_view): just the page, the day and where
+// the visit came from (TikTok, Google, ...). No cookies, and nothing about the visitor is stored or sent.
+// Skipped for bots, and on devices signed in to the edit page or set not to count.
+const SOURCE_OF = [[/(^|\.)tiktok\.com$/, "tiktok"], [/(^|\.)(facebook\.com|fb\.com|fb\.me)$/, "facebook"], [/(^|\.)instagram\.com$/, "instagram"],
+  [/(^|\.)(youtube\.com|youtu\.be)$/, "youtube"], [/(^|\.)google\.[a-z.]+$/, "google"], [/(^|\.)bing\.com$/, "bing"], [/(^|\.)duckduckgo\.com$/, "duckduckgo"],
+  [/(^|\.)(t\.co|x\.com|twitter\.com)$/, "x"], [/(^|\.)reddit\.com$/, "reddit"], [/(^|\.)pinterest\.[a-z.]+$/, "pinterest"], [/(^|\.)linktr\.ee$/, "linktree"]];
+function countView() {
+  try { if (localStorage.getItem("tt-editor-session") || localStorage.getItem("tt-no-count")) return; } catch {}
+  if (!S.page || navigator.webdriver || /bot|crawl|spider|slurp|headless|lighthouse|preview/i.test(navigator.userAgent)) return;
+  // ?from=tiktok on a link (like the one in her bio) says where the visit came from; it's taken off the address after
+  const url = new URL(location.href), tag = url.searchParams.get("from") || url.searchParams.get("utm_source");
+  let source = tag ? tag.toLowerCase().replace(/[^a-z0-9.-]/g, "").slice(0, 40) : "";
+  if (tag !== null) {
+    url.searchParams.delete("from"); url.searchParams.delete("utm_source");
+    try { history.replaceState(history.state, "", url.pathname + url.search + url.hash); } catch {}
+  }
+  if (!source) {
+    let ref = "";
+    try { ref = document.referrer ? new URL(document.referrer).hostname.replace(/^www\./, "") : ""; } catch {}
+    if (ref === location.hostname.replace(/^www\./, "")) source = ""; // moving around the site: a page view, not a new visit
+    else source = !ref ? "direct" : (SOURCE_OF.find(([re]) => re.test(ref)) || [, ref])[1];
+  }
+  fetch(`${S.supabaseUrl}/rest/v1/rpc/count_view`, {
+    method: "POST", keepalive: true,
+    headers: { apikey: S.supabaseKey, "Content-Type": "application/json" },
+    body: JSON.stringify({ p_path: S.page, p_source: source || null }),
+  }).catch(() => {});
+}
+
 /* ---------- start ---------- */
 renderText();
 renderHelp();
@@ -450,4 +480,5 @@ $$("[data-rescues]").forEach(renderRescues);
 $$("[data-horses]").forEach(renderHorses);
 $$("[data-events]").forEach(renderEvents);
 $$("[data-sniffari]").forEach(renderSniffari);
+countView();
 })();

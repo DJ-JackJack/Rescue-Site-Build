@@ -1,7 +1,7 @@
 # Builds site/ and publishes it to GitHub Pages on every push to main.
 # One-time setup: repo Settings > Pages > Build and deployment > Source = "GitHub Actions".
 # Launch switch: Settings > Secrets and variables > Actions > Variables, set SITE_PREVIEW to 0
-# (unset or 1 = preview: hidden from search engines, with a preview banner).
+# (unset or 1 = preview: hidden from search engines, with a preview banner). Full steps: docs/launch-checklist.md.
 name: Deploy site
 
 on:
