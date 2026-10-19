@@ -4,6 +4,10 @@
    supports it, and opens Messages when the notification is tapped.
    It doesn't cache pages or touch anything else. */
 const ICON = "{{asset:icon-192.png}}", BADGE = "{{asset:badge-96.png}}";
+// A new version takes over straight away instead of waiting for every editor tab to close: it keeps no
+// cache or state, so there's nothing to get out of step, and a change here applies to the next notification.
+self.addEventListener("install", () => self.skipWaiting());
+self.addEventListener("activate", e => e.waitUntil(self.clients.claim()));
 self.addEventListener("push", e => {
   let d = {};
   try { d = e.data ? e.data.json() : {}; } catch {}
