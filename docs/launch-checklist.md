@@ -18,7 +18,9 @@ This stops anyone else from pointing the domain at their own GitHub site.
 
 ## 2. Point the domain at GitHub (5 minutes)
 
-At Porkbun: sign in → **Domain Management** → next to terrortwinsflock.com, **DNS** (on a phone, tap the domain first). Each record is added at the top (Type, Host, Answer, then **Add**) and listed underneath, with a trash can to delete it.
+**Or let the "Set up domain DNS" job do it** (`.github/workflows/setup-dns.yml`): at Porkbun, **Account** → **API Access** → create a key, and turn on **API Access** for the domain (Domain Management → the domain → **Details**). Put the two keys in the repo as secrets `PORKBUN_API_KEY` and `PORKBUN_SECRET_KEY` (Settings → Secrets and variables → Actions → **New repository secret**). Then **Actions** → **Set up domain DNS** → **Run workflow**, first without **Make the changes** to see what it will do, then with it. Delete the key at Porkbun afterwards.
+
+By hand: at Porkbun, sign in → **Domain Management** → next to terrortwinsflock.com, **DNS** (on a phone, tap the domain first). Each record is added at the top (Type, Host, Answer, then **Add**) and listed underneath, with a trash can to delete it.
 
 - [ ] Delete Porkbun's two parking records, both pointing to `uixie.porkbun.com`: the **ALIAS** record with a blank host, and the **CNAME** record with host `*`.
 - [ ] Add these records. Leave Host blank where it says so, and TTL at the default.
