@@ -143,6 +143,9 @@ for (const file of fs.readdirSync(pagesDir).filter(f => f.endsWith(".html")).sor
   if (left) throw new Error(`edit.html: unfilled placeholder ${left[0]}`);
   fs.mkdirSync(path.join(OUT, "edit"), { recursive: true });
   fs.writeFileSync(path.join(OUT, "edit", "index.html"), html);
+  const sw = fill(fs.readFileSync(path.join(SRC, "edit-sw.js"), "utf8")); // notifications; must sit in /edit/ to look after it
+  if (/\{\{[^}]*\}\}/.test(sw)) throw new Error("edit-sw.js: unfilled placeholder");
+  fs.writeFileSync(path.join(OUT, "edit", "sw.js"), sw);
   fs.writeFileSync(path.join(OUT, "edit", "manifest.webmanifest"), JSON.stringify({
     name: "TheTerr0rTw!ns site editor", short_name: "Site editor", start_url: "./", scope: "./", display: "standalone",
     background_color: "#FBF8FF", theme_color: "#352262",
