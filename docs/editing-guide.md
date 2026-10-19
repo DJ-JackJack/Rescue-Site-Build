@@ -1,7 +1,6 @@
 # Editing the site from your phone
 
-The edit page lives at **`/edit/`** on the site. Today that's
-`https://dj-jackjack.github.io/Rescue-Site-Build/edit/`. It isn't in the menu, and search engines are told to skip it.
+The edit page lives at **`https://terrortwinsflock.com/edit/`**. It isn't in the menu, and search engines are told to skip it.
 
 **Tip:** open it on your phone and use "Add to Home Screen". It then opens like an app, and you stay signed in.
 
