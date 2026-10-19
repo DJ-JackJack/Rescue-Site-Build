@@ -108,7 +108,7 @@ The site counts page views itself, with no cookies and nothing about the visitor
 
 ## Checking the live site
 
-`.github/workflows/check-site.yml` runs `tools/check-site.mjs` after every deploy: every page in the sitemap loads, link previews point at the site's address and their images load, preview mode is the same on every page, the edit page is hidden from search engines, missing pages get the 404 page, and the database answers. With a custom domain it also checks HTTPS, the `www.` address and the old github.io links. A failure shows red on the Actions tab, and GitHub sends its usual failure email. Run it by hand from the Actions tab any time.
+`.github/workflows/check-site.yml` runs `tools/check-site.mjs` after every deploy: every page in the sitemap loads, link previews point at the site's address and their images load, preview mode is the same on every page, the edit page is hidden from search engines, missing pages get the 404 page, and the database answers. With a custom domain it also checks the domain's DNS records, HTTPS, the `www.` address and the old github.io links. A failure shows red on the Actions tab, and GitHub sends its usual failure email. Run it by hand from the Actions tab any time.
 
 ## Keeping the database awake
 
