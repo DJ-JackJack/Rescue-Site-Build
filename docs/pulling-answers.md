@@ -40,3 +40,5 @@ order by updated_at desc;
 - More than one row means she used more than one device. Each is shown separately; merge them by hand, preferring the newest answer.
 - Test rows from Krys's phone may appear. Krys's earlier test device started with `42e21e2b` and has been deleted; any new test row can be deleted from the Table Editor.
 - The script reads the question wording out of `questionnaire/index.html`, so if the form changes, the transcript follows automatically.
+
+**Note (Oct 2026):** the questionnaire is no longer published and no longer accepts answers (the `save_questionnaire` function was closed to the public). The saved answers above are kept.
