@@ -36,7 +36,8 @@ const ROOT = path.resolve(SRC, "..");
 const OUT = path.join(ROOT, "_site");
 const BASE = ("/" + (process.env.SITE_BASE || "/").replace(/^\/+|\/+$/g, "") + "/").replace("//", "/");
 const PREVIEW = process.env.SITE_PREVIEW !== "0";
-const SITE_URL = (process.env.SITE_URL || "https://dj-jackjack.github.io" + BASE).replace(/\/+$/, "") + "/";
+// GitHub gives the address as http:// until "Enforce HTTPS" is ticked; the site is always meant to be https://.
+const SITE_URL = (process.env.SITE_URL || "https://dj-jackjack.github.io" + BASE).replace(/\/+$/, "").replace(/^http:\/\/(?!localhost|127\.)/, "https://") + "/";
 
 // The name she publishes under (a pen name). Change it here and every page follows.
 const OWNER = { full: "Taea Whelan", first: "Taea" };
