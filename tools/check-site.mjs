@@ -3,9 +3,12 @@
 // the right address and their images load, preview mode is on or off everywhere at once, the edit page
 // stays hidden from search engines, and missing pages get the 404 page.
 //   node tools/check-site.mjs https://example.com/
-// .github/workflows/check-site.yml runs it after every deploy. On launch day it also checks HTTPS,
-// the www address and the redirect from the old github.io address (see docs/launch-checklist.md).
-const site = new URL(process.argv[2] || process.env.SITE_URL || "https://dj-jackjack.github.io/Rescue-Site-Build/");
+//   node tools/check-site.mjs https://example.com/ --dns     (only the domain's DNS records, while setting it up)
+// .github/workflows/check-site.yml runs it after every deploy. On its own domain it also checks the DNS
+// records, HTTPS, the www address and the redirect from the old github.io address (see docs/launch-checklist.md).
+import dns from "node:dns/promises";
+const args = process.argv.slice(2), dnsOnly = args.includes("--dns");
+const site = new URL(args.find(a => !a.startsWith("--")) || process.env.SITE_URL || "https://dj-jackjack.github.io/Rescue-Site-Build/");
 if (!site.pathname.endsWith("/")) site.pathname += "/";
 const OLD = "https://dj-jackjack.github.io/Rescue-Site-Build/";
 const custom = !site.hostname.endsWith(".github.io");
@@ -19,6 +22,36 @@ async function get(url, opts = {}) {
   }
 }
 const attr = (html, re) => (html.match(re) || [])[1] || "";
+const done = () => {
+  const bad = results.filter(ok => !ok).length;
+  console.log(bad ? `\n${bad} of ${results.length} checks failed.` : `\nAll ${results.length} checks passed.`);
+  process.exit(bad ? 1 : 0);
+};
+
+// A domain of its own: the records GitHub Pages asks for (docs/launch-checklist.md, step 2).
+const OWNER = "dj-jackjack";
+const GITHUB_A = ["185.199.108.153", "185.199.109.153", "185.199.110.153", "185.199.111.153"];
+const GITHUB_AAAA = ["2606:50c0:8000::153", "2606:50c0:8001::153", "2606:50c0:8002::153", "2606:50c0:8003::153"];
+async function checkDns() {
+  const r = new dns.Resolver();
+  r.setServers(["8.8.8.8", "1.1.1.1"]); // public resolvers, so the answer is what the world sees now
+  const ask = (name, type) => r.resolve(name, type).catch(e => (["ENODATA", "ENOTFOUND"].includes(e.code) ? [] : Promise.reject(e)));
+  const apex = site.hostname.replace(/^www\./, ""), www = "www." + apex;
+  const list = xs => xs.join(", ") || "none";
+  const ns = await ask(apex, "NS").catch(() => []);
+  console.log(`  ${apex} is run by: ${list(ns.map(n => n.toLowerCase()))}`);
+  const a = (await ask(apex, "A")).sort(), aaaa = (await ask(apex, "AAAA")).map(x => x.toLowerCase()).sort();
+  check(a.join() === GITHUB_A.join(), `${apex} A records are GitHub's four`, list(a));
+  check(!aaaa.length || aaaa.join() === GITHUB_AAAA.join(), `${apex} AAAA records are GitHub's four (or there are none)`, list(aaaa));
+  const cname = (await ask(www, "CNAME")).map(x => x.toLowerCase().replace(/\.$/, ""));
+  check(cname.join() === `${OWNER}.github.io`, `${www} points at ${OWNER}.github.io`, list(cname));
+  const caa = await ask(apex, "CAA");
+  if (caa.length) check(caa.some(c => c.issue === "letsencrypt.org"), "CAA records allow GitHub's HTTPS certificate (letsencrypt.org)", list(caa.map(c => c.issue || c.issuewild || "")));
+  const txt = (await ask(`_github-pages-challenge-${OWNER}.${apex}`, "TXT")).flat();
+  console.log(`  GitHub's domain verification record: ${txt.length ? "found" : "not found (only needed until GitHub shows the domain as verified)"}`);
+}
+if (custom) await checkDns();
+if (dnsOnly) done();
 
 // the homepage decides which mode the site is in
 const homeRes = await get(site.href);
@@ -76,6 +109,4 @@ if (custom) {
   check(old.status === 200 && new URL(old.url).hostname === site.hostname, "the old github.io address leads to the new one", `${old.status} ${old.url}`);
 }
 
-const bad = results.filter(ok => !ok).length;
-console.log(bad ? `\n${bad} of ${results.length} checks failed.` : `\nAll ${results.length} checks passed.`);
-process.exit(bad ? 1 : 0);
+done();

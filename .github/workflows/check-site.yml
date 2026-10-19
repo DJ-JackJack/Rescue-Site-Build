@@ -11,6 +11,10 @@ on:
       url:
         description: "Address to check (leave empty for the site's current address)"
         required: false
+      dns_only:
+        description: "Only check the domain's DNS records (while setting up a new domain)"
+        type: boolean
+        default: false
 permissions:
   contents: read
   pages: read
@@ -40,4 +44,5 @@ jobs:
       - name: Check the site
         env:
           SITE_URL: ${{ steps.site.outputs.url }}
-        run: node tools/check-site.mjs "$SITE_URL"
+          DNS_ONLY: ${{ inputs.dns_only && '--dns' || '' }}
+        run: node tools/check-site.mjs "$SITE_URL" $DNS_ONLY
