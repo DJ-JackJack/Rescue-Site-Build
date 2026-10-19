@@ -13,6 +13,7 @@ The website for TheTerr0rTw!ns (tae): rescue features, shelter goals, dog day ou
 - **The edit page** (`site/edit.html`, `site/assets/edit.js`) signs in with Supabase Auth. Only emails in the `admins` table can change anything; the database enforces it with row-level security. Photos upload to the public `photos` storage bucket after being shrunk and stripped of hidden data in the browser.
 - **Link previews and icons:** each page gets a title, description and share image for Facebook, texts and TikTok links (`site/assets/share/<page>.jpg`, else `default.jpg`). The paw icon is `site/assets/icon.svg`, with PNG sizes beside it. A sitemap is written for search engines, and listed in `robots.txt` once the site launches.
 - **Publishing:** every push to `main` builds the site and publishes it to GitHub Pages (`.github/workflows/deploy-site.yml`).
+- **Keeping the database awake:** `.github/workflows/keep-awake.yml` reads a little public data twice a day so the free Supabase project doesn't pause. See `docs/updating-content.md`.
 - **Preview mode** is on until launch: the site is hidden from search engines and shows a preview banner. To launch, set the repository variable `SITE_PREVIEW` to `0`.
 - **`questionnaire/`** is the original planning questionnaire. It's no longer on the site and can't take new answers; its saved answers stay in the `questionnaire_responses` table, and `tools/render-answers.mjs` still uses its question wording.
 
