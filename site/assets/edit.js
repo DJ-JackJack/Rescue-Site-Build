@@ -150,6 +150,12 @@ const HELPCATS = [["food", "Food and supplies"], ["vet", "Vet bills"], ["behavio
 const TOPICS = { partner: "Partnership", help: "Help keeping a pet", dog: "About a dog", sniffari: "Day-out program", other: "Something else" };
 const RANK = { looking: 0, foster: 1, adopted: 2, sanctuary: 3, placed: 4 };
 const stale = (d, days) => d === null || d === undefined || daysAgo(d) >= days;
+const platform = u => {
+  let host = "";
+  try { host = new URL(u).hostname.replace(/^www\./, ""); } catch { return ""; }
+  return /(^|\.)tiktok\.com$/.test(host) ? "TikTok" : /(^|\.)instagram\.com$/.test(host) ? "Instagram" : /(^|\.)(youtube\.com|youtu\.be)$/.test(host) ? "YouTube"
+    : /(^|\.)(facebook\.com|fb\.watch)$/.test(host) ? "Facebook" : host;
+};
 
 const SHOW = { name: "published", type: "toggle", label: "Show on the site", help: "Turn this off to hide it without losing anything.", dflt: true };
 const SORT = { name: "sort", type: "number", label: "Order", help: "Lower numbers show first.", dflt: 100 };
@@ -173,7 +179,9 @@ const SECTIONS = {
       { name: "partner_id", type: "partner", label: "Rescue or shelter" },
       { name: "photo_url", type: "photo", label: "Photo", folder: "animals" },
       { name: "note", type: "textarea", rows: 2, max: 200, label: "Short note", help: "Shown under their name. Keep it to a line." },
-      { name: "journey", type: "journey", label: "Their journey", help: "The steps people see when they tap this animal on Happy Tails, in order. Leave it empty and the site uses the video and adoption dates." },
+      { name: "story", type: "textarea", rows: 8, max: 6000, label: "Their story", help: "Shown when people tap them on Happy Tails. Leave a blank line between paragraphs." },
+      { name: "journey", type: "journey", label: "Their journey", help: "The steps people see when they tap this animal on Happy Tails, in order, like each visit until they leave the shelter. Leave it empty and the site uses the video and adoption dates." },
+      { name: "updates", type: "updates", label: "Updates and notes", help: "Dated news, like how they're doing in their new home. The newest shows first." },
       { name: "listing_url", type: "url", label: "Link to their adoption listing", when: v => ["looking", "foster"].includes(v.status) },
       { name: "checked_on", type: "date", label: "Last checked that they're still available", today: "Checked today", dflt: today,
         help: "A dog who's still looking hides from the site 4 weeks after this date, so the site never shows a dog who's already gone.", when: v => v.status === "looking" },
@@ -280,6 +288,36 @@ const SECTIONS = {
       SHOW, SORT,
     ],
   },
+  videos: {
+    table: "videos", title: "Day-out videos", one: "day-out video", icon: "🎬",
+    intro: "Videos of the dogs' day outs, shown on Rescues on Sniffari. That part of the page stays hidden until there's a video to show.",
+    query: "select=*&order=sort.asc,posted_on.desc.nullslast,created_at.desc",
+    titleOf: r => r.title,
+    row: r => ({ title: r.title, emoji: "🎬", photo: r.photo_url, sub: [r.posted_on && nice(r.posted_on), platform(r.url)].filter(Boolean).join(" · "), flags: [!r.published && "Hidden"] }),
+    fields: [
+      { name: "title", type: "text", label: "Title", required: true, max: 200, help: "Like “Biscuit's first beach day”." },
+      { name: "url", type: "url", label: "Link to the video", required: true, help: "From TikTok, Instagram, YouTube or Facebook: tap Share, then Copy link.", check: [/^https:\/\//, "Video links need to start with https://"] },
+      { name: "posted_on", type: "date", label: "Date posted" },
+      { name: "note", type: "textarea", rows: 2, max: 300, label: "Short note", help: "Shown under the title." },
+      { name: "photo_url", type: "photo", label: "Cover photo", folder: "videos" },
+      SHOW, { ...SORT, help: "Lower numbers show first. Videos with the same number show newest first." },
+    ],
+  },
+  places: {
+    table: "places", title: "Dog-friendly places", one: "dog-friendly place", icon: "📍",
+    intro: "Your picks for places to take a dog, and why, shown on Rescues on Sniffari. That part of the page stays hidden until there's a place to show.",
+    query: "select=*&order=sort.asc,name.asc",
+    titleOf: r => r.name,
+    row: r => ({ title: r.name, emoji: "📍", photo: r.photo_url, sub: r.area || "", flags: [!r.published && "Hidden"] }),
+    fields: [
+      { name: "name", type: "text", label: "Name", required: true, max: 200 },
+      { name: "area", type: "text", label: "Where", max: 100, help: "A city, or the public place itself. Never a private address." },
+      { name: "why", type: "textarea", rows: 5, max: 1000, label: "Why you pick it" },
+      { name: "link_url", type: "url", label: "Their website" },
+      { name: "photo_url", type: "photo", label: "Photo", folder: "places" },
+      SHOW, SORT,
+    ],
+  },
   help: {
     table: "help_resources", title: "Local help list", one: "help listing", icon: "🤝",
     intro: "Shown on the “Help keeping your pet” page under each kind of help. Wild animal help shows on the Wildlife page.",
@@ -293,9 +331,13 @@ const SECTIONS = {
       { name: "category", type: "choice", label: "What kind of help?", options: HELPCATS, dflt: "food" },
       { name: "name", type: "text", label: "Name", required: true, max: 200 },
       { name: "description", type: "textarea", rows: 3, max: 600, label: "What they offer" },
+      { name: "caution", type: "textarea", rows: 2, max: 400, label: "Caution", help: "Shown in a box with the listing, like “This is a credit card, not financial assistance.”" },
       { name: "link_url", type: "url", label: "Website" },
-      { name: "phone", type: "text", label: "Phone", max: 40, inputmode: "tel" },
-      { name: "area", type: "text", label: "Area", max: 100, help: "A city, or “All of Hampton Roads”. Never a private address." },
+      { name: "more_url", type: "url", label: "Second link", help: "Optional, like their free resource library." },
+      { name: "more_label", type: "text", label: "What the second link says", max: 80, help: "Like “Free pet care library”.", when: v => !!v.more_url },
+      { name: "phone", type: "text", label: "Phone", max: 40, inputmode: "tel", help: "Extra words are fine, like “(757) 427-0071, option 1”. The call button uses the first number." },
+      { name: "email", type: "text", label: "Email", max: 120, inputmode: "email", check: [/^[^@\s]+@[^@\s]+\.[^@\s]+$/, "That doesn't look like an email address."] },
+      { name: "area", type: "text", label: "Area", max: 100, help: "A city, “All of Hampton Roads”, or a public building's address. Never a private home, and never a wildlife rehab or release site." },
       { name: "checked_on", type: "date", label: "Last checked it's still running", today: "Checked today", dflt: today },
       SHOW, SORT,
     ],
@@ -371,7 +413,7 @@ function showNotEditor() {
 }
 
 async function showHome() {
-  const [msgs, animals, goals, progs, help, events, week] = await Promise.all([
+  const [msgs, animals, goals, progs, help, events, week, videos, places] = await Promise.all([
     api.list("messages", "select=id&handled=is.false"),
     api.list("animals", "select=id,name,status,published,checked_on"),
     api.list("goals", "select=id,title,status,published,figures_updated_at,bars:goal_bars(id)"),
@@ -379,6 +421,8 @@ async function showHome() {
     api.list("help_resources", "select=id,name,published,checked_on"),
     api.list("events", `select=id&starts_on=gte.${today()}`),
     db("POST", "rpc/visitor_summary", { p_days: 7 }).catch(e => { if (e instanceof SignedOut) throw e; return null; }),
+    api.list("videos", "select=id"),
+    api.list("places", "select=id"),
   ]);
   const todo = [];
   if (msgs.length) todo.push(`<li><b>${plural(msgs.length, "new message")}</b><div class="btns"><a class="btn royal sm" href="#/messages">Read ${msgs.length === 1 ? "it" : "them"}</a></div></li>`);
@@ -406,6 +450,8 @@ async function showHome() {
     ["events", "📅", "Events", plural(events.length, "coming up", "coming up")],
     ["partners", "🏡", "Rescues & shelters", ""],
     ["sniffari", "🦮", "Day-out programs", plural(progs.length, "program")],
+    ["videos", "🎬", "Day-out videos", plural(videos.length, "video")],
+    ["places", "📍", "Dog-friendly places", plural(places.length, "place")],
     ["help", "🤝", "Local help list", plural(help.length, "listing")],
     ["text", "✏️", "Page wording", ""],
     ["visitors", "📈", "Visitors", week ? plural(week.days.reduce((a, d) => a + d[1], 0), "view") + " this week" : ""],
@@ -473,8 +519,14 @@ const barRow = b => `<div class="bar-row" data-id="${h(b.id || "")}">
 const stepRow = s => `<div class="step-row">
   <label>What happened<input name="j_label" value="${h(s.label || "")}" maxlength="80" placeholder="Went to a foster home" autocomplete="off"></label>
   <label>When<input name="j_date" type="date" value="${h(s.date || "")}"></label>
-  <label class="wide">Details<input name="j_detail" value="${h(s.detail || "")}" maxlength="200" placeholder="Learning to love car rides" autocomplete="off"></label>
+  <label class="wide">Details<textarea name="j_detail" rows="2" maxlength="500" placeholder="Learning to love car rides">${h(s.detail || "")}</textarea></label>
   <div class="step-btns"><button type="button" class="xbtn" data-step-up aria-label="Move this step up">↑</button><button type="button" class="xbtn" data-step-down aria-label="Move this step down">↓</button><button type="button" class="xbtn" data-step-remove aria-label="Remove this step">✕</button></div></div>`;
+
+// Newest first, like the site shows them. Keys in the database's order (date, text), as with the journey.
+const noteRow = n => `<div class="step-row note-row">
+  <label>Date<input name="u_date" type="date" value="${h(n.date || "")}"></label>
+  <label class="wide">Update or note<textarea name="u_text" rows="3" maxlength="1000" placeholder="Went on a day out to the beach and loved the waves">${h(n.text || "")}</textarea></label>
+  <div class="step-btns"><button type="button" class="xbtn" data-note-remove aria-label="Remove this update">✕</button></div></div>`;
 
 function fieldHTML(f, v, ctx) {
   const id = fid(f.name), help = f.help ? `<p class="hint" id="${id}-h">${h(f.help)}</p>` : "";
@@ -510,6 +562,9 @@ function fieldHTML(f, v, ctx) {
     case "journey":
       return wrap(`<span class="flabel">${h(f.label)}</span><div class="steps-ed">${(v || []).map(stepRow).join("")}</div>
         <div class="btns"><button type="button" class="btn ghost sm" data-step-add>+ Add a step</button><button type="button" class="btn ghost sm" data-step-fill>Fill in from the dates</button></div>`);
+    case "updates":
+      return wrap(`<span class="flabel">${h(f.label)}</span><div class="notes-ed">${(v || []).map(noteRow).join("")}</div>
+        <button type="button" class="btn ghost sm" data-note-add>+ Add an update</button>`);
     case "bars":
       return wrap(`<span class="flabel">${h(f.label)}</span><div class="bars">${[...(v || [])].sort((a, b) => a.sort - b.sort).map(barRow).join("")}</div><button type="button" class="btn ghost sm" data-bar-add>+ Add a line</button>`);
   }
@@ -534,8 +589,12 @@ function readForm(form, fields) {
         break;
       }
       case "journey": // empty rows are dropped
-        out[f.name] = $$(".step-row", form).map(r => ({ date: $("[name=j_date]", r).value || null, label: $("[name=j_label]", r).value.trim(), detail: $("[name=j_detail]", r).value.trim() || null }))
+        out[f.name] = $$(".steps-ed .step-row", form).map(r => ({ date: $("[name=j_date]", r).value || null, label: $("[name=j_label]", r).value.trim(), detail: $("[name=j_detail]", r).value.trim() || null }))
           .filter(s => s.label || s.detail || s.date);
+        break;
+      case "updates": // empty rows are dropped; newest first, undated last, as on the site
+        out[f.name] = $$(".note-row", form).map(r => ({ date: $("[name=u_date]", r).value || null, text: $("[name=u_text]", r).value.trim() }))
+          .filter(n => n.text || n.date).sort((a, b) => (b.date || "").localeCompare(a.date || ""));
         break;
       case "bars":
         out[f.name] = $$(".bar-row", form).map((r, i) => ({ id: r.dataset.id || null, label: $("[name=bar_label]", r).value.trim(), target: num($("[name=bar_target]", r).value), current: num($("[name=bar_current]", r).value), sort: i + 1 }));
@@ -555,9 +614,14 @@ function validate(form, fields, vals) {
     if (!box.hidden) {
       if (f.required && (v === null || v === "")) msg = "Please fill this in.";
       else if (f.type === "url" && v && !safeUrl(v)) msg = "That doesn't look like a web link. It should start with https://";
+      else if (f.check && v && !f.check[0].test(v)) msg = f.check[1];
       else if (f.type === "journey") {
         $$(".step-row", box).forEach(r => r.classList.toggle("bad", !$("[name=j_label]", r).value.trim() && !!($("[name=j_detail]", r).value.trim() || $("[name=j_date]", r).value)));
         if (v.some(s => !s.label)) msg = "Each step needs a “What happened”.";
+      }
+      else if (f.type === "updates") {
+        $$(".note-row", box).forEach(r => r.classList.toggle("bad", !$("[name=u_text]", r).value.trim() && !!$("[name=u_date]", r).value));
+        if (v.some(n => !n.text)) msg = "Each update needs some words.";
       }
       else if (f.type === "bars") {
         const rows = $$(".bar-row", box);
@@ -587,7 +651,7 @@ async function showForm(key, id) {
     render(`<a class="back" href="#/${key}">‹ ${h(S.title)}</a><h1>Not found</h1><p class="note">That one wasn't found. It may have been deleted.</p>`);
     return;
   }
-  const vals = row || Object.fromEntries(S.fields.map(f => [f.name, typeof f.dflt === "function" ? f.dflt() : f.dflt ?? (f.type === "toggle" ? false : f.type === "tags" || f.type === "lines" || f.type === "bars" || f.type === "journey" ? [] : null)]));
+  const vals = row || Object.fromEntries(S.fields.map(f => [f.name, typeof f.dflt === "function" ? f.dflt() : f.dflt ?? (f.type === "toggle" ? false : f.type === "tags" || f.type === "lines" || f.type === "bars" || f.type === "journey" || f.type === "updates" ? [] : null)]));
   const ctx = { partners };
   render(`<a class="back" href="#/${key}">‹ ${h(S.title)}</a>
     <h1>${isNew ? `Add ${h(S.one)}` : h(S.titleOf(row))}</h1>
@@ -621,6 +685,8 @@ async function showForm(key, id) {
     if (t.hasAttribute("data-bar-remove")) { t.closest(".bar-row").remove(); dirty = true; return; }
     if (t.hasAttribute("data-step-add")) { $(".steps-ed", form).insertAdjacentHTML("beforeend", stepRow({})); $(".steps-ed .step-row:last-child input", form).focus(); dirty = true; return; }
     if (t.hasAttribute("data-step-remove")) { t.closest(".step-row").remove(); dirty = true; return; }
+    if (t.hasAttribute("data-note-add")) { $(".notes-ed", form).insertAdjacentHTML("afterbegin", noteRow({ date: today() })); $(".notes-ed .note-row:first-child textarea", form).focus(); dirty = true; return; }
+    if (t.hasAttribute("data-note-remove")) { t.closest(".note-row").remove(); dirty = true; return; }
     if (t.hasAttribute("data-step-up") || t.hasAttribute("data-step-down")) {
       const r = t.closest(".step-row"), up = t.hasAttribute("data-step-up"), other = up ? r.previousElementSibling : r.nextElementSibling;
       if (other) { up ? other.before(r) : other.after(r); t.focus(); dirty = true; }
@@ -809,7 +875,8 @@ const WORDS = CFG.textDefaults || [], AREAS = CFG.areas || [];
 const PHRASE_GROUPS = {
   goal: "Shelter goals", status: "Animal labels", count: "Animal counts", animal: "Happy Tails", stat: "The adoption number",
   journey: "An animal's journey (the pop-up)", rescue: "Rescues", horse: "Willow Woods horses", event: "Events",
-  program: "Day-out programs", form: "Contact forms", failed: "When part of a page can't load",
+  program: "Day-out programs", video: "Day-out videos", place: "Dog-friendly places", help: "Local help list",
+  form: "Contact forms", failed: "When part of a page can't load",
 };
 const clip = (s, n = 60) => (s.length > n ? s.slice(0, n - 1) + "…" : s);
 const areaTitle = scope => AREAS.find(a => a.scope === scope)?.title || scope;
@@ -948,6 +1015,7 @@ async function showText(scope) {
 const KIND = {
   animals: ["Animal", r => r.name], goals: ["Shelter goal", r => r.title], goal_bars: ["Line on a shelter goal", r => r.label],
   events: ["Event", r => r.title], partners: ["Rescue or shelter", r => r.name], sniffari_programs: ["Day-out program", r => r.program_name || r.shelter_name],
+  videos: ["Day-out video", r => r.title], places: ["Dog-friendly place", r => r.name],
   help_resources: ["Help listing", r => r.name], messages: ["Message", r => (r.name ? `From ${r.name}` : `From ${r.email}`)],
 };
 async function showDeleted() {

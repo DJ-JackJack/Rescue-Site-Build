@@ -127,12 +127,18 @@
 .steps-ed{display:flex;flex-direction:column;gap:10px}
 .step-row{display:grid;grid-template-columns:minmax(0,1fr) 160px;gap:6px 8px;background:#fff;border:1.5px solid var(--midviolet);border-radius:14px;padding:10px}
 .form .step-row label{font-size:.8rem;gap:4px}
-.form .step-row input{padding:10px;min-height:44px}
+.form .step-row input,.form .step-row textarea{padding:10px;min-height:44px}
+.form .step-row textarea{resize:vertical}
 .step-row .wide{grid-column:1/-1}
 .step-btns{grid-column:1/-1;display:flex;gap:6px;justify-content:flex-end}
 .step-row.bad{border-color:#B3261E}
 .step-row.bad input[name=j_label]{border-color:#B3261E}
 @media (max-width:420px){.step-row{grid-template-columns:1fr}}
+/* updates and notes */
+.notes-ed{display:flex;flex-direction:column;gap:10px;margin-bottom:10px}
+.notes-ed:empty{display:none}
+.step-row.note-row{grid-template-columns:minmax(0,200px)}
+.note-row.bad textarea[name=u_text]{border-color:#B3261E}
 /* visitors */
 .vstats{display:flex;gap:12px;margin:14px 0 12px}
 .vstats p{flex:1;margin:0;background:#fff;border-radius:16px;box-shadow:var(--shadow);padding:14px 16px;font-weight:700;color:var(--ink2)}

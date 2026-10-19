@@ -22,7 +22,9 @@ Add a row to `animals`:
 - For a dog still looking: `listing_url` (the rescue's live listing) and `checked_on` (the date you last confirmed it's still available). If `checked_on` is more than 4 weeks old, the dog hides itself until it's re-checked.
 - `people_ok`: untick it if a person shown or named hasn't agreed yet. The animal stays hidden until it's ticked.
 - `published`: tick it to show the animal.
+- `story`: her story of the animal (up to 6,000 characters), shown first when someone taps them. A blank line starts a new paragraph.
 - `journey`: the steps shown when someone taps the animal, in order, as a list like `[{"date": "2026-08-25", "label": "Featured", "detail": "Video posted"}]` (`date` and `detail` can be left out). Leave it `[]` and the site builds the steps from `featured_on` and `adopted_on`.
+- `updates`: dated updates and notes, shown under the journey, newest first, as a list like `[{"date": "2026-10-19", "text": "Settling in at home"}]`.
 
 The homepage stat ("X of Y dogs I featured were home within 3 months") appears by itself once at least 5 dogs were featured 3 or more months ago. Until then the site uses her own words.
 
@@ -33,6 +35,11 @@ In `partners`, an organization appears when both `feature_ok` and `published` ar
 ## Rescues on Sniffari
 
 Add a row to `sniffari_programs` with the shelter, program, city, the shelter's public address, sign-up link, facts (like "Free", "Full day") and tags (`free`, `half`, `kids`, `first`). It shows once `published` is ticked; no shelter OK is needed for publicly advertised programs. Set `checked_on` whenever you confirm the details. Filter buttons only appear for tags at least one program has.
+
+The same page has two more parts, each hidden until it has a published row:
+
+- `videos`: videos of the dogs' day outs. `title`, `url` (an `https://` link to the post on TikTok, Instagram, YouTube or Facebook), and optionally `posted_on`, `note` and a cover `photo_url`. They're links, not embeds, so no outside scripts or cookies load on the page. They show by `sort`, then newest first.
+- `places`: her dog-friendly places. `name`, `area` (a city or the public place, never a private address), `why`, and optionally `link_url` and `photo_url`.
 
 ## Events
 
@@ -64,7 +71,7 @@ The original files from the shared Drive folder are kept in `responses/drive-pho
 
 ## Local help list
 
-`help_resources`: `category` (food, vet, behavior, housing, rehoming, birds), `name`, `description`, `link_url`, `phone`, `area` (a city or "All of Hampton Roads", never a private address), `checked_on`, `sort`, `published`. Published rows show on the help page under their category; a category with none keeps its short description.
+`help_resources`: `category` (food, vet, behavior, housing, rehoming, birds), `name`, `description` (line breaks are kept), `link_url`, `phone` (extra words are fine; the call button dials the first number), `email`, `more_url` and `more_label` (a second link, like a free resource library), `caution` (shown in a yellow box, like "This is a credit card, not financial assistance"), `area` (a city, "All of Hampton Roads", or a public building's address; never a private home or a wildlife rehab or release site), `checked_on`, `sort`, `published`. Published rows show on the help page under their category; a category with none keeps its short description.
 
 ## Page wording
 

@@ -92,14 +92,19 @@
         </form>
       </div>
     </div>
-    <p class="fine">Every donation goes directly to the shelter named on it. This site never handles money. Rehab sites, release spots and private homes are never shown, to keep animals and people safe. Visits are counted without cookies, and nothing about you is kept.</p>
+    <p class="fine">Every donation goes directly to the shelter named on it, and tips through Buy Me a Coffee go to {{owner_first}}. This site never handles money. Rehab sites, release spots and private homes are never shown, to keep animals and people safe. Visits are counted without cookies, and nothing about you is kept.</p>
   </div>
 </footer>
 
 <dialog class="journey" id="journey" aria-labelledby="jname">
   <button class="jclose" type="button" aria-label="Close">✕</button>
   <div class="jhead"><div class="ph" id="jpic" aria-hidden="true"></div><div><h2 id="jname"></h2><span class="chip" id="jchip"></span></div></div>
-  <div class="jbody"><ol class="steps" id="jsteps"></ol></div>
+  <div class="jbody">
+    <div class="jstory" id="jstory" hidden></div>
+    <h3 class="jsub" id="jsteps-h" hidden>Their journey</h3>
+    <ol class="steps" id="jsteps"></ol>
+    <div id="jnotes-wrap" hidden><h3 class="jsub">Updates and notes</h3><ul class="jnotes" id="jnotes"></ul></div>
+  </div>
 </dialog>
 </body>
 </html>
