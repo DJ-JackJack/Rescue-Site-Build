@@ -10,7 +10,7 @@ import path from "node:path";
 const API = (process.env.SUPABASE_URL || "").replace(/\/+$/, ""), KEY = process.env.SUPABASE_KEY;
 if (!API || !KEY) { console.error("Set SUPABASE_URL and SUPABASE_KEY."); process.exit(1); }
 const OUT = path.resolve(process.argv[2] || "backup");
-const TABLES = ["partners", "goals", "goal_bars", "animals", "events", "sniffari_programs", "help_resources", "site_text"];
+const TABLES = ["partners", "goals", "goal_bars", "animals", "events", "sniffari_programs", "videos", "places", "help_resources", "site_text"];
 
 async function get(url, tries = 3) {
   for (let i = 1; ; i++) {

@@ -20,6 +20,7 @@ const today = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; };
 const asDate = s => (s ? new Date(s + (s.length === 10 ? "T00:00:00" : "")) : null);
 const daysBetween = (a, b) => Math.round((b - a) / DAY);
 const monthYear = s => asDate(s)?.toLocaleDateString("en-US", { month: "short", year: "numeric" }) || "";
+const fullDate = s => asDate(s)?.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) || "";
 
 // Phrases this script writes itself (labels, empty lists, form replies). Each can be changed on the edit page
 // (Page wording → Messages and labels); {names} in curly brackets are filled in here. Saved versions come built
@@ -77,7 +78,7 @@ const wordingLoaded = q("site_text", "select=key,body").then(rows => {
 // The live sections wait for it (at most a moment), so their phrases are the latest too.
 const wordingReady = Promise.race([wordingLoaded, new Promise(ok => setTimeout(ok, 1500))]);
 const getGoals = () => once("goals", () => q("goals", "select=id,title,why,price_note,donate_url,photo_url,status,featured,figures_updated_at,met_on,sort,partner:partners(name,slug),bars:goal_bars(label,target,current,sort)&order=sort.asc"));
-const getAnimals = () => once("animals", () => q("animals", "select=id,name,species,status,herd,sort,featured_on,adopted_on,transport,note,listing_url,checked_on,photo_url,journey,created_at,partner:partners(name,slug)&order=featured_on.desc.nullslast,created_at.desc"));
+const getAnimals = () => once("animals", () => q("animals", "select=id,name,species,status,herd,sort,featured_on,adopted_on,transport,note,story,updates,listing_url,checked_on,photo_url,journey,created_at,partner:partners(name,slug)&order=featured_on.desc.nullslast,created_at.desc"));
 const getPartners = () => once("partners", () => q("partners", "select=id,slug,name,kind,mission,website_url,adopt_url,donate_url,sort&order=sort.asc"));
 const getSniffari = () => once("sniffari", () => q("sniffari_programs", "select=id,shelter_name,program_name,city,address,signup_url,facts,tags,checked_on,sort&order=sort.asc"));
 
@@ -244,9 +245,18 @@ document.addEventListener("click", e => {
       steps.push({ label, detail: [a.note, via].filter(Boolean).join(" · ") });
     }
   }
+  // her story, the steps of their journey, then dated updates and notes, newest first
+  const story = String(a.story || "").trim(), notes = (Array.isArray(a.updates) ? a.updates : []).filter(n => n && n.text)
+    .sort((x, y) => (y.date || "").localeCompare(x.date || ""));
+  $("#jstory").innerHTML = story ? blockHTML(story) : "";
+  $("#jstory").hidden = !story;
+  $("#jsteps-h").hidden = !(story || notes.length); // a heading only when there's more than the steps
   $("#jsteps").innerHTML = steps.length
-    ? steps.map(s => `<li><b>${h(s.label)}</b><span>${h([s.detail, s.date ? monthYear(s.date) : ""].filter(Boolean).join(" · "))}</span></li>`).join("")
+    ? steps.map(s => `<li><b>${h(s.label)}${s.date ? ` <time datetime="${h(s.date)}">${h(monthYear(s.date))}</time>` : ""}</b>${s.detail ? `<span>${h(s.detail)}</span>` : ""}</li>`).join("")
     : `<li><b>${h(t("js.journey.soon-title", "Their story is being written up"))}</b><span>${h(t("js.journey.soon", "Check back soon."))}</span></li>`;
+  $("#jnotes").innerHTML = notes.map(n => `<li>${n.date ? `<time datetime="${h(n.date)}">${h(fullDate(n.date))}</time>` : ""}<p>${h(String(n.text).trim())}</p></li>`).join("");
+  $("#jnotes-wrap").hidden = !notes.length;
+  $(".jbody", dlg).scrollTop = 0;
   dlg.showModal ? dlg.showModal() : dlg.setAttribute("open", "");
 });
 if (dlg) {
@@ -464,18 +474,60 @@ async function renderHelp() {
   const boxes = $$("[data-help]");
   if (!boxes.length) return;
   let rows = [];
-  try { rows = await q("help_resources", "select=category,name,description,link_url,phone,area&order=sort.asc,name.asc"); } catch { return; }
+  try { rows = await q("help_resources", "select=category,name,description,caution,link_url,more_url,more_label,phone,email,area&order=sort.asc,name.asc"); } catch { return; }
+  await wordingReady;
   boxes.forEach(box => {
     const list = rows.filter(r => r.category === box.dataset.help);
     if (!list.length) return;
     box.innerHTML = `<ul class="res">${list.map(r => {
-      const link = safeUrl(r.link_url), tel = String(r.phone || "").replace(/[^\d+]/g, "");
+      const link = safeUrl(r.link_url), more = safeUrl(r.more_url);
+      // the call button dials the first number, so a phone like "(757) 427-0071, option 1" still works
+      const tel = (String(r.phone || "").match(/\+?\d[\d\s().-]{5,}\d/) || [""])[0].replace(/[^\d+]/g, "");
+      const email = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(r.email || "") ? r.email : "";
+      const reach = [r.area ? h(r.area) : "", r.phone ? (tel ? `<a href="tel:${h(tel)}">${h(r.phone)}</a>` : h(r.phone)) : "", email ? `<a href="mailto:${h(email)}">${h(email)}</a>` : ""].filter(Boolean);
       return `<li>${link ? `<a href="${h(link)}" target="_blank" rel="noopener">${h(r.name)} <span class="ext" aria-hidden="true">↗</span></a>` : `<b>${h(r.name)}</b>`}
         ${r.description ? `<span>${h(r.description)}</span>` : ""}
-        ${r.area || r.phone ? `<small>${[r.area ? h(r.area) : "", r.phone ? `<a href="tel:${h(tel)}">${h(r.phone)}</a>` : ""].filter(Boolean).join(" · ")}</small>` : ""}</li>`;
+        ${r.caution ? `<span class="caution" role="note">${h(r.caution)}</span>` : ""}
+        ${more ? `<a class="more" href="${h(more)}" target="_blank" rel="noopener">${h(r.more_label || t("js.help.more", "More from them"))} <span class="ext" aria-hidden="true">↗</span></a>` : ""}
+        ${reach.length ? `<small>${reach.join(" · ")}</small>` : ""}</li>`;
     }).join("")}</ul>`;
     box.closest("[data-help-wrap]")?.removeAttribute("hidden"); // a section that only shows once it has listings
   });
+}
+
+/* ---------- Rescues on Sniffari: day-out videos and her dog-friendly places ----------
+   Each part of the page stays hidden until it has something in it. Videos are links to where they were posted,
+   not embeds, so no outside scripts or cookies load on the page. */
+const platform = u => {
+  let host = "";
+  try { host = new URL(u).hostname.replace(/^www\./, ""); } catch { return ""; }
+  return /(^|\.)tiktok\.com$/.test(host) ? "TikTok" : /(^|\.)instagram\.com$/.test(host) ? "Instagram" : /(^|\.)(youtube\.com|youtu\.be)$/.test(host) ? "YouTube"
+    : /(^|\.)(facebook\.com|fb\.watch)$/.test(host) ? "Facebook" : "";
+};
+async function renderVideos(el) {
+  let rows = [];
+  try { rows = (await q("videos", "select=title,url,posted_on,note,photo_url&order=sort.asc,posted_on.desc.nullslast,created_at.desc")).filter(v => safeUrl(v.url)); } catch { return; }
+  if (!rows.length) return;
+  await wordingReady;
+  el.innerHTML = rows.map((v, i) => {
+    const where = platform(v.url), watch = where ? t("js.video.watch", "Watch on {site}", { site: where }) : t("js.video.watch-it", "Watch the video");
+    return `<li><a class="vid" href="${h(safeUrl(v.url))}" target="_blank" rel="noopener"><span class="ph ${BG[i % 6]}" aria-hidden="true">🎬${photoTag(v.photo_url)}<span class="play">▶</span></span>
+      <span class="bd"><b>${h(v.title)}</b>${v.note ? `<span>${h(v.note)}</span>` : ""}<small>${h([v.posted_on ? fullDate(v.posted_on) : "", watch].filter(Boolean).join(" · "))} <span aria-hidden="true">↗</span></small></span></a></li>`;
+  }).join("");
+  el.closest("[data-show-when-filled]")?.removeAttribute("hidden");
+}
+async function renderPlaces(el) {
+  let rows = [];
+  try { rows = await q("places", "select=name,area,why,link_url,photo_url&order=sort.asc,name.asc"); } catch { return; }
+  if (!rows.length) return;
+  await wordingReady;
+  el.innerHTML = rows.map((p, i) => {
+    const link = safeUrl(p.link_url);
+    return `<li class="place"><span class="ph ${BG[(i + 2) % 6]}" aria-hidden="true">📍${photoTag(p.photo_url)}</span><div class="bd"><h3>${h(p.name)}</h3>
+      ${p.area ? `<small>${h(p.area)}</small>` : ""}${p.why ? `<p>${h(p.why)}</p>` : ""}
+      ${link ? `<a href="${h(link)}" target="_blank" rel="noopener">${h(t("js.place.website", "Their website"))} <span class="ext" aria-hidden="true">↗</span></a>` : ""}</div></li>`;
+  }).join("");
+  el.closest("[data-show-when-filled]")?.removeAttribute("hidden");
 }
 
 /* ---------- visitor counts ---------- */
@@ -523,5 +575,7 @@ $$("[data-rescues]").forEach(renderRescues);
 $$("[data-horses]").forEach(renderHorses);
 $$("[data-events]").forEach(renderEvents);
 $$("[data-sniffari]").forEach(renderSniffari);
+$$("[data-videos]").forEach(renderVideos);
+$$("[data-places]").forEach(renderPlaces);
 countView();
 })();
