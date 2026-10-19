@@ -1,4 +1,6 @@
-# Builds site/ and publishes it to GitHub Pages on every push to main.
+# Builds site/ and publishes it to GitHub Pages on every push to main, and every night, so wording saved on the
+# edit page gets built into the pages (it shows on the site straight away either way; the build is what link
+# previews and search engines see).
 # One-time setup: repo Settings > Pages > Build and deployment > Source = "GitHub Actions".
 # Launch switch: Settings > Secrets and variables > Actions > Variables, set SITE_PREVIEW to 0
 # (unset or 1 = preview: hidden from search engines, with a preview banner). Full steps: docs/launch-checklist.md.
@@ -7,6 +9,8 @@ name: Deploy site
 on:
   push:
     branches: [main]
+  schedule:
+    - cron: "13 8 * * *" # about 4 AM in Virginia
   workflow_dispatch:
 
 permissions:

@@ -12,7 +12,8 @@ The website for TheTerr0rTw!ns (tae): rescue features, shelter goals, dog day ou
 - **Forms** send to a private inbox (the `messages` table) through one checked, rate-limited function. The public can't read it.
 - **The edit page** (`site/edit.html`, `site/assets/edit.js`) signs in with Supabase Auth. Only emails in the `admins` table can change anything; the database enforces it with row-level security. Photos upload to the public `photos` storage bucket after being shrunk and stripped of hidden data in the browser.
 - **Link previews and icons:** each page gets a title, description and share image for Facebook, texts and TikTok links (`site/assets/share/<page>.jpg`, else `default.jpg`). The paw icon is `site/assets/icon.svg`, with PNG sizes beside it. A sitemap is written for search engines, and listed in `robots.txt` once the site launches.
-- **Publishing:** every push to `main` builds the site and publishes it to GitHub Pages (`.github/workflows/deploy-site.yml`).
+- **Publishing:** every push to `main`, and a nightly run, builds the site and publishes it to GitHub Pages (`.github/workflows/deploy-site.yml`).
+- **Editable wording:** the build gives every piece of text a key (`site/wording.mjs`) and builds in wording saved from the edit page; `site.js` applies anything saved since. See `docs/updating-content.md`.
 - **Safety nets:** the database keeps 90 days of copies of anything edited or deleted (the edit page's "Recently deleted"), and `.github/workflows/backup.yml` saves the public content and uploaded photos every week. After every deploy, `.github/workflows/check-site.yml` checks the live site from the outside.
 - **Message notifications:** editors can turn on phone notifications for new messages from the edit page. A database trigger calls the Edge Function in `supabase/functions/notify-message/`, which sends an encrypted Web Push to each signed-up device.
 - **Visitor counts:** the site counts page views and where visits come from in its own database, with no cookies. Editors see them on the edit page.
@@ -20,7 +21,7 @@ The website for TheTerr0rTw!ns (tae): rescue features, shelter goals, dog day ou
 - **Preview mode** is on until launch: the site is hidden from search engines and shows a preview banner. Launch day, with the custom domain, is step by step in `docs/launch-checklist.md`.
 - **`questionnaire/`** is the original planning questionnaire. It's no longer on the site and can't take new answers; its saved answers stay in the `questionnaire_responses` table, and `tools/render-answers.mjs` still uses its question wording.
 
-**Editing:** the private edit page at `/edit/` (sign-in required) updates animals, goals, events, rescues, Sniffari programs, the local help list, page wording and photos, restores recent deletes, shows visitor counts, and turns on notifications for new messages. Plain-language guide: `docs/editing-guide.md`. What each setting does underneath: `docs/updating-content.md`.
+**Editing:** the private edit page at `/edit/` (sign-in required) updates animals, goals, events, rescues, Sniffari programs, the local help list, any wording on the site, and photos, restores recent deletes, shows visitor counts, and turns on notifications for new messages. Plain-language guide: `docs/editing-guide.md`. What each setting does underneath: `docs/updating-content.md`.
 
 ## Rules the site is built around
 

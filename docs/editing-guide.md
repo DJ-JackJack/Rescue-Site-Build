@@ -42,7 +42,8 @@ Below that, **Everything** has a button for each part of the site.
 | Add an event | Events → **+ Add event**. Events disappear from the site by themselves the day after. |
 | Add a rescue | Rescues & shelters → **+ Add**. Use their full proper name. They only show once **"They've said yes to being featured"** and **"Show on the site"** are both on. |
 | Add local help | Local help list → **+ Add**. It shows on the "Help keeping your pet" page under its kind of help. |
-| Change wording | Page wording. Edit the words and tap **Save**. "Go back to the original words" undoes it. |
+| Change any wording | **Page wording**, then pick the page, or type a few of the words in the search box. Change the words and tap **Save changes**. Or, while you're signed in, open the page on the site and tap **✏️ Edit this page's wording** at the bottom. |
+| Undo a wording change | Open it in Page wording and tap **Use the original**, or empty the box, then save. |
 | Answer a message | Messages → **Reply by email** opens your email app. Then tap **Mark done**. |
 | Get a notification for new messages | **Messages** → **Turn on notifications**, then **Allow**. Do it on each phone or computer you want them on, and tap **Send a test** to check. On iPhone or iPad, add the editor to your Home Screen first (Share → Add to Home Screen) and turn them on from that icon. |
 | Undo a delete | **Recently deleted** → **Restore**. Anything deleted in the last 90 days comes back just as it was. |
@@ -53,6 +54,7 @@ Below that, **Everything** has a button for each part of the site.
 - **Changes show on the site straight away.** Refresh the page to see them.
 - **Hide, don't delete.** Turning off "Show on the site" hides something and keeps everything. If you do delete something by mistake, it stays in **Recently deleted** for 90 days.
 - **Links in your bios:** add `?from=tiktok` (or `?from=instagram`, `?from=youtube`) to the site link, so Visitors can tell where people came from. Visits from inside those apps often show as "Direct" otherwise.
+- **Wording:** every piece of wording on the site is in Page wording: headings, paragraphs, buttons, the menu and footer (under **On every page**), page titles and descriptions for Google and link previews, photo descriptions, and the messages the site writes itself, like "Still looking" or "Thanks! Your message reached Taea" (under **Messages and labels**). Words in {curly brackets} are filled in by the site, so keep them. Changes show on the site straight away; link previews and Google catch up overnight.
 - **Notifications** show the topic and the sender's name, never the message itself. Tapping one opens Messages. To stop them on a device, open Messages there and tap **Turn off on this device**.
 - **Your own visits don't count** while you're signed in here. On the Visitors screen you can also skip a phone or computer when it's signed out.
 - **Photos:** pick any photo from your phone. The edit page shrinks it and strips hidden data (like where it was taken) before uploading. Still check the background: no house, street, plates or mail.

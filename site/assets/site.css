@@ -389,10 +389,6 @@ footer .formmsg.is-err{color:#FFB4AB}
 .anniv .eyebrow{color:var(--cyan)}
 .anniv h2{font-size:1.6rem}
 .anniv p{color:#E6DCFF;margin-top:8px}
-/* wording from the edit page: hidden for a moment so the old words don't flash.
-   The animation shows it after 1.5s even if the script never runs. */
-@keyframes txtshow{to{visibility:visible}}
-.js [data-text]:not(.txt-ready){visibility:hidden;animation:txtshow 0s 1s forwards}
 .res{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column;gap:12px}
 .res li{display:flex;flex-direction:column;gap:2px;border-top:1px solid var(--wash);padding-top:10px}
 .res li:first-child{border-top:0;padding-top:0}
@@ -411,3 +407,7 @@ h2.eyebrow{font-family:var(--f-body);line-height:1.55}
 .no-js .menu{display:block;position:static;box-shadow:none}
 .no-js .menubtn,.no-js [data-form],.no-js .sniff-filters,.no-js .filters,.no-js .wallhint{display:none}
 .nojs-note{background:var(--midnight);color:#fff;text-align:center;font-weight:700;padding:10px 16px;margin:0}
+/* a shortcut to the edit page's wording for this page, only on devices signed in to the edit page */
+.editfab{position:fixed;left:12px;bottom:12px;z-index:60;background:var(--plum);color:#fff;font-weight:800;font-size:.9rem;padding:10px 14px;border-radius:999px;box-shadow:var(--shadow);text-decoration:none}
+.editfab:hover{background:var(--royal)}
+@media print{.editfab{display:none}}
