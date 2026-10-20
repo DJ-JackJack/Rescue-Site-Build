@@ -22,6 +22,7 @@ Add a row to `animals`:
 - For a dog still looking: `listing_url` (the rescue's live listing) and `checked_on` (the date you last confirmed it's still available). If `checked_on` is more than 4 weeks old, the dog hides itself until it's re-checked.
 - `people_ok`: untick it if a person shown or named hasn't agreed yet. The animal stays hidden until it's ticked.
 - `published`: tick it to show the animal.
+- `section`: `helped` (the default) shows them on Animals We've Helped: Happy Tails, the counts and the adoption stat. `spotlight` shows them on the Animal Story Spotlight page instead, grouped by where they live and then by herd. It's for animals in a forever home or a sanctuary, like the Willow Woods horses, which aren't up for adoption unless they're marked "looking".
 - `story`: her story of the animal (up to 6,000 characters), shown first when someone taps them. A blank line starts a new paragraph.
 - `journey`: the steps shown when someone taps the animal, in order, as a list like `[{"date": "2026-08-25", "label": "Featured", "detail": "Video posted"}]` (`date` and `detail` can be left out). Leave it `[]` and the site builds the steps from `featured_on` and `adopted_on`.
 - `updates`: dated updates and notes, shown under the journey, newest first, as a list like `[{"date": "2026-10-19", "text": "Settling in at home"}]`.

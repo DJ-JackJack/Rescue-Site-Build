@@ -34,6 +34,7 @@ Below that, **Everything** has a button for each part of the site.
 | I want to… | Do this |
 |---|---|
 | Add a dog I filmed | Animals → **+ Add animal**. Fill in the name, tap **Still looking**, pick the rescue, add a photo and the link to their listing, then tap **Add**. |
+| Move an animal to the Animal Story Spotlight | Open them, and under **Which part of the site?** tap **Animal Story Spotlight**, then **Save changes**. Tap **Animals We've Helped** to move them back. The Spotlight is for animals already in a forever home or a sanctuary, like the Willow Woods horses; Animals We've Helped is for animals you featured to find a home. Horses switch by themselves when you pick their status (Still looking keeps them in Animals We've Helped), and you can still change it by hand. |
 | Mark a dog adopted | Open them, tap **Adopted** (today's date fills in by itself), then **Save changes**. Or use **Adopted!** on the start screen. |
 | Tell an animal's story | Open them and write it in **Their story** (leave a blank line between paragraphs). People see it when they tap the animal on Happy Tails. |
 | Follow a dog's journey | Open them and scroll to **Their journey**. Tap **+ Add a step** for each visit or thing that happened ("Second day out", "Went to a foster home", "Adopted"), with a date and as much detail as you like. **Fill in from the dates** gives you a start. The arrows change the order. Left empty, the site makes the steps from the video and adoption dates. |

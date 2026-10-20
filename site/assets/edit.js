@@ -143,6 +143,7 @@ async function upload(file, folder, name) {
 /* ---------- what can be edited ---------- */
 const STATUS = [["looking", "Still looking"], ["foster", "In foster"], ["adopted", "Adopted"], ["sanctuary", "In sanctuary"], ["placed", "Placed or released"]];
 const SPECIES = [["dog", "Dog"], ["cat", "Cat"], ["horse", "Horse"], ["bird", "Bird"], ["other", "Other"]];
+const SHOWN_ON = [["helped", "Animals We've Helped"], ["spotlight", "Animal Story Spotlight"]];
 const EMOJI = { dog: "🐶", cat: "🐱", horse: "🐴", bird: "🐦", other: "🐾" };
 const KINDS = [["rescue", "Rescue"], ["shelter", "Shelter"], ["sanctuary", "Sanctuary"]];
 const TAGS = [["free", "Free"], ["half", "Half-day option"], ["kids", "Kids welcome"], ["first", "Good for first-timers"]];
@@ -163,19 +164,26 @@ const SORT = { name: "sort", type: "number", label: "Order", help: "Lower number
 const SECTIONS = {
   animals: {
     table: "animals", title: "Animals", one: "animal", icon: "🐾",
-    intro: "Everyone on Happy Tails, the rescue cards and the Willow Woods herds.",
+    intro: "Everyone on Animals We've Helped (Happy Tails), the Animal Story Spotlight, the rescue cards and the Willow Woods herds.",
     query: "select=*,partner:partners(name)&order=name.asc",
     titleOf: r => r.name,
-    filters: [["all", "All"], ["looking", "Still looking"], ["foster", "In foster"], ["adopted", "Adopted"], ["sanctuary", "In sanctuary"], ["hidden", "Hidden"]],
-    tokens: r => [r.status, r.published ? "" : "hidden"],
+    filters: [["all", "All"], ["looking", "Still looking"], ["foster", "In foster"], ["adopted", "Adopted"], ["sanctuary", "In sanctuary"], ["spotlight", "Spotlight"], ["hidden", "Hidden"]],
+    tokens: r => [r.status, r.section === "spotlight" ? "spotlight" : "", r.published ? "" : "hidden"],
     order: (a, b) => (RANK[a.status] ?? 9) - (RANK[b.status] ?? 9) || a.name.localeCompare(b.name),
-    row: r => ({ title: r.name, sub: [label(STATUS, r.status), r.partner?.name].filter(Boolean).join(" · "), photo: r.photo_url, emoji: EMOJI[r.species],
+    row: r => ({ title: r.name, sub: [label(STATUS, r.status), r.partner?.name, r.section === "spotlight" && "Story Spotlight"].filter(Boolean).join(" · "), photo: r.photo_url, emoji: EMOJI[r.species],
       flags: [!r.published && "Hidden", r.status === "looking" && r.published && stale(r.checked_on, 21) && "!Needs a check"] }),
     fields: [
       { name: "name", type: "text", label: "Name", required: true, max: 120 },
-      { name: "species", type: "choice", label: "What kind of animal?", options: SPECIES, dflt: "dog" },
+      { name: "species", type: "choice", label: "What kind of animal?", options: SPECIES, dflt: "dog",
+        onPick: (v, el) => { if (v === "horse") el.section.value = el.status.value === "looking" ? "helped" : "spotlight"; } }, // horses aren't up for adoption unless they're still looking
       { name: "status", type: "choice", label: "Where are they now?", options: STATUS, dflt: "looking",
-        onPick: (v, el) => { if (v === "adopted" && !el.adopted_on.value) el.adopted_on.value = today(); if (v === "looking" && !el.checked_on.value) el.checked_on.value = today(); } },
+        onPick: (v, el) => {
+          if (v === "adopted" && !el.adopted_on.value) el.adopted_on.value = today();
+          if (v === "looking" && !el.checked_on.value) el.checked_on.value = today();
+          if (el.species.value === "horse") el.section.value = v === "looking" ? "helped" : "spotlight";
+        } },
+      { name: "section", type: "choice", label: "Which part of the site?", options: SHOWN_ON, dflt: "helped",
+        help: "Animals We've Helped is for animals you featured to find a home. Animal Story Spotlight is for animals already in a forever home or a sanctuary, like the Willow Woods horses. Pick the other one and save to move them." },
       { name: "partner_id", type: "partner", label: "Rescue or shelter" },
       { name: "photo_url", type: "photo", label: "Photo", folder: "animals" },
       { name: "note", type: "textarea", rows: 2, max: 200, label: "Short note", help: "Shown under their name. Keep it to a line." },
@@ -875,7 +883,7 @@ const WORDS = CFG.textDefaults || [], AREAS = CFG.areas || [];
 const PHRASE_GROUPS = {
   goal: "Shelter goals", status: "Animal labels", count: "Animal counts", animal: "Happy Tails", stat: "The adoption number",
   journey: "An animal's journey (the pop-up)", rescue: "Rescues", horse: "Willow Woods horses", event: "Events",
-  program: "Day-out programs", video: "Day-out videos", place: "Dog-friendly places", help: "Local help list",
+  spotlight: "Animal Story Spotlight", program: "Day-out programs", video: "Day-out videos", place: "Dog-friendly places", help: "Local help list",
   form: "Contact forms", failed: "When part of a page can't load",
 };
 const clip = (s, n = 60) => (s.length > n ? s.slice(0, n - 1) + "…" : s);

@@ -256,6 +256,8 @@ dialog.journey::backdrop{background:rgba(25,19,51,.55)}
 .herds{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));margin-top:20px}
 .herd{border-radius:var(--r);padding:20px;background:#fff;box-shadow:var(--shadow)}
 .herd h3{font-size:1.25rem}
+.spot-home+.spot-home{margin-top:36px}
+.spot-home .more{display:inline-block;margin-top:6px;font-weight:800}
 .horses{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
 .horses span{background:var(--blush);border-radius:999px;padding:6px 12px;font-weight:700;font-size:.9rem}
 .book{display:grid;grid-template-columns:120px 1fr;gap:18px;align-items:center;background:#fff;border-radius:var(--r);padding:18px;box-shadow:var(--shadow)}
