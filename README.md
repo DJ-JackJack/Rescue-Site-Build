@@ -18,8 +18,8 @@ The website for TheTerr0rTw!ns (tae): rescue features, shelter goals, dog day ou
 - **Message notifications:** editors can turn on phone notifications for new messages from the edit page. A database trigger calls the Edge Function in `supabase/functions/notify-message/`, which sends an encrypted Web Push to each signed-up device.
 - **Visitor counts:** the site counts page views and where visits come from in its own database, with no cookies. Editors see them on the edit page.
 - **Keeping the database awake:** `.github/workflows/keep-awake.yml` reads a little public data twice a day so the free Supabase project doesn't pause. See `docs/updating-content.md`.
-- **Preview mode** is on until launch: the site is hidden from search engines and shows a preview banner. Launch day, with the custom domain, is step by step in `docs/launch-checklist.md`.
-- **`questionnaire/`** is the original planning questionnaire. It's no longer on the site and can't take new answers; its saved answers stay in the `questionnaire_responses` table, and `tools/render-answers.mjs` still uses its question wording.
+- **Launched** at https://terrortwinsflock.com. Preview mode (hidden from search engines, with a preview banner) is off: the repository variable `SITE_PREVIEW` is `0`. How the launch went, step by step: `docs/launch-checklist.md`.
+- **Database address and public key** are in `site/supabase.json`, read by the build, the weekly backup and the keep-awake job.
 
 **Editing:** the private edit page at `/edit/` (sign-in required) updates animals, goals, events, rescues, Sniffari programs, the local help list, any wording on the site, and photos, restores recent deletes, shows visitor counts, and turns on notifications for new messages. Plain-language guide: `docs/editing-guide.md`. What each setting does underneath: `docs/updating-content.md`.
 
@@ -35,5 +35,5 @@ The website for TheTerr0rTw!ns (tae): rescue features, shelter goals, dog day ou
 
 ## Planning material
 
-- `docs/site-brief-template.md`, `docs/pulling-answers.md` and `tools/render-answers.mjs` came from the planning stage.
-- `responses/` (git-ignored, never committed) holds her answers, the brief, the mockup and the review. This repo is public.
+- The planning questionnaire and its tools were removed once the site launched; they're in the git history. Her answers stay in the `questionnaire_responses` table.
+- `responses/` (git-ignored, never committed) holds working copies of her answers, the brief, the mockup and the review. This repo is public.

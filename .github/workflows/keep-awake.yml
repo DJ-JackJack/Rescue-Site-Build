@@ -7,17 +7,21 @@ on:
     - cron: "17 9 * * *"
     - cron: "17 21 * * *"
   workflow_dispatch:
-permissions: {}
+permissions:
+  contents: read
 jobs:
   ping:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: site/supabase.json
+          sparse-checkout-cone-mode: false
       - name: Read a little public data
-        env:
-          SUPABASE_URL: https://yysfgsdwlddeilktumza.supabase.co
-          SUPABASE_KEY: sb_publishable_UtnxK1yVdvtQhj9pP608jA_mW9ZL5Ty # public on purpose: reads published rows only
         run: |
+          # the database's address and publishable key (public on purpose: reads published rows only)
+          SUPABASE_URL=$(jq -r .url site/supabase.json); SUPABASE_KEY=$(jq -r .key site/supabase.json)
           for t in goals animals; do
             code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 30 -H "apikey: $SUPABASE_KEY" "$SUPABASE_URL/rest/v1/$t?select=id&limit=1" || true)
             echo "$t: $code"

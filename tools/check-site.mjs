@@ -3,12 +3,10 @@
 // the right address and their images load, preview mode is on or off everywhere at once, the edit page
 // stays hidden from search engines, and missing pages get the 404 page.
 //   node tools/check-site.mjs https://example.com/
-//   node tools/check-site.mjs https://example.com/ --dns     (only the domain's DNS records, while setting it up)
 // .github/workflows/check-site.yml runs it after every deploy. On its own domain it also checks the DNS
 // records, HTTPS, the www address and the redirect from the old github.io address (see docs/launch-checklist.md).
 import dns from "node:dns/promises";
-const args = process.argv.slice(2), dnsOnly = args.includes("--dns");
-const site = new URL(args.find(a => !a.startsWith("--")) || process.env.SITE_URL || "https://dj-jackjack.github.io/Rescue-Site-Build/");
+const site = new URL(process.argv[2] || process.env.SITE_URL || "https://dj-jackjack.github.io/Rescue-Site-Build/");
 if (!site.pathname.endsWith("/")) site.pathname += "/";
 if (site.protocol === "http:" && !/^(localhost|127\.)/.test(site.hostname)) site.protocol = "https:"; // GitHub says http:// until HTTPS is enforced
 const OLD = "https://dj-jackjack.github.io/Rescue-Site-Build/";
@@ -52,7 +50,6 @@ async function checkDns() {
   console.log(`  GitHub's domain verification record: ${txt.length ? "found" : "not found (only needed until GitHub shows the domain as verified)"}`);
 }
 if (custom) await checkDns();
-if (dnsOnly) done();
 
 // the homepage decides which mode the site is in
 const homeRes = await get(site.href);
