@@ -16,7 +16,7 @@ const VOID = new Set("area base br col embed hr img input link meta source track
 const RAW = new Set(["script", "style", "textarea", "title"]);
 const SKIP_TAGS = new Set(["head", "svg", "script", "style", "textarea", "title", "template"]);
 // attributes or ids whose content site.js writes itself
-const SKIP_ATTR = /\sdata-(?:text|stat|goals|wall|rescues|horses|events|sniffari|videos|places|counts)\b|\saria-hidden="true"|\sclass="formmsg\b|\sid="(?:wall-count|sniff-count|jname|jsteps|jchip|jpic|jstory|jnotes|hwsvg)"/;
+const SKIP_ATTR = /\sdata-(?:text|stat|goals|wall|rescues|horses|events|sniffari|videos|places|spotlight|counts)\b|\saria-hidden="true"|\sclass="formmsg\b|\sid="(?:wall-count|sniff-count|jname|jsteps|jchip|jpic|jstory|jnotes|hwsvg)"/;
 const INLINE = new Set("a b strong em i u span small mark q cite abbr time sub sup".split(" "));
 // elements that hold a sentence (rather than a section of the page)
 const SENTENCE = new Set("p h1 h2 h3 h4 li dt dd label button a small span b strong em i figcaption summary legend blockquote td th q".split(" "));

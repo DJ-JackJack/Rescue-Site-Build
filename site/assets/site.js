@@ -31,7 +31,10 @@ const t = (key, text, vars = {}) => (PHRASES[key] || text).replace(/\{(\w+)\}/g,
 /* ---------- menu ---------- */
 const menu = $("#menu"), menubtn = $(".menubtn");
 if (menu && menubtn) {
-  menubtn.addEventListener("click", () => { const o = menu.classList.toggle("open"); menubtn.setAttribute("aria-expanded", o); });
+  menubtn.addEventListener("click", () => {
+    const o = menu.classList.toggle("open"); menubtn.setAttribute("aria-expanded", o);
+    if (o) menu.style.maxHeight = Math.max(200, innerHeight - menu.getBoundingClientRect().top) + "px"; // the space left below it, so the last link can always be reached
+  });
   const close = () => { menu.classList.remove("open"); menubtn.setAttribute("aria-expanded", "false"); };
   document.addEventListener("keydown", e => {
     if (e.key === "Escape" && menu.classList.contains("open")) { close(); menubtn.focus(); }
@@ -78,7 +81,7 @@ const wordingLoaded = q("site_text", "select=key,body").then(rows => {
 // The live sections wait for it (at most a moment), so their phrases are the latest too.
 const wordingReady = Promise.race([wordingLoaded, new Promise(ok => setTimeout(ok, 1500))]);
 const getGoals = () => once("goals", () => q("goals", "select=id,title,why,price_note,donate_url,photo_url,status,featured,figures_updated_at,met_on,sort,partner:partners(name,slug),bars:goal_bars(label,target,current,sort)&order=sort.asc"));
-const getAnimals = () => once("animals", () => q("animals", "select=id,name,species,status,herd,sort,featured_on,adopted_on,transport,note,story,updates,listing_url,checked_on,photo_url,journey,created_at,partner:partners(name,slug)&order=featured_on.desc.nullslast,created_at.desc"));
+const getAnimals = () => once("animals", () => q("animals", "select=id,name,species,status,herd,sort,featured_on,adopted_on,transport,note,story,updates,section,listing_url,checked_on,photo_url,journey,created_at,partner:partners(name,slug)&order=featured_on.desc.nullslast,created_at.desc"));
 const getPartners = () => once("partners", () => q("partners", "select=id,slug,name,kind,mission,website_url,adopt_url,donate_url,sort&order=sort.asc"));
 const getSniffari = () => once("sniffari", () => q("sniffari_programs", "select=id,shelter_name,program_name,city,address,signup_url,facts,tags,checked_on,sort&order=sort.asc"));
 
@@ -155,10 +158,12 @@ const statusLabel = s => ({
 const WHO = S.ownerFirst || "she";
 const BG = ["g1", "g2", "g3", "g4", "g5", "g6"];
 const daysToHome = a => (a.status === "adopted" && a.featured_on && a.adopted_on) ? daysBetween(asDate(a.featured_on), asDate(a.adopted_on)) : null;
+// Animals We've Helped (Happy Tails, the counts and the adoption stat) or the Animal Story Spotlight page
+const helped = a => (a.section || "helped") === "helped";
 
 function stats(animals) {
   // Every dog featured at least 90 days ago counts. "Home" means adopted. Transport runs don't count.
-  const dogs = animals.filter(a => a.species === "dog" && !a.transport && a.featured_on);
+  const dogs = animals.filter(a => helped(a) && a.species === "dog" && !a.transport && a.featured_on);
   const cutoff = today() - 90 * DAY;
   const counted = dogs.filter(a => asDate(a.featured_on) <= cutoff);
   const fast = counted.filter(a => { const d = daysToHome(a); return d !== null && d <= 90; });
@@ -197,14 +202,14 @@ function countsHTML(animals) {
   const c = s => animals.filter(a => a.status === s).length;
   return [["adopted", t("js.count.adopted", "adopted")], ["foster", t("js.count.foster", "in foster")], ["sanctuary", t("js.count.sanctuary", "in sanctuary")],
     ["placed", t("js.count.placed", "placed or released")], ["looking", t("js.count.looking", "still looking")]]
-    .filter(([s]) => s !== "placed" || c("placed"))
+    .filter(([s]) => ["adopted", "foster", "looking"].includes(s) || c(s))
     .map(([s, l]) => `<div class="count"><b>${c(s)}</b><span>${h(l)}</span></div>`).join("");
 }
-let ANIMALS = [];
+let ANIMALS = []; // Animals We've Helped
 async function renderAnimals() {
   const walls = $$("[data-wall]"), counts = $$("[data-counts]");
   if (!walls.length && !counts.length) return;
-  try { ANIMALS = await getAnimals(); }
+  try { ANIMALS = (await getAnimals()).filter(helped); }
   catch { await wordingReady; walls.forEach(w => failed(w, t("js.failed.animals", "Happy Tails couldn't load right now. Please try again in a little while."))); return; }
   await wordingReady;
   counts.forEach(c => c.innerHTML = countsHTML(ANIMALS));
@@ -226,9 +231,9 @@ async function renderAnimals() {
   });
 }
 const dlg = $("#journey");
-document.addEventListener("click", e => {
+document.addEventListener("click", async e => {
   const b = e.target.closest(".pet"); if (!b || !dlg) return;
-  const a = ANIMALS.find(x => x.id === b.dataset.id); if (!a) return;
+  const a = (await getAnimals().catch(() => [])).find(x => x.id === b.dataset.id); if (!a) return;
   $("#jname").textContent = a.name;
   const cls = STATUS[a.status] || STATUS.placed, label = statusLabel(a.status);
   const chip = $("#jchip"); chip.className = "chip " + cls; chip.textContent = label;
@@ -296,15 +301,35 @@ async function renderRescues(el) {
 }
 
 /* horses at a partner, grouped by herd (Willow Woods page) */
+// animals grouped by herd (the "Herd" field), in each herd's order; rest names the group without a herd
+function herdsHTML(animals, rest) {
+  const herds = [...new Set(animals.map(a => a.herd || ""))].sort((a, b) => (a === "") - (b === "") || a.localeCompare(b));
+  return `<div class="herds">${herds.map(herd => `<div class="herd"><h3>${h(herd || rest)}</h3>
+    <ul class="wall" style="margin-top:12px">${animals.filter(a => (a.herd || "") === herd).sort((a, b) => (a.sort ?? 100) - (b.sort ?? 100)).map(petHTML).join("")}</ul></div>`).join("")}</div>`;
+}
 async function renderHorses(el) {
   try {
     const horses = (await getAnimals()).filter(a => a.partner?.slug === el.dataset.horses && a.species === "horse");
     await wordingReady;
     if (!horses.length) { el.innerHTML = `<p class="empty">${h(t("js.horse.none", "The horses are being added."))}</p>`; return; }
-    const herds = [...new Set(horses.map(a => a.herd || ""))].sort((a, b) => (a === "") - (b === "") || a.localeCompare(b));
-    el.innerHTML = `<div class="herds">${herds.map(herd => `<div class="herd"><h3>${h(herd || t("js.horse.more", "More horses"))}</h3>
-      <ul class="wall" style="margin-top:12px">${horses.filter(a => (a.herd || "") === herd).sort((a, b) => (a.sort ?? 100) - (b.sort ?? 100)).map(petHTML).join("")}</ul></div>`).join("")}</div>`;
+    el.innerHTML = herdsHTML(horses, t("js.horse.more", "More horses"));
   } catch { failed(el, t("js.failed.horses", "The horses couldn't load right now. Please try again in a little while.")); }
+}
+
+/* Animal Story Spotlight: animals in their forever homes and sanctuaries, by where they live */
+async function renderSpotlight(el) {
+  let list;
+  try { list = (await getAnimals()).filter(a => !helped(a)); }
+  catch { await wordingReady; failed(el, t("js.failed.spotlight", "The spotlight couldn't load right now. Please try again in a little while.")); return; }
+  await wordingReady;
+  if (!list.length) { el.innerHTML = `<p class="empty">${h(t("js.spotlight.none", "The first stories are on their way."))}</p>`; return; }
+  const homes = [...new Set(list.map(a => a.partner?.slug || ""))].sort((a, b) => (a === "") - (b === "") || a.localeCompare(b));
+  el.innerHTML = homes.map(slug => {
+    const here = list.filter(a => (a.partner?.slug || "") === slug), name = here[0].partner?.name;
+    const page = OWN_PAGE[slug] ? `<a class="more" href="${h(S.base + OWN_PAGE[slug])}">${h(t("js.spotlight.visit", "More about {name}", { name }))}</a>` : "";
+    return `<div class="spot-home"><h2 class="h2">${h(name ? t("js.spotlight.at", "At {name}", { name }) : t("js.spotlight.more", "More stories"))}</h2>${page}
+      ${herdsHTML(here, here.every(a => a.species === "horse") ? t("js.horse.more", "More horses") : t("js.spotlight.meet", "Meet them"))}</div>`;
+  }).join("");
 }
 
 /* upcoming events for a partner (Willow Woods page) */
@@ -573,6 +598,7 @@ renderStats();
 renderAnimals();
 $$("[data-rescues]").forEach(renderRescues);
 $$("[data-horses]").forEach(renderHorses);
+$$("[data-spotlight]").forEach(renderSpotlight);
 $$("[data-events]").forEach(renderEvents);
 $$("[data-sniffari]").forEach(renderSniffari);
 $$("[data-videos]").forEach(renderVideos);
