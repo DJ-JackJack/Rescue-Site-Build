@@ -19,10 +19,7 @@ jobs:
         with:
           node-version: 22
       - name: Copy the content
-        env:
-          SUPABASE_URL: https://yysfgsdwlddeilktumza.supabase.co
-          SUPABASE_KEY: sb_publishable_UtnxK1yVdvtQhj9pP608jA_mW9ZL5Ty # public on purpose: reads published rows only
-        run: node tools/backup-content.mjs backup
+        run: node tools/backup-content.mjs backup # reads the database address and public key from site/supabase.json
       - id: day
         run: echo "day=$(date -u +%F)" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@v4

@@ -1,14 +1,15 @@
 #!/usr/bin/env node
 // Saves a copy of the site's public content, and the photos uploaded from the edit page, into a folder:
-//   SUPABASE_URL=... SUPABASE_KEY=<publishable key> node tools/backup-content.mjs backup
+//   node tools/backup-content.mjs backup
+// The database's address and publishable key come from site/supabase.json (SUPABASE_URL and SUPABASE_KEY override them).
 // .github/workflows/backup.yml runs it every week and keeps each copy for 90 days on the Actions tab.
 // It uses the public key, so it copies only what visitors can already see. Hidden rows and messages stay in
 // the database, where "Recently deleted" (content_history) keeps 90 days of copies of anything changed.
 import fs from "node:fs";
 import path from "node:path";
 
-const API = (process.env.SUPABASE_URL || "").replace(/\/+$/, ""), KEY = process.env.SUPABASE_KEY;
-if (!API || !KEY) { console.error("Set SUPABASE_URL and SUPABASE_KEY."); process.exit(1); }
+const SUPABASE = JSON.parse(fs.readFileSync(new URL("../site/supabase.json", import.meta.url), "utf8"));
+const API = (process.env.SUPABASE_URL || SUPABASE.url).replace(/\/+$/, ""), KEY = process.env.SUPABASE_KEY || SUPABASE.key;
 const OUT = path.resolve(process.argv[2] || "backup");
 const TABLES = ["partners", "goals", "goal_bars", "animals", "events", "sniffari_programs", "videos", "places", "help_resources", "site_text"];
 

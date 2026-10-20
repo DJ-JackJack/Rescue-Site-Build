@@ -42,12 +42,14 @@ const SITE_URL = (process.env.SITE_URL || "https://dj-jackjack.github.io" + BASE
 // The name she publishes under (a pen name). Change it here and every page follows.
 const OWNER = { full: "Taea Whelan", first: "Taea" };
 
-// Public on purpose: the publishable key can only read published rows and call submit_message.
+// The database's address and publishable key, kept in site/supabase.json for the build, the backup and the
+// keep-awake job. Public on purpose: the publishable key can only read published rows and call submit_message.
+const SUPABASE = JSON.parse(fs.readFileSync(path.join(SRC, "supabase.json"), "utf8"));
 const CONFIG = {
   base: BASE,
   ownerFirst: OWNER.first,
-  supabaseUrl: "https://yysfgsdwlddeilktumza.supabase.co",
-  supabaseKey: "sb_publishable_UtnxK1yVdvtQhj9pP608jA_mW9ZL5Ty",
+  supabaseUrl: SUPABASE.url,
+  supabaseKey: SUPABASE.key,
 };
 
 const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -208,7 +210,6 @@ for (const file of fs.readdirSync(pagesDir).filter(f => f.endsWith(".html")).sor
   built.push("/edit/ (private)");
 }
 
-// questionnaire/ (the planning questionnaire) is no longer published; tools/render-answers.mjs still reads it.
 fs.writeFileSync(path.join(OUT, ".nojekyll"), "");
 fs.cpSync(path.join(SRC, "root"), OUT, { recursive: true }); // favicon.ico for the domain root
 fs.writeFileSync(path.join(OUT, "sitemap.xml"), `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${pageUrls.map(u => `  <url><loc>${esc(u)}</loc></url>`).join("\n")}\n</urlset>\n`);
