@@ -31,6 +31,7 @@ The website for TheTerr0rTw!ns (tae): rescue features, shelter goals, dog day ou
 - Rescues on Sniffari lists publicly advertised day-out programs; no shelter OK is needed.
 - Her published name is a pen name, set once in `site/build.mjs` (`OWNER`).
 - Photos have their hidden data (like GPS location) stripped before they're added, and nothing in the background can point to a private home. See `docs/updating-content.md`.
+- The Privacy page (`site/pages/privacy.html`) says exactly what the site keeps. If the forms, the visit counts or the services behind the site change, update it to match.
 - Numbers are never invented. The adoption stat appears only once there are enough real records, and goals show "coming soon" until the shelter reports figures.
 
 ## Planning material
