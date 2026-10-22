@@ -44,8 +44,12 @@
       <li><a data-nav="shop" href="{{base}}shop/">Shop</a></li>
       <li><a data-nav="partner" href="{{base}}partner/">Partner With Me</a></li>
       <li><a data-nav="help" href="{{base}}help/">Help Keeping Your Pet</a></li>
+      <li><a data-nav="foster" href="{{base}}foster/">Foster</a></li>
       <li><a data-nav="animals" href="{{base}}animals/">Animals We've Helped</a></li>
       <li><a data-nav="spotlight" href="{{base}}spotlight/">Animal Story Spotlight</a></li>
+      <li><a data-nav="aga" href="{{base}}animal-guardian-alliance/">Animal Guardian Alliance</a></li>
+      <li><a data-nav="bts" href="{{base}}behind-the-scenes/">Behind the Scenes</a></li>
+      <li><a data-nav="ask" href="{{base}}ask/">Requests and Questions</a></li>
       <li><a data-nav="about" href="{{base}}about/">About {{owner_first}}</a></li>
     </ul>
   </nav>
@@ -67,15 +71,20 @@
         <li><a href="{{base}}shelter-goals/">Shelter Goals</a></li>
         <li><a href="{{base}}partner/">Partner With Me</a></li>
         <li><a href="{{base}}help/">Help Keeping Your Pet</a></li>
+        <li><a href="{{base}}foster/">Foster</a></li>
         <li><a href="{{base}}animals/">Animals We've Helped</a></li>
         <li><a href="{{base}}spotlight/">Animal Story Spotlight</a></li>
+        <li><a href="{{base}}animal-guardian-alliance/">Animal Guardian Alliance</a></li>
+        <li><a href="{{base}}behind-the-scenes/">Behind the Scenes</a></li>
+        <li><a href="{{base}}ask/">Requests and Questions</a></li>
       </ul></div>
       <div><h2>Follow along</h2><ul>
         <li><a href="https://www.tiktok.com/@terrortwins89" rel="noopener">TikTok @terrortwins89</a></li>
         <li><a href="https://www.instagram.com/liladydrkwolf12/" rel="noopener">Instagram @liladydrkwolf12</a></li>
         <li><a href="https://www.youtube.com/@terrortwyns" rel="noopener">YouTube TerrorTwyns</a></li>
+        <li {{if:patreon}}><a href="{{patreon}}" rel="noopener">Patreon</a></li>
       </ul></div>
-      <div><h2>Say hello</h2>
+      <div id="hello"><h2>Say hello</h2>
         <form class="form" method="post" data-form="footer">
           <label>What's this about?<select name="topic" required>
             <option value="" selected disabled>Pick a topic</option>
@@ -83,6 +92,7 @@
             <option value="help">Help keeping my pet</option>
             <option value="dog">A dog I saw in a video</option>
             <option value="sniffari">A Sniffari listing</option>
+            <option value="request">A video request or question</option>
             <option value="other">Something else</option>
           </select></label>
           <label>Your name<input name="name" autocomplete="name" maxlength="200"></label>
@@ -94,7 +104,7 @@
         </form>
       </div>
     </div>
-    <p class="fine">Every donation goes directly to the shelter named on it, and tips through Buy Me a Coffee go to {{owner_first}}. This site never handles money. Rehab sites, release spots and private homes are never shown, to keep animals and people safe. Visits are counted without cookies or tracking. <a href="{{base}}privacy/">Privacy</a></p>
+    <p class="fine">Every donation goes directly to the shelter named on it, and tips through Buy Me a Coffee and memberships on Patreon go to {{owner_first}}. This site never handles money. Rehab sites, release spots and private homes are never shown, to keep animals and people safe. Visits are counted without cookies or tracking. <a href="{{base}}privacy/">Privacy</a></p>
   </div>
 </footer>
 

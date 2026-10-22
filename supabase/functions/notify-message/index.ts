@@ -15,7 +15,7 @@ const SECRET: string = json(Deno.env.get("SUPABASE_SECRET_KEYS")).default || Den
 const PUBLISHABLE: string = json(Deno.env.get("SUPABASE_PUBLISHABLE_KEYS")).default || Deno.env.get("SUPABASE_ANON_KEY")!;
 const CONTACT = "https://dj-jackjack.github.io/Rescue-Site-Build/"; // who push services can contact about these notifications
 const BRAND = "TheTerr0rTw!ns ·"; // starts every title, so it's clear the notification is about the site
-const TOPICS: Record<string, string> = { partner: "Partnership", help: "Help keeping a pet", dog: "About a dog", sniffari: "Day-out program", other: "Something else" };
+const TOPICS: Record<string, string> = { partner: "Partnership", help: "Help keeping a pet", dog: "About a dog", sniffari: "Day-out program", request: "Video request or question", other: "Something else" };
 const PUSH_HOSTS = /(^|\.)(fcm\.googleapis\.com|push\.apple\.com|push\.services\.mozilla\.com|notify\.windows\.com)$/; // nowhere else
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS" };
 const reply = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { ...CORS, "Content-Type": "application/json" } });

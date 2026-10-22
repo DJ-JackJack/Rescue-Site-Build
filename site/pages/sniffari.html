@@ -18,6 +18,7 @@
       <button aria-pressed="false" data-s="half">Half-day option</button>
       <button aria-pressed="false" data-s="kids">Kids welcome</button>
       <button aria-pressed="false" data-s="first">Good for first-timers</button>
+      <button aria-pressed="false" data-s="sleepover">Sleepovers</button>
     </div>
     <p class="sr" id="sniff-count" aria-live="polite"></p>
     <div class="slist" data-sniffari data-filters="#sniff-filters" data-live="#sniff-count" data-loading></div>
@@ -42,6 +43,37 @@
     </div>
   </div>
 </section>
+
+<section style="padding-top:0" data-show-when-filled hidden>
+  <div class="wrap">
+    <p class="eyebrow">Sleepovers</p>
+    <h2 class="h2">Some shelters let a dog stay the night.</h2>
+    <p class="lede">A sleepover is a night or a weekend in a real home. The dog gets a break from the kennel, and the shelter learns how they act in a house, which helps them find the right family.</p>
+    <div class="box callbox" data-sleepovers></div>
+    <p class="small" style="margin-top:12px">Each shelter sets its own rules for sleepovers, like age limits, other pets at home and how long a stay can be. Read theirs before you sign up.</p>
+  </div>
+</section>
+
+<section id="day-outs" style="padding-top:0" data-show-when-filled hidden>
+  <div class="wrap">
+    <p class="eyebrow">Our day outs</p>
+    <h2 class="h2">Where we've been.</h2>
+    <p class="lede">The day outs I've taken shelter dogs on: what we did, the videos and photos, and the places we went.</p>
+    <ul class="advs" data-adventures></ul>
+  </div>
+</section>
+
+<dialog class="journey adv" id="adventure" aria-labelledby="aname">
+  <button class="jclose" type="button" aria-label="Close">✕</button>
+  <div class="jhead"><div class="ph" id="apic" aria-hidden="true"></div><div><h2 id="aname"></h2><p class="small" id="ameta"></p></div></div>
+  <div class="jbody" id="abody"></div>
+  <div class="lightbox" id="alight" hidden>
+    <img id="alight-img" alt="">
+    <button class="lb-btn lb-x" type="button" aria-label="Close the photo">✕</button>
+    <button class="lb-btn lb-prev" type="button" aria-label="Previous photo">‹</button>
+    <button class="lb-btn lb-next" type="button" aria-label="Next photo">›</button>
+  </div>
+</dialog>
 
 <section style="padding-top:0" data-show-when-filled hidden>
   <div class="wrap">

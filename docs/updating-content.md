@@ -15,7 +15,7 @@ Goals, animals, rescues, events, Sniffari programs, the local help list and some
 
 Add a row to `animals`:
 
-- `name`, `species` (dog, cat, horse, bird, other) and `status` (adopted, foster, sanctuary, looking, placed).
+- `name`, `species` (dog, cat, horse, bird, other) and `status` (adopted, foster, sanctuary, looking, placed, unknown). "unknown" is for an animal she has lost touch with: the site says their status is unknown. They still count in the adoption stat, as not known to be home.
 - Horses: `herd` (for example "Herd One") groups them on the Willow Woods page, and `sort` sets their order.
 - `featured_on`: the date of the video. `adopted_on`: the adoption date. These two dates drive the adoption numbers.
 - `transport`: tick it for transport runs like the puppy relay, so they don't count in the adoption stat.
@@ -31,16 +31,23 @@ The homepage stat ("X of Y dogs I featured were home within 3 months") appears b
 
 ## Rescues and shelters
 
-In `partners`, an organization appears when both `feature_ok` and `published` are ticked. Filming an organization's animals (always done with consent) counts as OK to feature. Use the organization's proper full name. Add `website_url`, `adopt_url` and `donate_url` when you have them; `mission` only in their own words with their permission. Isle of Wight County Animal Services, Portsmouth Humane Society and Frankie's Friends Animal Rescue are in the table, hidden for now.
+In `partners`, an organization appears when both `feature_ok` and `published` are ticked. Filming an organization's animals (always done with consent) counts as OK to feature. Use the organization's proper full name. Add `website_url`, `adopt_url` and `donate_url` when you have them; `mission` only in their own words with their permission. `links` is a list of extra links (`[{"url": "https://…", "label": "Wish list"}]`) shown on their card under "More from them".
+
+Each rescue's card on the Rescues page also shows its upcoming `events` and its `collabs` (collaborations): `partner_id`, `title`, `kind` (like "Portraits"), `starts_on`, and either `ends_on` or `ongoing`, plus optional `description`, `link_url` and `photo_url`. Whether one is coming up, happening now or done comes from its dates. Collaborations show while their rescue is shown. The Willow Woods page shows its own collaborations and links too. Isle of Wight County Animal Services, Portsmouth Humane Society and Frankie's Friends Animal Rescue are in the table, hidden for now.
 
 ## Rescues on Sniffari
 
-Add a row to `sniffari_programs` with the shelter, program, city, the shelter's public address, sign-up link, facts (like "Free", "Full day") and tags (`free`, `half`, `kids`, `first`). It shows once `published` is ticked; no shelter OK is needed for publicly advertised programs. Set `checked_on` whenever you confirm the details. Filter buttons only appear for tags at least one program has.
+Add a row to `sniffari_programs` with the shelter, program, city, the shelter's public address, sign-up link, extra `links` (same shape as a rescue's), facts (like "Free", "Full day") and tags (`free`, `half`, `kids`, `first`, `sleepover`). A program tagged `sleepover` also shows in the page's Sleepovers part, which is hidden while no program has the tag. It shows once `published` is ticked; no shelter OK is needed for publicly advertised programs. Set `checked_on` whenever you confirm the details. Filter buttons only appear for tags at least one program has.
 
-The same page has two more parts, each hidden until it has a published row:
+The same page has three more parts, each hidden until it has a published row:
 
+- `adventures` ("Our day outs"): `title`, `went_on`, `dogs`, `partner_id`, `story`, `videos` (`[{"url", "title"}]`), `photos` (a list of photo links, the first is the cover, up to 40) and `businesses` (`[{"url", "name"}]`, the places they went). YouTube videos play in the pop-up from youtube-nocookie.com, and only after play is tapped; other videos are links. `#day-out-<id>` on the page's address opens one.
 - `videos`: videos of the dogs' day outs. `title`, `url` (an `https://` link to the post on TikTok, Instagram, YouTube or Facebook), and optionally `posted_on`, `note` and a cover `photo_url`. They're links, not embeds, so no outside scripts or cookies load on the page. They show by `sort`, then newest first.
 - `places`: her dog-friendly places. `name`, `area` (a city or the public place, never a private address), `why`, and optionally `link_url` and `photo_url`.
+
+## Foster programs
+
+`foster_programs`, shown on the Foster page: `shelter_name`, `program_name`, `city`, `signup_url`, `facts`, `links`, `tags` (`free`, `dogs`, `cats`, `kittens`, `puppies`, `medical`, `short`, `sleepover`, `adopt`), `checked_on`, `sort`, `published`. `free` means the program says the animal's care is covered at no cost to the foster; the page counts them ("4 of the 9 programs listed here are free to foster"). Like day-out programs, publicly advertised programs need no shelter OK.
 
 ## Events
 
@@ -48,7 +55,7 @@ Add a row to `events` with the organization, `title`, `starts_on` (date), and op
 
 ## Messages
 
-Every form on the site lands in `messages`, tagged by topic (`partner`, `help`, `dog`, `sniffari`, `other`). Tick `handled` once it's dealt with. Only signed-in admins can read this table; the public site can't.
+Every form on the site lands in `messages`, tagged by topic (`partner`, `help`, `dog`, `sniffari`, `request`, `other`). `request` comes from the Requests and Questions page (/ask/): asking her to cover a topic, react to a video or answer a question, with what kind, a video link, how they would like an answer, and whether their name can be said in a video. Tick `handled` once it's dealt with. Only signed-in admins can read this table; the public site can't.
 
 ## Photos
 
@@ -72,7 +79,7 @@ The original files from the shared Drive folder are kept in `responses/drive-pho
 
 ## Local help list
 
-`help_resources`: `category` (food, vet, behavior, housing, rehoming, birds), `name`, `description` (line breaks are kept), `link_url`, `phone` (extra words are fine; the call button dials the first number), `email`, `more_url` and `more_label` (a second link, like a free resource library), `caution` (shown in a yellow box, like "This is a credit card, not financial assistance"), `area` (a city, "All of Hampton Roads", or a public building's address; never a private home or a wildlife rehab or release site), `checked_on`, `sort`, `published`. Published rows show on the help page under their category; a category with none keeps its short description.
+`help_resources`: `category` (food, vet, behavior, housing, rehoming, birds; financing for credit cards, loans and payment plans; abuse for where to report cruelty; wildlife for who to call about a wild animal; wildgroups for wildlife groups and sanctuaries), `kind` and `best_for` (for financing: shown as a label like "Credit card", and as "Best for: …"), `name`, `description` (line breaks are kept), `link_url`, `phone` (extra words are fine; the call button dials the first number), `email`, `more_url` and `more_label` (a second link, like a free resource library), `caution` (shown in a yellow box, like "This is a credit card, not financial assistance"), `area` (a city, "All of Hampton Roads", or a public building's address; never a private home or a wildlife rehab or release site), `checked_on`, `sort`, `published`. Published rows show on the help page under their category; a category with none keeps its short description. The financing section, and its link at the top of the page, stay hidden until one financing row is published. Wildlife rows show on both the help page and the Wildlife page.
 
 ## Page wording
 

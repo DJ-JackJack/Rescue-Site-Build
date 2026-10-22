@@ -6,7 +6,7 @@
 // The rest of the file is the page body. site/layout.html wraps it with the header,
 // menu and footer. In any file, {{base}} becomes the site's root URL and
 // {{asset:name}} becomes a cache-busted link to site/assets/name, and {{owner}} / {{owner_first}}
-// become her published name (see OWNER below).
+// become her published name (see OWNER below). {{patreon}} and {{if:patreon}}: see LINKS below.
 //
 // site/edit.html is the private edit page, written to /edit/. It gets the same {{base}}/{{asset:}} filling,
 // plus {{config}}: the public settings and every piece of wording on the site, for its Page wording screen.
@@ -41,6 +41,9 @@ const SITE_URL = (process.env.SITE_URL || "https://dj-jackjack.github.io" + BASE
 
 // The name she publishes under (a pen name). Change it here and every page follows.
 const OWNER = { full: "Taea Whelan", first: "Taea" };
+// Her pages elsewhere, used in links on the site. {{patreon}} is the address; anything marked {{if:patreon}} stays
+// hidden while it's empty, so the Patreon buttons appear on their own once it's filled in.
+const LINKS = { patreon: "https://www.patreon.com/TerrorTwyns" };
 
 // The database's address and publishable key, kept in site/supabase.json for the build, the backup and the
 // keep-awake job. Public on purpose: the publishable key can only read published rows and call submit_message.
@@ -93,7 +96,9 @@ function fill(html) {
     })
     .replace(/\{\{base\}\}/g, BASE)
     .replace(/\{\{owner\}\}/g, OWNER.full)
-    .replace(/\{\{owner_first\}\}/g, OWNER.first);
+    .replace(/\{\{owner_first\}\}/g, OWNER.first)
+    .replace(/\{\{if:(\w+)\}\}/g, (_, k) => (LINKS[k] ? "" : "hidden"))
+    .replace(/\{\{(patreon)\}\}/g, (_, k) => esc(LINKS[k] || "#"));
 }
 
 // Wording marked data-text="key" data-label="..." can be changed from the edit page. The page's own words
