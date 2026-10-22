@@ -71,6 +71,6 @@ Below that, **Everything** has a button for each part of the site.
 - **Photos:** pick any photo from your phone. The edit page shrinks it and strips hidden data (like where it was taken) before uploading. Still check the background: no house, street, plates or mail.
 - **Private stuff never goes in:** no home addresses, no wildlife rehab or release spots, no names of people who haven't said yes. Public buildings like shelters and vet hospitals are fine.
 - **Parts that wait for something to show:** on Rescues on Sniffari, day outs, sleepovers, videos and places stay hidden until there's at least one. On the help page, the credit cards and loans section stays hidden until one is switched on.
-- **Patreon buttons** on the Animal Guardian Alliance and Behind the Scenes pages, and in the footer, appear once the Patreon link is added to the site's settings (ask Krys).
+- **Patreon** is linked from the Animal Guardian Alliance and Behind the Scenes pages and the footer. The link lives in the site's settings (ask Krys to change it).
 - **Requests and questions** from the new Requests page arrive in Messages as "Video request or question", with what they're asking for, a video link you can tap, how they'd like an answer, and whether it's OK to say their name in a video.
 - **Messages** are only visible to signed-in editors.

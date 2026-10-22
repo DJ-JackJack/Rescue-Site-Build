@@ -43,7 +43,7 @@ const SITE_URL = (process.env.SITE_URL || "https://dj-jackjack.github.io" + BASE
 const OWNER = { full: "Taea Whelan", first: "Taea" };
 // Her pages elsewhere, used in links on the site. {{patreon}} is the address; anything marked {{if:patreon}} stays
 // hidden while it's empty, so the Patreon buttons appear on their own once it's filled in.
-const LINKS = { patreon: "" };
+const LINKS = { patreon: "https://www.patreon.com/TerrorTwyns" };
 
 // The database's address and publishable key, kept in site/supabase.json for the build, the backup and the
 // keep-awake job. Public on purpose: the publishable key can only read published rows and call submit_message.
