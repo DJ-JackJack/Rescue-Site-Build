@@ -458,6 +458,12 @@ async function renderFosters(el) {
   });
 }
 
+/* "Leave this page quickly" (Caring for Yourself): swaps the page for Google, so Back doesn't bring it up again */
+document.addEventListener("click", e => {
+  const a = e.target.closest("[data-quick-exit]");
+  if (a) { e.preventDefault(); location.replace(a.href); }
+});
+
 /* ---------- forms: everything goes to the write-only inbox ---------- */
 const TOPIC = { partner: "partner", sniffari: "sniffari", request: "request" };
 $$("form[data-form]").forEach(form => form.addEventListener("submit", async e => {
@@ -593,8 +599,8 @@ async function renderHelp() {
     if (!list.length) return;
     box.innerHTML = `<ul class="res">${list.map(r => {
       const link = safeUrl(r.link_url), more = safeUrl(r.more_url);
-      // the call button dials the first number, so a phone like "(757) 427-0071, option 1" still works
-      const tel = (String(r.phone || "").match(/\+?\d[\d\s().-]{5,}\d/) || [""])[0].replace(/[^\d+]/g, "");
+      // the call button dials the first number, so a phone like "(757) 427-0071, option 1" still works; 988 and 211 too
+      const tel = (String(r.phone || "").match(/\+?\d[\d\s().-]{5,}\d/) || String(r.phone || "").match(/^(?:988|[2-9]11)\b/) || [""])[0].replace(/[^\d+]/g, "");
       const email = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(r.email || "") ? r.email : "";
       const reach = [r.area ? h(r.area) : "", r.phone ? (tel ? `<a href="tel:${h(tel)}">${h(r.phone)}</a>` : h(r.phone)) : "", email ? `<a href="mailto:${h(email)}">${h(email)}</a>` : ""].filter(Boolean);
       return `<li>${r.kind ? `<em class="kind">${h(r.kind)}</em>` : ""}${link ? `<a href="${h(link)}" target="_blank" rel="noopener">${h(r.name)} <span class="ext" aria-hidden="true">↗</span></a>` : `<b>${h(r.name)}</b>`}
