@@ -148,6 +148,8 @@ const SHOWN_ON = [["helped", "Animals We've Helped"], ["spotlight", "Animal Stor
 const EMOJI = { dog: "🐶", cat: "🐱", horse: "🐴", bird: "🐦", other: "🐾" };
 const KINDS = [["rescue", "Rescue"], ["shelter", "Shelter"], ["sanctuary", "Sanctuary"]];
 const TAGS = [["free", "Free"], ["half", "Half-day option"], ["kids", "Kids welcome"], ["first", "Good for first-timers"], ["sleepover", "Sleepovers"]];
+const FOSTER_TAGS = [["free", "Free to foster"], ["dogs", "Dogs"], ["cats", "Cats"], ["kittens", "Kittens"], ["puppies", "Puppies"], ["medical", "Medical"],
+  ["short", "Short stays"], ["sleepover", "Sleepovers"], ["adopt", "Foster to adopt"]];
 const LINK_COLS = [{ key: "label", label: "What it says", max: 80, ph: "Amazon wish list", need: true }, { key: "url", label: "Link", url: true, need: true }];
 // whether a collaboration is coming up, happening now or done, from its dates (the site works it out the same way)
 const collabWhen = c => { const now = today(); return c.starts_on > now ? "soon" : c.ongoing || (c.ends_on || c.starts_on) >= now ? "now" : "past"; };
@@ -328,6 +330,27 @@ const SECTIONS = {
       SHOW, SORT,
     ],
   },
+  fosters: {
+    table: "foster_programs", title: "Foster programs", one: "foster program", icon: "🏠",
+    intro: "The shelters' and rescues' foster programs, listed on the Foster page. The page counts how many are free to foster.",
+    query: "select=*&order=sort.asc,shelter_name.asc",
+    titleOf: r => r.program_name || r.shelter_name,
+    filters: [["all", "All"], ...FOSTER_TAGS.slice(0, 3), ["hidden", "Hidden"]],
+    tokens: r => [...(r.tags || []), r.published ? "" : "hidden"],
+    row: r => ({ title: r.program_name || r.shelter_name, emoji: "🏠", sub: [r.program_name && r.shelter_name, r.city].filter(Boolean).join(" · "),
+      flags: [!r.published && "Hidden", r.published && stale(r.checked_on, 90) && "!Check the details"] }),
+    fields: [
+      { name: "shelter_name", type: "text", label: "Shelter or rescue's full name", required: true, max: 150 },
+      { name: "program_name", type: "text", label: "Program name", max: 120, help: "Like “Foster Program” or “Bottle Baby Fosters”." },
+      { name: "city", type: "text", label: "City", max: 60 },
+      { name: "signup_url", type: "url", label: "Their foster page", help: "Where people apply." },
+      { name: "facts", type: "lines", label: "Quick facts", rows: 4, help: "One per line, like “Food, supplies and vet care provided” or “Ages 21+”." },
+      { name: "tags", type: "tags", label: "Filters it shows under", options: FOSTER_TAGS, help: "“Free to foster” means the shelter covers the animal's care. The page counts these." },
+      { name: "links", type: "rows", label: "More links", cols: LINK_COLS, add: "+ Add a link", help: "Like their foster handbook or an info session." },
+      { name: "checked_on", type: "date", label: "Details last checked", today: "Checked today", dflt: today },
+      SHOW, SORT,
+    ],
+  },
   videos: {
     table: "videos", title: "Day-out videos", one: "day-out video", icon: "🎬",
     intro: "Videos of the dogs' day outs, shown on Rescues on Sniffari. That part of the page stays hidden until there's a video to show.",
@@ -456,7 +479,7 @@ function showNotEditor() {
 }
 
 async function showHome() {
-  const [msgs, animals, goals, progs, help, events, week, videos, places, collabs] = await Promise.all([
+  const [msgs, animals, goals, progs, help, events, week, videos, places, collabs, fosters] = await Promise.all([
     api.list("messages", "select=id&handled=is.false"),
     api.list("animals", "select=id,name,status,published,checked_on"),
     api.list("goals", "select=id,title,status,published,figures_updated_at,bars:goal_bars(id)"),
@@ -467,6 +490,7 @@ async function showHome() {
     api.list("videos", "select=id"),
     api.list("places", "select=id"),
     api.list("collabs", "select=id"),
+    api.list("foster_programs", "select=id,program_name,shelter_name,published,checked_on"),
   ]);
   const todo = [];
   if (msgs.length) todo.push(`<li><b>${plural(msgs.length, "new message")}</b><div class="btns"><a class="btn royal sm" href="#/messages">Read ${msgs.length === 1 ? "it" : "them"}</a></div></li>`);
@@ -483,6 +507,10 @@ async function showHome() {
     todo.push(`<li><b>${h(p.program_name || p.shelter_name)}: details still right?</b><small>${p.checked_on ? `Last checked ${h(nice(p.checked_on))}.` : "Never checked."}</small>
       <div class="btns"><button class="btn royal sm" type="button" data-act="checked" data-t="sniffari_programs" data-id="${h(p.id)}">Still right</button><a class="btn ghost sm" href="#/sniffari/${h(p.id)}">Open</a></div></li>`);
   }
+  for (const p of fosters.filter(p => p.published && stale(p.checked_on, 90))) {
+    todo.push(`<li><b>${h(p.program_name || p.shelter_name)}: details still right?</b><small>${p.checked_on ? `Last checked ${h(nice(p.checked_on))}.` : "Never checked."}</small>
+      <div class="btns"><button class="btn royal sm" type="button" data-act="checked" data-t="foster_programs" data-id="${h(p.id)}">Still right</button><a class="btn ghost sm" href="#/fosters/${h(p.id)}">Open</a></div></li>`);
+  }
   for (const r of help.filter(r => r.published && stale(r.checked_on, 180))) {
     todo.push(`<li><b>${h(r.name)}: still running?</b><small>${r.checked_on ? `Last checked ${h(nice(r.checked_on))}.` : "Never checked."}</small>
       <div class="btns"><button class="btn royal sm" type="button" data-act="checked" data-t="help_resources" data-id="${h(r.id)}">Still running</button><a class="btn ghost sm" href="#/help/${h(r.id)}">Open</a></div></li>`);
@@ -495,6 +523,7 @@ async function showHome() {
     ["partners", "🏡", "Rescues & shelters", ""],
     ["collabs", "🎨", "Collaborations", plural(collabs.length, "collaboration")],
     ["sniffari", "🦮", "Day-out programs", plural(progs.length, "program")],
+    ["fosters", "🏠", "Foster programs", plural(fosters.length, "program")],
     ["videos", "🎬", "Day-out videos", plural(videos.length, "video")],
     ["places", "📍", "Dog-friendly places", plural(places.length, "place")],
     ["help", "🤝", "Local help list", plural(help.length, "listing")],
@@ -950,7 +979,7 @@ const WORDS = CFG.textDefaults || [], AREAS = CFG.areas || [];
 const PHRASE_GROUPS = {
   goal: "Shelter goals", status: "Animal labels", count: "Animal counts", animal: "Happy Tails", stat: "The adoption number",
   journey: "An animal's journey (the pop-up)", rescue: "Rescues", horse: "Willow Woods horses", event: "Events",
-  spotlight: "Animal Story Spotlight", collab: "Collaborations", program: "Day-out programs", video: "Day-out videos", place: "Dog-friendly places", help: "Local help list",
+  spotlight: "Animal Story Spotlight", collab: "Collaborations", program: "Day-out programs", foster: "Foster programs", video: "Day-out videos", place: "Dog-friendly places", help: "Local help list",
   form: "Contact forms", failed: "When part of a page can't load",
 };
 const clip = (s, n = 60) => (s.length > n ? s.slice(0, n - 1) + "…" : s);
@@ -1090,6 +1119,7 @@ async function showText(scope) {
 const KIND = {
   animals: ["Animal", r => r.name], goals: ["Shelter goal", r => r.title], goal_bars: ["Line on a shelter goal", r => r.label],
   events: ["Event", r => r.title], collabs: ["Collaboration", r => r.title], partners: ["Rescue or shelter", r => r.name], sniffari_programs: ["Day-out program", r => r.program_name || r.shelter_name],
+  foster_programs: ["Foster program", r => r.program_name || r.shelter_name],
   videos: ["Day-out video", r => r.title], places: ["Dog-friendly place", r => r.name],
   help_resources: ["Help listing", r => r.name], messages: ["Message", r => (r.name ? `From ${r.name}` : `From ${r.email}`)],
 };

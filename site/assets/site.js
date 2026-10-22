@@ -402,11 +402,9 @@ async function renderCollabs(el) {
 }
 
 /* ---------- Sniffari programs ---------- */
-async function renderSniffari(el) {
+// shelter-run programs (day outs, fostering), with filter buttons that hide when nothing has their tag
+function programList(el, programs, o) {
   const group = $(el.dataset.filters || "#none"), live = $(el.dataset.live || "#none");
-  let programs;
-  try { programs = await getSniffari(); } catch { await wordingReady; failed(el, t("js.failed.programs", "Day-out programs couldn't load right now. Please try again in a little while.")); return; }
-  await wordingReady;
   const draw = f => {
     const list = programs.filter(p => f === "all" || (p.tags || []).includes(f));
     el.innerHTML = list.length ? list.map(p => {
@@ -415,12 +413,23 @@ async function renderSniffari(el) {
         ${p.address ? `<p class="small">${h(p.address)}</p>` : ""}
         ${(p.facts || []).length ? `<div class="facts">${p.facts.map(f => `<span>${h(f)}</span>`).join("")}</div>` : ""}
         ${p.checked_on ? `<p class="small">${h(t("js.program.checked", "Details checked {date}", { date: new Date(p.checked_on + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) }))}</p>` : ""}
-        ${url ? `<div class="btns"><a class="btn ocean" href="${h(url)}" target="_blank" rel="noopener">${h(t("js.program.signup", "Sign up on their page"))} <span class="ext" aria-hidden="true">↗</span></a></div>` : ""}
+        ${url ? `<div class="btns"><a class="btn ocean" href="${h(url)}" target="_blank" rel="noopener">${h(o.signup)} <span class="ext" aria-hidden="true">↗</span></a></div>` : ""}
         ${linksHTML(p.links)}</article>`;
-    }).join("") : `<p class="empty">${h(programs.length ? t("js.program.no-match", "No programs match that yet.") : t("js.program.none", "The first programs are being confirmed with the shelters. Run one? Use the form below."))}</p>`;
+    }).join("") : `<p class="empty">${h(programs.length ? t("js.program.no-match", "No programs match that yet.") : o.none)}</p>`;
     if (live) live.textContent = list.length === 1 ? t("js.program.showing-one", "Showing 1 program") : t("js.program.showing", "Showing {n} programs", { n: list.length });
   };
   draw("all");
+  if (group) {
+    if (!programs.length) group.hidden = true;
+    $$("button", group).forEach(b => { if (b.dataset.s !== "all" && !programs.some(p => (p.tags || []).includes(b.dataset.s))) b.hidden = true; });
+    $$("button", group).forEach(b => b.addEventListener("click", () => { $$("button", group).forEach(x => x.setAttribute("aria-pressed", x === b)); draw(b.dataset.s); }));
+  }
+}
+async function renderSniffari(el) {
+  let programs;
+  try { programs = await getSniffari(); } catch { await wordingReady; failed(el, t("js.failed.programs", "Day-out programs couldn't load right now. Please try again in a little while.")); return; }
+  await wordingReady;
+  programList(el, programs, { signup: t("js.program.signup", "Sign up on their page"), none: t("js.program.none", "The first programs are being confirmed with the shelters. Run one? Use the form below.") });
   // programs that offer sleepovers also get their own short list, which stays hidden until there's one
   const sleep = $("[data-sleepovers]"), stays = programs.filter(p => (p.tags || []).includes("sleepover"));
   if (sleep && stays.length) {
@@ -431,11 +440,22 @@ async function renderSniffari(el) {
     }).join("")}</ul>`;
     sleep.closest("[data-show-when-filled]")?.removeAttribute("hidden");
   }
-  if (group) {
-    if (!programs.length) group.hidden = true;
-    $$("button", group).forEach(b => { if (b.dataset.s !== "all" && !programs.some(p => (p.tags || []).includes(b.dataset.s))) b.hidden = true; });
-    $$("button", group).forEach(b => b.addEventListener("click", () => { $$("button", group).forEach(x => x.setAttribute("aria-pressed", x === b)); draw(b.dataset.s); }));
-  }
+}
+
+/* ---------- Foster: the foster programs at the shelters and rescues, and how many are free ---------- */
+async function renderFosters(el) {
+  let programs;
+  try { programs = await q("foster_programs", "select=id,shelter_name,program_name,city,facts,tags,signup_url,links,checked_on,sort&order=sort.asc,shelter_name.asc"); }
+  catch { await wordingReady; failed(el, t("js.failed.fosters", "Foster programs couldn't load right now. Please try again in a little while.")); return; }
+  await wordingReady;
+  programList(el, programs, { signup: t("js.foster.apply", "Apply on their page"), none: t("js.foster.none", "Foster programs around Hampton Roads are being added here.") });
+  const free = programs.filter(p => (p.tags || []).includes("free")).length;
+  $$("[data-foster-free]").forEach(x => {
+    if (!programs.length) return;
+    x.textContent = free === programs.length ? t("js.foster.free-all", "All {n} programs listed here are free to foster, with the animal's care covered.", { n: programs.length })
+      : t("js.foster.free-some", "{free} of the {n} programs listed here are free to foster, with the animal's care covered.", { free, n: programs.length });
+    x.hidden = false;
+  });
 }
 
 /* ---------- forms: everything goes to the write-only inbox ---------- */
@@ -671,6 +691,7 @@ $$("[data-events]").forEach(renderEvents);
 $$("[data-collabs]").forEach(renderCollabs);
 $$("[data-partner-links]").forEach(renderPartnerLinks);
 $$("[data-sniffari]").forEach(renderSniffari);
+$$("[data-fosters]").forEach(renderFosters);
 $$("[data-videos]").forEach(renderVideos);
 $$("[data-places]").forEach(renderPlaces);
 countView();

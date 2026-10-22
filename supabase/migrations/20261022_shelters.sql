@@ -11,6 +11,11 @@ alter table public.animals add constraint animals_status_check
 alter table public.partners add column if not exists links jsonb not null default '[]'::jsonb check (jsonb_typeof(links) = 'array');
 alter table public.sniffari_programs add column if not exists links jsonb not null default '[]'::jsonb check (jsonb_typeof(links) = 'array');
 
+-- Day-out programs can be tagged as offering sleepovers (a night or a weekend in a home).
+alter table public.sniffari_programs drop constraint if exists sniffari_programs_tags_check;
+alter table public.sniffari_programs add constraint sniffari_programs_tags_check
+  check (tags <@ array['free','half','kids','first','sleepover']::text[]);
+
 -- Collaborations with a rescue. Whether one is coming up, happening now or done comes from its dates.
 create table if not exists public.collabs (
   id uuid primary key default gen_random_uuid(),
@@ -38,14 +43,15 @@ grant select, insert, update, delete on public.collabs to authenticated;
 create trigger collabs_touch before update on public.collabs for each row execute function public.touch_updated_at();
 create trigger collabs_history after update or delete on public.collabs for each row execute function public.keep_history();
 
--- Recently deleted can bring collaborations back too (after their rescue, if both were deleted together).
+-- Recently deleted can bring back collaborations (after their rescue, if both were deleted together), and the
+-- foster programs and Sniffari adventures from the same list (20261022_foster.sql, 20261022_adventures.sql).
 create or replace function public.restore_deleted(p_id bigint) returns int
 language plpgsql security definer set search_path = '' as $$
 declare
   v_tx bigint;
   e record;
   n int := 0;
-  tables text[] := array['partners','goals','goal_bars','animals','events','collabs','sniffari_programs','help_resources','videos','places','messages','site_text'];
+  tables text[] := array['partners','goals','goal_bars','animals','events','collabs','sniffari_programs','foster_programs','adventures','help_resources','videos','places','messages','site_text'];
 begin
   if not public.is_admin() then raise exception 'not allowed' using errcode = '42501'; end if;
   select h.tx into v_tx from public.content_history h where h.id = p_id and h.op = 'delete' and h.restored_at is null;

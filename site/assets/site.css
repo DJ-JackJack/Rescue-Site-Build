@@ -315,6 +315,20 @@ dialog.journey::backdrop{background:rgba(25,19,51,.55)}
 .tip{background:var(--soft);border-radius:18px;padding:16px 18px}
 .tip b{font-family:var(--f-disp);font-weight:600;font-size:1.08rem;display:block;margin-bottom:4px}
 .tip span{color:var(--plum);font-size:.95rem}
+/* Animal Guardian Alliance: levels, units, the sign-off questions */
+.levels{list-style:none;counter-reset:lvl;margin:20px 0 0;padding:0;display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr))}
+.levels li{counter-increment:lvl;background:#fff;border-radius:18px;box-shadow:var(--shadow);padding:14px 16px 14px 60px;position:relative}
+.levels li::before{content:counter(lvl);position:absolute;left:14px;top:14px;width:34px;height:34px;border-radius:50%;background:var(--inkgrad);color:#fff;display:grid;place-items:center;font:700 1.05rem var(--f-disp)}
+.levels b{display:block;font-family:var(--f-disp);font-weight:600;font-size:1.08rem}
+.levels span{color:var(--ink2);font-size:.92rem}
+.units{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));margin-top:18px}
+.units div{background:var(--soft);border-radius:18px;padding:14px 16px}
+.units span{font-size:1.8rem;display:block}
+.units b{font-family:var(--f-disp);font-weight:600;font-size:1.08rem;display:block;margin-top:4px}
+.units small{color:var(--plum);font-size:.88rem;display:block;margin-top:2px}
+.box ol.checks{margin:0;padding-left:22px;color:var(--ink2)}
+.box ol.checks li{margin-top:6px}
+.box .free{margin-top:10px;font-weight:800;color:var(--royal)}
 
 /* partner page */
 .cols{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));margin-top:20px}
