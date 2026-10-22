@@ -643,6 +643,94 @@ async function renderPlaces(el) {
   el.closest("[data-show-when-filled]")?.removeAttribute("hidden");
 }
 
+/* ---------- Our day outs (Rescues on Sniffari): her write-up, videos, photos and the places they went ----------
+   YouTube videos play on the page, from youtube-nocookie.com, and only once the play button is tapped, so nothing
+   from YouTube loads before that. Videos from anywhere else are links to where they were posted. */
+const ytId = u => {
+  try {
+    const x = new URL(u), host = x.hostname.replace(/^(www|m)\./, "");
+    const id = host === "youtu.be" ? x.pathname.slice(1) : /(^|\.)youtube\.com$/.test(host) ? (x.searchParams.get("v") || (x.pathname.match(/^\/(?:shorts|live|embed)\/([^/?#]+)/) || [])[1]) : "";
+    return /^[\w-]{11}$/.test(id || "") ? id : "";
+  } catch { return ""; }
+};
+const advDate = a => (a.went_on ? fullDate(a.went_on) : "");
+let ADVS = [];
+function openAdventure(a) {
+  const dlg = $("#adventure");
+  if (!dlg || !a) return;
+  const photos = (Array.isArray(a.photos) ? a.photos : []).map(photoUrl).filter(Boolean);
+  const vids = (Array.isArray(a.videos) ? a.videos : []).filter(v => v && safeUrl(v.url));
+  const places = (Array.isArray(a.businesses) ? a.businesses : []).filter(b => b && b.name);
+  $("#aname").textContent = a.title;
+  $("#ameta").textContent = [advDate(a), a.dogs, a.partner?.name].filter(Boolean).join(" · ");
+  $("#apic").className = "ph " + BG[1];
+  $("#apic").innerHTML = "🦮" + (photos[0] ? `<img src="${h(photos[0])}" alt="">` : "");
+  const story = String(a.story || "").trim();
+  $("#abody").innerHTML = (story ? `<div class="jstory">${blockHTML(story)}</div>` : "")
+    + (vids.length ? `<h3 class="jsub">${h(t("js.adventure.videos", "Videos"))}</h3><div class="avids">${vids.map(v => {
+      const id = ytId(v.url), title = v.title || a.title, where = platform(v.url);
+      return id ? `<div class="yt${/\/shorts\//.test(v.url) ? " tall" : ""}" data-yt="${h(id)}" data-title="${h(title)}"><button type="button" class="yt-play"><span class="yt-icon" aria-hidden="true">▶</span><b>${h(title)}</b><small>${h(t("js.adventure.yt", "Tap to play. It loads from YouTube."))}</small></button></div>`
+        : `<a class="btn ghost" href="${h(safeUrl(v.url))}" target="_blank" rel="noopener">${h(v.title || (where ? t("js.video.watch", "Watch on {site}", { site: where }) : t("js.video.watch-it", "Watch the video")))} <span class="ext" aria-hidden="true">↗</span></a>`;
+    }).join("")}</div>` : "")
+    + (photos.length ? `<h3 class="jsub">${h(t("js.adventure.photos", "Photos"))}</h3><ul class="agal">${photos.map((u, i) => `<li><button type="button" data-photo="${i}" aria-label="${h(t("js.adventure.photo", "Photo {n} of {count}", { n: i + 1, count: photos.length }))}"><img src="${h(u)}" alt="" loading="lazy"></button></li>`).join("")}</ul>` : "")
+    + (places.length ? `<h3 class="jsub">${h(t("js.adventure.places", "Places we went"))}</h3><ul class="xlinks">${places.map(b => safeUrl(b.url)
+      ? `<li><a href="${h(safeUrl(b.url))}" target="_blank" rel="noopener">${h(b.name)} <span class="ext" aria-hidden="true">↗</span></a></li>` : `<li><span>${h(b.name)}</span></li>`).join("")}</ul>` : "");
+  dlg.photos = photos;
+  $("#alight").hidden = true;
+  if (!dlg.open) dlg.showModal ? dlg.showModal() : dlg.setAttribute("open", "");
+  $("#abody").scrollTop = 0;
+  history.replaceState(null, "", "#day-out-" + a.id);
+}
+async function renderAdventures(el) {
+  try { ADVS = await q("adventures", "select=id,title,went_on,dogs,story,videos,photos,businesses,sort,partner:partners(name)&order=sort.asc,went_on.desc.nullslast,created_at.desc"); } catch { return; }
+  if (!ADVS.length) return;
+  await wordingReady;
+  el.innerHTML = ADVS.map((a, i) => {
+    const photos = (Array.isArray(a.photos) ? a.photos : []).map(photoUrl).filter(Boolean), vids = (Array.isArray(a.videos) ? a.videos : []).filter(v => v && safeUrl(v.url));
+    const bits = [photos.length && (photos.length === 1 ? t("js.adventure.one-photo", "1 photo") : t("js.adventure.n-photos", "{n} photos", { n: photos.length })),
+      vids.length && (vids.length === 1 ? t("js.adventure.one-video", "1 video") : t("js.adventure.n-videos", "{n} videos", { n: vids.length }))].filter(Boolean);
+    return `<li><button class="advcard" type="button" aria-haspopup="dialog" data-adv="${h(a.id)}"><span class="ph ${BG[i % 6]}" aria-hidden="true">🦮${photoTag(photos[0])}</span>
+      <span class="bd"><b>${h(a.title)}</b><small>${h([advDate(a), a.dogs].filter(Boolean).join(" · "))}</small>${bits.length ? `<span>${h(bits.join(" · "))}</span>` : ""}</span></button></li>`;
+  }).join("");
+  el.closest("[data-show-when-filled]")?.removeAttribute("hidden");
+  // a link to one day out (#day-out-…) opens it, on arrival or later
+  const fromHash = () => { const m = location.hash.match(/^#day-out-([\w-]+)$/); if (m) openAdventure(ADVS.find(a => a.id === m[1])); };
+  fromHash();
+  addEventListener("hashchange", fromHash);
+}
+{
+  const dlg = $("#adventure");
+  if (dlg) {
+    const light = $("#alight"), img = $("#alight-img");
+    const show = i => { const n = dlg.photos.length; dlg.at = (i + n) % n; img.src = dlg.photos[dlg.at]; img.alt = t("js.adventure.photo", "Photo {n} of {count}", { n: dlg.at + 1, count: n }); light.hidden = false; $(".lb-x", light).focus(); };
+    const shut = () => { light.hidden = true; img.removeAttribute("src"); };
+    document.addEventListener("click", e => { const b = e.target.closest(".advcard"); if (b) openAdventure(ADVS.find(a => a.id === b.dataset.adv)); });
+    dlg.addEventListener("click", e => {
+      if (e.target === dlg) return dlg.close();
+      const play = e.target.closest(".yt-play");
+      if (play) {
+        const box = play.parentElement, id = box.dataset.yt;
+        box.innerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(id)}?autoplay=1&rel=0" title="${h(box.dataset.title)}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>`;
+        return;
+      }
+      const ph = e.target.closest("[data-photo]");
+      if (ph) return show(Number(ph.dataset.photo));
+      if (e.target.closest(".lb-x") || e.target === light || e.target === img) return shut();
+      if (e.target.closest(".lb-prev")) return show(dlg.at - 1);
+      if (e.target.closest(".lb-next")) return show(dlg.at + 1);
+    });
+    dlg.addEventListener("cancel", e => { if (!light.hidden) { e.preventDefault(); shut(); } }); // Escape closes the photo first
+    dlg.addEventListener("keydown", e => {
+      if (light.hidden) return;
+      if (e.key === "ArrowLeft") show(dlg.at - 1);
+      else if (e.key === "ArrowRight") show(dlg.at + 1);
+    });
+    $(".jclose", dlg).addEventListener("click", () => dlg.close());
+    // closing stops any video and takes the day out off the address
+    dlg.addEventListener("close", () => { $("#abody").innerHTML = ""; shut(); if (/^#day-out-/.test(location.hash)) history.replaceState(null, "", location.pathname + location.search); });
+  }
+}
+
 /* ---------- visitor counts ---------- */
 // One count per page view, kept in the site's own database (count_view): just the page, the day and where
 // the visit came from (TikTok, Google, ...). No cookies, and nothing about the visitor is stored or sent.
@@ -694,5 +782,6 @@ $$("[data-sniffari]").forEach(renderSniffari);
 $$("[data-fosters]").forEach(renderFosters);
 $$("[data-videos]").forEach(renderVideos);
 $$("[data-places]").forEach(renderPlaces);
+$$("[data-adventures]").forEach(renderAdventures);
 countView();
 })();

@@ -246,6 +246,41 @@ dialog.journey::backdrop{background:rgba(25,19,51,.55)}
 .steps span{display:block;font-size:.9rem;color:var(--ink2);white-space:pre-line}
 .steps b time{font:700 .8rem var(--f-body);color:var(--plum);margin-left:6px}
 .jclose{position:absolute;top:10px;right:10px;border:0;background:#fff;color:var(--royal);font:800 1rem var(--f-body);border-radius:999px;width:44px;height:44px;cursor:pointer}
+/* Our day outs: cards, and the pop-up with videos, a photo gallery and the places they went */
+.advs{list-style:none;margin:18px 0 0;padding:0;display:grid;gap:16px;grid-template-columns:repeat(auto-fill,minmax(min(100%,240px),1fr))}
+.advcard{display:flex;flex-direction:column;width:100%;height:100%;padding:0;border:0;text-align:left;cursor:pointer;background:#fff;border-radius:var(--r);box-shadow:var(--shadow);overflow:hidden;font:inherit;color:var(--ink)}
+.advcard .ph{aspect-ratio:4/3;display:grid;place-items:center;font-size:2.6rem;position:relative;overflow:hidden}
+.advcard .ph img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.advcard .bd{display:flex;flex-direction:column;gap:2px;padding:12px 16px 16px}
+.advcard b{font-family:var(--f-disp);font-weight:600;font-size:1.12rem}
+.advcard small{color:var(--ink2);font-size:.86rem}
+.advcard .bd span{color:var(--royal);font-weight:800;font-size:.84rem;margin-top:4px}
+.advcard:hover,.advcard:focus-visible{box-shadow:0 0 0 3px var(--lavender),var(--shadow)}
+dialog.adv{max-width:min(720px,calc(100vw - 24px))}
+.adv .jhead .ph{position:relative;overflow:hidden}
+.adv .jhead .ph img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.adv #ameta{color:var(--plum);margin-top:4px}
+.adv .jhead h2{overflow-wrap:anywhere}
+.adv .jsub{margin-top:18px}
+.adv .jbody>.jsub:first-child{margin-top:0}
+.avids{display:flex;flex-direction:column;gap:10px;align-items:flex-start}
+.yt{width:100%;aspect-ratio:16/9;border-radius:16px;overflow:hidden;background:var(--deep)}
+.yt.tall{aspect-ratio:9/16;max-width:320px}
+.yt iframe{width:100%;height:100%;border:0;display:block}
+.yt-play{width:100%;height:100%;border:0;background:var(--deep);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:16px;cursor:pointer;font:inherit;text-align:center}
+.yt-icon{width:58px;height:58px;border-radius:50%;background:rgba(255,255,255,.95);color:var(--royal);display:grid;place-items:center;font-size:1.3rem;padding-left:4px}
+.yt-play b{font-family:var(--f-disp);font-weight:600;font-size:1.05rem}
+.yt-play small{color:#E6DCFF;font-size:.82rem}
+.agal{list-style:none;margin:0;padding:0;display:grid;gap:6px;grid-template-columns:repeat(auto-fill,minmax(96px,1fr))}
+.agal button{display:block;width:100%;aspect-ratio:1;padding:0;border:0;border-radius:12px;overflow:hidden;cursor:pointer;background:var(--wash)}
+.agal img{width:100%;height:100%;object-fit:cover;display:block}
+.adv .xlinks span{display:inline-block;background:var(--paper);border:1.5px solid var(--lavender);color:var(--plum);font-weight:800;font-size:.9rem;border-radius:999px;padding:7px 13px}
+.lightbox{position:absolute;inset:0;background:rgba(25,19,51,.94);display:flex;align-items:center;justify-content:center;z-index:2;border-radius:24px}
+.lightbox img{max-width:calc(100% - 24px);max-height:calc(100% - 120px);object-fit:contain;border-radius:12px}
+.lb-btn{position:absolute;border:0;background:#fff;color:var(--royal);font:800 1.4rem var(--f-body);border-radius:999px;width:48px;height:48px;cursor:pointer}
+.lb-x{top:10px;right:10px;font-size:1rem}
+.lb-prev{left:10px;bottom:16px}
+.lb-next{right:10px;bottom:16px}
 
 /* hub pages */
 .phead{background:var(--soft);padding:36px 0 30px}

@@ -351,6 +351,28 @@ const SECTIONS = {
       SHOW, SORT,
     ],
   },
+  adventures: {
+    table: "adventures", title: "Our day outs", one: "day out", icon: "🦮",
+    intro: "The day outs you go on, shown on Rescues on Sniffari: your write-up, videos, a photo gallery and the places you went. That part of the page stays hidden until there's one to show.",
+    query: "select=*,partner:partners(name)&order=sort.asc,went_on.desc.nullslast",
+    titleOf: r => r.title,
+    row: r => ({ title: r.title, emoji: "🦮", photo: r.photos?.[0], sub: [r.went_on && nice(r.went_on), r.dogs].filter(Boolean).join(" · "), flags: [!r.published && "Hidden"] }),
+    fields: [
+      { name: "title", type: "text", label: "Title", required: true, max: 200, help: "Like “Tyce's first beach day”." },
+      { name: "went_on", type: "date", label: "The day you went" },
+      { name: "dogs", type: "text", label: "The dogs who went", max: 200, help: "Like “Tyce and Zazu”." },
+      { name: "partner_id", type: "partner", label: "Which shelter are they from?" },
+      { name: "story", type: "textarea", rows: 8, max: 6000, label: "What you did", help: "Your write-up of the day. Leave a blank line between paragraphs." },
+      { name: "videos", type: "rows", label: "Videos", add: "+ Add a video", bad: "Each video needs a link starting with https://",
+        cols: [{ key: "title", label: "Title", max: 200, ph: "Beach day, part 1" }, { key: "url", label: "Link", url: true, need: true }],
+        help: "YouTube videos play right on the page. Others, like TikTok, open where they were posted. Tap Share, then Copy link." },
+      { name: "photos", type: "gallery", label: "Photos", folder: "day-outs", max: 40, help: "The first photo is the cover. Never photos of a home, or anything showing where someone lives." },
+      { name: "businesses", type: "rows", label: "Places you went", add: "+ Add a place", bad: "Each place needs a name, and links need to start with https://",
+        cols: [{ key: "name", label: "Name", max: 120, ph: "The Dog Bakery", need: true }, { key: "url", label: "Their website", url: true }],
+        help: "Businesses and public places only, with a link to their website." },
+      SHOW, { ...SORT, help: "Lower numbers show first. Day outs with the same number show newest first." },
+    ],
+  },
   videos: {
     table: "videos", title: "Day-out videos", one: "day-out video", icon: "🎬",
     intro: "Videos of the dogs' day outs, shown on Rescues on Sniffari. That part of the page stays hidden until there's a video to show.",
@@ -479,7 +501,7 @@ function showNotEditor() {
 }
 
 async function showHome() {
-  const [msgs, animals, goals, progs, help, events, week, videos, places, collabs, fosters] = await Promise.all([
+  const [msgs, animals, goals, progs, help, events, week, videos, places, collabs, fosters, advs] = await Promise.all([
     api.list("messages", "select=id&handled=is.false"),
     api.list("animals", "select=id,name,status,published,checked_on"),
     api.list("goals", "select=id,title,status,published,figures_updated_at,bars:goal_bars(id)"),
@@ -491,6 +513,7 @@ async function showHome() {
     api.list("places", "select=id"),
     api.list("collabs", "select=id"),
     api.list("foster_programs", "select=id,program_name,shelter_name,published,checked_on"),
+    api.list("adventures", "select=id"),
   ]);
   const todo = [];
   if (msgs.length) todo.push(`<li><b>${plural(msgs.length, "new message")}</b><div class="btns"><a class="btn royal sm" href="#/messages">Read ${msgs.length === 1 ? "it" : "them"}</a></div></li>`);
@@ -524,6 +547,7 @@ async function showHome() {
     ["collabs", "🎨", "Collaborations", plural(collabs.length, "collaboration")],
     ["sniffari", "🦮", "Day-out programs", plural(progs.length, "program")],
     ["fosters", "🏠", "Foster programs", plural(fosters.length, "program")],
+    ["adventures", "🦮", "Our day outs", plural(advs.length, "day out")],
     ["videos", "🎬", "Day-out videos", plural(videos.length, "video")],
     ["places", "📍", "Dog-friendly places", plural(places.length, "place")],
     ["help", "🤝", "Local help list", plural(help.length, "listing")],
@@ -609,6 +633,10 @@ const rowsRow = (f, r) => `<div class="step-row rows-row">
   ${f.cols.map(c => `<label>${h(c.label)}<input name="r_${f.name}_${c.key}"${c.url ? ' type="url" inputmode="url" placeholder="https://"' : ` type="text"${c.ph ? ` placeholder="${h(c.ph)}"` : ""}`} maxlength="${c.max || 300}" value="${h(r[c.key] || "")}" autocomplete="off"></label>`).join("")}
   <div class="step-btns"><button type="button" class="xbtn" data-row-up aria-label="Move up">↑</button><button type="button" class="xbtn" data-row-down aria-label="Move down">↓</button><button type="button" class="xbtn" data-row-remove aria-label="Remove">✕</button></div></div>`;
 
+// one photo in a gallery: the first one is the cover
+const galItem = u => `<li class="gal-item" data-url="${h(u)}"><img src="${h(photoUrl(u))}" alt="">
+  <span class="gal-btns"><button type="button" class="xbtn" data-gal-left aria-label="Move this photo earlier">‹</button><button type="button" class="xbtn" data-gal-right aria-label="Move this photo later">›</button><button type="button" class="xbtn" data-gal-remove aria-label="Remove this photo">✕</button></span></li>`;
+
 function fieldHTML(f, v, ctx) {
   const id = fid(f.name), help = f.help ? `<p class="hint" id="${id}-h">${h(f.help)}</p>` : "";
   const desc = f.help ? ` aria-describedby="${id}-h"` : "", req = f.required ? " required" : "", max = f.max ? ` maxlength="${f.max}"` : "";
@@ -647,6 +675,10 @@ function fieldHTML(f, v, ctx) {
     case "updates":
       return wrap(`<span class="flabel">${h(f.label)}</span><div class="notes-ed">${(v || []).map(noteRow).join("")}</div>
         <button type="button" class="btn ghost sm" data-note-add>+ Add an update</button>`);
+    case "gallery":
+      return wrap(`<span class="flabel">${h(f.label)}</span><ul class="gal-ed" data-gallery="${f.name}">${(v || []).map(galItem).join("")}</ul>
+        <label class="btn ghost sm pick">+ Add photos<input type="file" accept="image/*" multiple class="sr" data-gallery-add="${f.name}"></label>
+        <p class="hint gal-status" aria-live="polite"></p>`);
     case "rows":
       return wrap(`<span class="flabel">${h(f.label)}</span><div class="rows-ed" data-rows-of="${f.name}">${(v || []).map(r => rowsRow(f, r)).join("")}</div>
         <button type="button" class="btn ghost sm" data-row-add="${f.name}">${h(f.add || "+ Add one")}</button>`);
@@ -675,6 +707,7 @@ function readForm(form, fields) {
       case "lines": out[f.name] = el.value.split("\n").map(s => s.trim()).filter(Boolean); break;
       case "number": out[f.name] = el.value === "" ? (f.dflt ?? null) : Math.round(Number(el.value)); break;
       case "url": out[f.name] = cleanUrl(el.value) || null; break;
+      case "gallery": out[f.name] = $$(`[data-gallery="${f.name}"] .gal-item`, form).map(li => li.dataset.url); break;
       case "rows": // empty rows are dropped
         out[f.name] = $$(`[data-rows-of="${f.name}"] .rows-row`, form)
           .map(r => jsonbOrder(Object.fromEntries(f.cols.map(c => { const x = $(`[name="r_${f.name}_${c.key}"]`, r).value; return [c.key, c.url ? cleanUrl(x) : x.trim()]; }))))
@@ -750,7 +783,7 @@ async function showForm(key, id) {
     render(`<a class="back" href="#/${key}">‹ ${h(S.title)}</a><h1>Not found</h1><p class="note">That one wasn't found. It may have been deleted.</p>`);
     return;
   }
-  const vals = row || Object.fromEntries(S.fields.map(f => [f.name, typeof f.dflt === "function" ? f.dflt() : f.dflt ?? (f.type === "toggle" ? false : ["tags", "lines", "bars", "journey", "updates", "rows"].includes(f.type) ? [] : null)]));
+  const vals = row || Object.fromEntries(S.fields.map(f => [f.name, typeof f.dflt === "function" ? f.dflt() : f.dflt ?? (f.type === "toggle" ? false : ["tags", "lines", "bars", "journey", "updates", "rows", "gallery"].includes(f.type) ? [] : null)]));
   const ctx = { partners };
   render(`<a class="back" href="#/${key}">‹ ${h(S.title)}</a>
     <h1>${isNew ? `Add ${h(S.one)}` : h(S.titleOf(row))}</h1>
@@ -787,6 +820,12 @@ async function showForm(key, id) {
       list.insertAdjacentHTML("beforeend", rowsRow(f, {})); $(".rows-row:last-child input", list).focus(); dirty = true; return;
     }
     if (t.hasAttribute("data-row-remove")) { t.closest(".rows-row").remove(); dirty = true; return; }
+    if (t.hasAttribute("data-gal-remove")) { t.closest(".gal-item").remove(); dirty = true; return; }
+    if (t.hasAttribute("data-gal-left") || t.hasAttribute("data-gal-right")) {
+      const li = t.closest(".gal-item"), left = t.hasAttribute("data-gal-left"), other = left ? li.previousElementSibling : li.nextElementSibling;
+      if (other) { left ? other.before(li) : other.after(li); t.focus(); dirty = true; }
+      return;
+    }
     if (t.hasAttribute("data-step-add")) { $(".steps-ed", form).insertAdjacentHTML("beforeend", stepRow({})); $(".steps-ed .step-row:last-child input", form).focus(); dirty = true; return; }
     if (t.hasAttribute("data-step-remove")) { t.closest(".step-row").remove(); dirty = true; return; }
     if (t.hasAttribute("data-note-add")) { $(".notes-ed", form).insertAdjacentHTML("afterbegin", noteRow({ date: today() })); $(".notes-ed .note-row:first-child textarea", form).focus(); dirty = true; return; }
@@ -836,6 +875,26 @@ async function showForm(key, id) {
       if (err instanceof SignedOut) return route();
       toast(err.message, true);
     } finally { inp.value = ""; }
+  }));
+
+  // several photos at once, one after another, each shrunk and cleaned like any photo
+  $$("[data-gallery-add]", form).forEach(inp => inp.addEventListener("change", async () => {
+    const f = S.fields.find(x => x.name === inp.dataset.galleryAdd), list = $(`[data-gallery="${f.name}"]`, form), status = $(".gal-status", list.parentElement);
+    const files = [...inp.files], room = (f.max || 40) - $$(".gal-item", list).length;
+    if (files.length > room) toast(room > 0 ? `Only ${room} more photo${room === 1 ? "" : "s"} fit, so the rest were skipped.` : `That's the most photos one can have (${f.max || 40}).`, true);
+    let done = 0;
+    try {
+      for (const file of files.slice(0, Math.max(room, 0))) {
+        status.textContent = `Adding photo ${done + 1} of ${Math.min(files.length, room)}…`;
+        const url = await upload(file, f.folder, form.elements.title?.value || f.folder);
+        list.insertAdjacentHTML("beforeend", galItem(url));
+        done++; dirty = true;
+      }
+      if (done) toast(`${done === 1 ? "Photo" : done + " photos"} added. Tap Save to keep ${done === 1 ? "it" : "them"}.`);
+    } catch (err) {
+      if (err instanceof SignedOut) return route();
+      toast(err.message, true);
+    } finally { inp.value = ""; status.textContent = ""; }
   }));
 
   form.addEventListener("submit", async e => {
@@ -979,7 +1038,7 @@ const WORDS = CFG.textDefaults || [], AREAS = CFG.areas || [];
 const PHRASE_GROUPS = {
   goal: "Shelter goals", status: "Animal labels", count: "Animal counts", animal: "Happy Tails", stat: "The adoption number",
   journey: "An animal's journey (the pop-up)", rescue: "Rescues", horse: "Willow Woods horses", event: "Events",
-  spotlight: "Animal Story Spotlight", collab: "Collaborations", program: "Day-out programs", foster: "Foster programs", video: "Day-out videos", place: "Dog-friendly places", help: "Local help list",
+  spotlight: "Animal Story Spotlight", collab: "Collaborations", program: "Day-out programs", foster: "Foster programs", adventure: "Our day outs", video: "Day-out videos", place: "Dog-friendly places", help: "Local help list",
   form: "Contact forms", failed: "When part of a page can't load",
 };
 const clip = (s, n = 60) => (s.length > n ? s.slice(0, n - 1) + "…" : s);
@@ -1119,7 +1178,7 @@ async function showText(scope) {
 const KIND = {
   animals: ["Animal", r => r.name], goals: ["Shelter goal", r => r.title], goal_bars: ["Line on a shelter goal", r => r.label],
   events: ["Event", r => r.title], collabs: ["Collaboration", r => r.title], partners: ["Rescue or shelter", r => r.name], sniffari_programs: ["Day-out program", r => r.program_name || r.shelter_name],
-  foster_programs: ["Foster program", r => r.program_name || r.shelter_name],
+  foster_programs: ["Foster program", r => r.program_name || r.shelter_name], adventures: ["Day out", r => r.title],
   videos: ["Day-out video", r => r.title], places: ["Dog-friendly place", r => r.name],
   help_resources: ["Help listing", r => r.name], messages: ["Message", r => (r.name ? `From ${r.name}` : `From ${r.email}`)],
 };
