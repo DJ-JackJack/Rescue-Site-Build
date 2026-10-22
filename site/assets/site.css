@@ -399,6 +399,8 @@ dialog.adv{max-width:min(720px,calc(100vw - 24px))}
 .form .checks{display:grid;gap:8px;grid-template-columns:repeat(auto-fill,minmax(200px,1fr))}
 .form .checks label{flex-direction:row;align-items:center;font-weight:700;background:#fff;border:1.5px solid var(--midviolet);border-radius:12px;padding:10px 12px}
 .form .checks input{min-height:0;width:20px;height:20px;accent-color:var(--royal)}
+.form label.tick{flex-direction:row;align-items:center;font-weight:700;gap:10px}
+.form label.tick input{min-height:0;width:20px;height:20px;accent-color:var(--royal);flex:none}
 .formcard{background:#fff;border-radius:var(--r);box-shadow:var(--shadow);padding:22px}
 
 /* footer */

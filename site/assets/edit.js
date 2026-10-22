@@ -156,7 +156,7 @@ const collabWhen = c => { const now = today(); return c.starts_on > now ? "soon"
 const WHEN = [["soon", "Coming up"], ["now", "Happening now"], ["past", "Done"]];
 const HELPCATS = [["food", "Food and supplies"], ["vet", "Vet bills"], ["behavior", "Behavior help"], ["housing", "Housing and pet deposits"], ["rehoming", "Rehoming without a shelter"], ["birds", "Bird care"], ["financing", "Credit cards and loans"], ["abuse", "Reporting animal abuse"],
   ["wildlife", "Wild animal help: who to call"], ["wildgroups", "Wildlife groups and sanctuaries"]];
-const TOPICS = { partner: "Partnership", help: "Help keeping a pet", dog: "About a dog", sniffari: "Day-out program", other: "Something else" };
+const TOPICS = { partner: "Partnership", help: "Help keeping a pet", dog: "About a dog", sniffari: "Day-out program", request: "Video request or question", other: "Something else" };
 const RANK = { looking: 0, foster: 1, adopted: 2, sanctuary: 3, placed: 4, unknown: 5 };
 const stale = (d, days) => d === null || d === undefined || daysAgo(d) >= days;
 const platform = u => {
@@ -932,7 +932,15 @@ async function showForm(key, id) {
 }
 
 /* ---------- messages ---------- */
-const DETAIL = { shelter: "Shelter or rescue", want: "Interested in", program: "Program", city: "City", link: "Link", dog: "Dog", rescue: "Rescue" };
+const DETAIL = { shelter: "Shelter or rescue", want: "Interested in", program: "Program", city: "City", link: "Link", dog: "Dog", rescue: "Rescue",
+  kind: "Asking for", video: "Video", answer: "Answer", mention: "OK to say their name in a video" };
+// the partner form's checkboxes, in words
+const WANT = { features: "Adoption features", goal: "A shelter goal", sniffari: "A Sniffari listing", events: "Event coverage", series: "A video series", coloring: "Coloring pages" };
+const detailHTML = (k, x) => {
+  if (k === "want") x = [].concat(x).map(w => WANT[w] || w);
+  const text = Array.isArray(x) ? x.join(", ") : typeof x === "object" ? JSON.stringify(x) : String(x);
+  return (k === "link" || k === "video") && safeUrl(text) ? `<a href="${h(safeUrl(text))}" target="_blank" rel="noopener">${h(text)}</a>` : h(text);
+};
 const when = ts => {
   const d = new Date(ts), days = Math.round((new Date(today()) - new Date(d.toLocaleDateString("en-CA"))) / 864e5);
   const t = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
@@ -954,7 +962,7 @@ async function showMessages(view) {
         <h2>${h(m.name || "No name given")}</h2>
         <p class="memail">${h(m.email)}</p>
         ${m.body ? `<p class="mbody">${h(m.body)}</p>` : ""}
-        ${det.length ? `<dl class="mdet">${det.map(([k, x]) => `<dt>${h(DETAIL[k] || k)}</dt><dd>${h(Array.isArray(x) ? x.join(", ") : typeof x === "object" ? JSON.stringify(x) : x)}</dd>`).join("")}</dl>` : ""}
+        ${det.length ? `<dl class="mdet">${det.map(([k, x]) => `<dt>${h(DETAIL[k] || k)}</dt><dd>${detailHTML(k, x)}</dd>`).join("")}</dl>` : ""}
         ${m.page ? `<p class="small">Sent from ${h(m.page)}</p>` : ""}
         <div class="btns"><a class="btn royal sm" href="mailto:${h(mail)}?subject=${encodeURIComponent("Re: your message to TheTerr0rTw!ns")}">Reply by email</a>
           ${m.handled ? `<button class="btn ghost sm" type="button" data-act="msg-undo" data-id="${h(m.id)}">Move back to new</button>` : `<button class="btn ghost sm" type="button" data-act="msg-done" data-id="${h(m.id)}">Mark done</button>`}

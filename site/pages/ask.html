@@ -1,0 +1,56 @@
+<!--{"title":"Requests and Questions","description":"Ask {{owner_first}} to cover a topic, react to a video, or answer a question, by email or in a video.","nav":"ask","path":"ask/"}-->
+<div class="phead">
+  <div class="wrap">
+    <p class="eyebrow">Requests and questions</p>
+    <h1>Got a question, or an idea for a video?</h1>
+    <p class="lede">Ask me to cover a topic, react to or respond to a video, or answer a question. I might answer by email, or in a video on one of my channels.</p>
+  </div>
+</div>
+
+<section>
+  <div class="wrap">
+    <div class="formcard">
+      <h2 class="h2" style="font-size:1.5rem">Send a request</h2>
+      <form class="form" method="post" data-form="request" style="margin-top:14px">
+        <fieldset><legend>What are you asking for?</legend>
+          <div class="checks">
+            <label><input type="radio" name="kind" value="Cover a topic" required> Cover a topic</label>
+            <label><input type="radio" name="kind" value="React to or respond to a video"> React to or respond to a video</label>
+            <label><input type="radio" name="kind" value="Answer a question"> Answer a question</label>
+            <label><input type="radio" name="kind" value="Something else"> Something else</label>
+          </div>
+        </fieldset>
+        <label>Link to the video, if it's about one<input name="video" type="url" inputmode="url" placeholder="https://" maxlength="500"></label>
+        <label>Your request or question<textarea name="body" rows="5" maxlength="5000" required></textarea></label>
+        <fieldset><legend>How would you like an answer?</legend>
+          <div class="checks">
+            <label><input type="radio" name="answer" value="Either is fine" checked> Either is fine</label>
+            <label><input type="radio" name="answer" value="In a video"> In a video</label>
+            <label><input type="radio" name="answer" value="By email"> By email</label>
+          </div>
+        </fieldset>
+        <label>Your first name or username<input name="name" autocomplete="nickname" maxlength="200"></label>
+        <label class="tick"><input type="checkbox" name="mention" value="Yes"> It's OK to say my name or username in a video</label>
+        <label>Your email<input name="email" type="email" autocomplete="email" required maxlength="200"></label>
+        <p class="small">Your email is only used to reply, and it's never shown or read out.</p>
+        <label class="sr" aria-hidden="true">Leave this empty<input name="website" tabindex="-1" autocomplete="off"></label>
+        <button class="btn royal" type="submit">Send request</button>
+        <p class="formmsg" role="status" aria-live="polite"></p>
+      </form>
+    </div>
+    <div class="cols">
+      <div class="box">
+        <h2>Good to know</h2>
+        <ul>
+          <li>I read every request, but I can't answer them all.</li>
+          <li>A request answered in a video might be read out, so leave out anything private.</li>
+          <li>Under 13? Ask a parent or guardian to send it for you.</li>
+        </ul>
+      </div>
+      <div class="box">
+        <h2>Need help with a pet right now?</h2>
+        <p>The <a href="{{base}}help/">help page</a> has local help sorted by what you need, and a way to ask me directly.</p>
+      </div>
+    </div>
+  </div>
+</section>

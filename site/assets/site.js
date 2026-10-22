@@ -459,7 +459,7 @@ async function renderFosters(el) {
 }
 
 /* ---------- forms: everything goes to the write-only inbox ---------- */
-const TOPIC = { partner: "partner", sniffari: "sniffari" };
+const TOPIC = { partner: "partner", sniffari: "sniffari", request: "request" };
 $$("form[data-form]").forEach(form => form.addEventListener("submit", async e => {
   e.preventDefault();
   const msg = $(".formmsg", form), btn = $("button[type=submit]", form);
@@ -481,7 +481,8 @@ $$("form[data-form]").forEach(form => form.addEventListener("submit", async e =>
     }
     form.reset();
     msg.className = "formmsg is-ok";
-    msg.textContent = topic === "help" ? t("js.form.thanks-help", "Thanks, {name} will see this. Replies can take a little while.", { name: WHO }) : thanks();
+    msg.textContent = topic === "help" ? t("js.form.thanks-help", "Thanks, {name} will see this. Replies can take a little while.", { name: WHO })
+      : topic === "request" ? t("js.form.thanks-request", "Thanks! {name} reads every request, but can't answer them all. Keep an eye on her channels.", { name: WHO }) : thanks();
   } catch (err) {
     msg.className = "formmsg is-err";
     msg.textContent = err.message === "slow" ? t("js.form.slow", "That's a lot of messages from this email in the last hour. Please try again later.")
