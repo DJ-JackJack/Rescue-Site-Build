@@ -82,8 +82,9 @@ const wordingLoaded = q("site_text", "select=key,body").then(rows => {
 const wordingReady = Promise.race([wordingLoaded, new Promise(ok => setTimeout(ok, 1500))]);
 const getGoals = () => once("goals", () => q("goals", "select=id,title,why,price_note,donate_url,photo_url,status,featured,figures_updated_at,met_on,sort,partner:partners(name,slug),bars:goal_bars(label,target,current,sort)&order=sort.asc"));
 const getAnimals = () => once("animals", () => q("animals", "select=id,name,species,status,herd,sort,featured_on,adopted_on,transport,note,story,updates,section,listing_url,checked_on,photo_url,journey,created_at,partner:partners(name,slug)&order=featured_on.desc.nullslast,created_at.desc"));
-const getPartners = () => once("partners", () => q("partners", "select=id,slug,name,kind,mission,website_url,adopt_url,donate_url,sort&order=sort.asc"));
-const getSniffari = () => once("sniffari", () => q("sniffari_programs", "select=id,shelter_name,program_name,city,address,signup_url,facts,tags,checked_on,sort&order=sort.asc"));
+const getPartners = () => once("partners", () => q("partners", "select=id,slug,name,kind,mission,website_url,adopt_url,donate_url,links,sort&order=sort.asc"));
+const getSniffari = () => once("sniffari", () => q("sniffari_programs", "select=id,shelter_name,program_name,city,address,signup_url,links,facts,tags,checked_on,sort&order=sort.asc"));
+const getCollabs = () => once("collabs", () => q("collabs", "select=id,title,kind,starts_on,ends_on,ongoing,description,link_url,photo_url,sort,partner:partners(slug)&order=sort.asc,starts_on.desc"));
 
 function failed(el, message) {
   el.innerHTML = `<p class="empty">${h(message)}</p>`;
@@ -150,10 +151,10 @@ async function renderGoals(el) {
 
 /* ---------- animals: counts, stat, walls, journey ---------- */
 const EMOJI = { dog: "🐶", cat: "🐱", horse: "🐴", bird: "🐦", other: "🐾" };
-const STATUS = { adopted: "c-adopted", placed: "c-placed", foster: "c-foster", sanctuary: "c-sanct", looking: "c-wait" };
+const STATUS = { adopted: "c-adopted", placed: "c-placed", foster: "c-foster", sanctuary: "c-sanct", looking: "c-wait", unknown: "c-unknown" };
 const statusLabel = s => ({
   adopted: t("js.status.adopted", "Adopted"), foster: t("js.status.foster", "In foster"), sanctuary: t("js.status.sanctuary", "In sanctuary"),
-  looking: t("js.status.looking", "Still looking"),
+  looking: t("js.status.looking", "Still looking"), unknown: t("js.status.unknown", "Status unknown"),
 }[s] || t("js.status.placed", "Placed"));
 const WHO = S.ownerFirst || "she";
 const BG = ["g1", "g2", "g3", "g4", "g5", "g6"];
@@ -201,7 +202,7 @@ function petHTML(a, i) {
 function countsHTML(animals) {
   const c = s => animals.filter(a => a.status === s).length;
   return [["adopted", t("js.count.adopted", "adopted")], ["foster", t("js.count.foster", "in foster")], ["sanctuary", t("js.count.sanctuary", "in sanctuary")],
-    ["placed", t("js.count.placed", "placed or released")], ["looking", t("js.count.looking", "still looking")]]
+    ["placed", t("js.count.placed", "placed or released")], ["looking", t("js.count.looking", "still looking")], ["unknown", t("js.count.unknown", "status unknown")]]
     .filter(([s]) => ["adopted", "foster", "looking"].includes(s) || c(s))
     .map(([s, l]) => `<div class="count"><b>${c(s)}</b><span>${h(l)}</span></div>`).join("");
 }
@@ -246,8 +247,10 @@ document.addEventListener("click", async e => {
     else {
       const name = a.partner?.name;
       const via = !name ? "" : a.status === "looking" || a.status === "foster" ? t("js.journey.with", "With {name}", { name })
-        : a.status === "sanctuary" ? t("js.journey.at", "At {name}", { name }) : t("js.journey.through", "Through {name}", { name });
-      steps.push({ label, detail: [a.note, via].filter(Boolean).join(" · ") });
+        : a.status === "sanctuary" ? t("js.journey.at", "At {name}", { name })
+        : a.status === "unknown" ? t("js.journey.last-with", "Last known with {name}", { name }) : t("js.journey.through", "Through {name}", { name });
+      const lost = a.status === "unknown" ? t("js.journey.unknown", "We've lost touch, so we don't know how they're doing now.") : "";
+      steps.push({ label, detail: [a.note, via, lost].filter(Boolean).join(" · ") });
     }
   }
   // her story, the steps of their journey, then dated updates and notes, newest first
@@ -274,6 +277,8 @@ const OWN_PAGE = { "willow-woods": "willow-woods/" }; // partners with their own
 async function renderRescues(el) {
   try {
     const [partners, animals] = await Promise.all([getPartners(), getAnimals()]);
+    // events and collaborations are extras: a card still shows if they can't load
+    const [events, collabs] = await Promise.all([getEvents().catch(() => []), getCollabs().catch(() => [])]);
     await wordingReady;
     const list = partners;
     if (!list.length) {
@@ -294,6 +299,7 @@ async function renderRescues(el) {
             ${a.status === "looking" && a.checked_on ? `<small>${h(t("js.rescue.checked", "Checked {date}", { date: new Date(a.checked_on + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }) }))}</small>` : d !== null ? `<small>${h(t("js.animal.home-in", "Home in {n} days", { n: d }))}</small>` : ""}
             ${a.status === "looking" && live ? `<a href="${h(live)}" target="_blank" rel="noopener">${h(t("js.rescue.listing", "Live listing"))} ↗</a>` : ""}</div>`;
         }).join("")}</div>` : ""}
+        ${extrasHTML(events.filter(e => e.partner?.slug === p.slug), collabs.filter(c => c.partner?.slug === p.slug), p.links)}
         <div class="btns">${OWN_PAGE[p.slug] ? `<a class="btn royal" href="${S.base}${OWN_PAGE[p.slug]}">${h(t("js.rescue.horses", "Meet the horses"))}</a>` : ""}${safeUrl(p.website_url) ? `<a class="btn ghost" href="${h(safeUrl(p.website_url))}" rel="noopener">${h(t("js.rescue.site", "Visit their site"))} <span class="ext" aria-hidden="true">↗</span></a>` : ""}${adopt ? `<a class="btn ocean" href="${h(adopt)}" target="_blank" rel="noopener">${h(t("js.rescue.adopt", "Adopt or foster from {rescue}", { rescue: p.name }))} <span class="ext" aria-hidden="true">↗</span></a>` : ""}${donate ? `<a class="btn ghost" href="${h(donate)}" target="_blank" rel="noopener">${h(t("js.rescue.donate", "Donate on their page"))} <span class="ext" aria-hidden="true">↗</span></a>` : ""}</div>
         </div></div>`;
     }).join("");
@@ -332,18 +338,67 @@ async function renderSpotlight(el) {
   }).join("");
 }
 
-/* upcoming events for a partner (Willow Woods page) */
+/* upcoming events for a partner (Willow Woods page and the rescue cards) */
 const getEvents = () => once("events", () => q("events", "select=id,title,starts_on,time_text,place,link_url,partner:partners(slug)&order=starts_on.asc"));
+const eventsHTML = list => `<ul class="events">${list.map(e => {
+  const d = asDate(e.starts_on), link = safeUrl(e.link_url);
+  return `<li><span class="when"><b>${d.toLocaleDateString("en-US", { month: "short" })}</b>${d.getDate()}</span><span class="what"><b>${link ? `<a href="${h(link)}" rel="noopener">${h(e.title)}</a>` : h(e.title)}</b><span>${h([d.toLocaleDateString("en-US", { weekday: "long" }), e.time_text, e.place].filter(Boolean).join(" · "))}</span></span></li>`;
+}).join("")}</ul>`;
 async function renderEvents(el) {
   try {
     const list = (await getEvents()).filter(e => !el.dataset.events || e.partner?.slug === el.dataset.events);
     await wordingReady;
     if (!list.length) { el.innerHTML = `<p class="empty">${h(t("js.event.none", "New events are shared here as they're announced."))}</p>`; return; }
-    el.innerHTML = `<ul class="events">${list.map(e => {
-      const d = asDate(e.starts_on), link = safeUrl(e.link_url);
-      return `<li><span class="when"><b>${d.toLocaleDateString("en-US", { month: "short" })}</b>${d.getDate()}</span><span class="what"><b>${link ? `<a href="${h(link)}" rel="noopener">${h(e.title)}</a>` : h(e.title)}</b><span>${h([d.toLocaleDateString("en-US", { weekday: "long" }), e.time_text, e.place].filter(Boolean).join(" · "))}</span></span></li>`;
-    }).join("")}</ul>`;
+    el.innerHTML = eventsHTML(list);
   } catch { failed(el, t("js.failed.events", "Events couldn't load right now. Please try again in a little while.")); }
+}
+
+/* collaborations with a rescue: coming up, happening now and done, from their dates */
+const isoToday = () => new Date().toLocaleDateString("en-CA");
+const collabWhen = c => { const now = isoToday(); return c.starts_on > now ? "soon" : c.ongoing || (c.ends_on || c.starts_on) >= now ? "now" : "past"; };
+const collabDates = c => {
+  const a = fullDate(c.starts_on);
+  if (c.ongoing) return t("js.collab.since", "Since {date}", { date: a });
+  return c.ends_on && c.ends_on !== c.starts_on ? t("js.collab.range", "{from} to {to}", { from: a, to: fullDate(c.ends_on) }) : a;
+};
+function collabsHTML(list) {
+  const groups = [["now", t("js.collab.now", "Happening now")], ["soon", t("js.collab.soon", "Coming up")], ["past", t("js.collab.past", "Done together")]];
+  return groups.map(([w, label]) => {
+    const here = list.filter(c => collabWhen(c) === w).sort((a, b) => (a.sort ?? 100) - (b.sort ?? 100) || (w === "soon" ? a.starts_on.localeCompare(b.starts_on) : b.starts_on.localeCompare(a.starts_on)));
+    if (!here.length) return "";
+    return `<div class="cgroup"><p class="clabel">${h(label)}</p><ul class="collabs">${here.map((c, i) => {
+      const link = safeUrl(c.link_url), pic = photoTag(c.photo_url);
+      return `<li>${pic ? `<span class="ph ${BG[i % 6]}" aria-hidden="true">${pic}</span>` : ""}<div><b>${link ? `<a href="${h(link)}" target="_blank" rel="noopener">${h(c.title)} <span class="ext" aria-hidden="true">↗</span></a>` : h(c.title)}</b>
+        <small>${h([c.kind, collabDates(c)].filter(Boolean).join(" · "))}</small>${c.description ? `<p>${h(c.description)}</p>` : ""}</div></li>`;
+    }).join("")}</ul></div>`;
+  }).join("");
+}
+// extra links a rescue or program wants shared, like how they prefer donations
+const linksHTML = links => {
+  const ok = (Array.isArray(links) ? links : []).filter(l => l && l.label && safeUrl(l.url));
+  return ok.length ? `<ul class="xlinks">${ok.map(l => `<li><a href="${h(safeUrl(l.url))}" target="_blank" rel="noopener">${h(l.label)} <span class="ext" aria-hidden="true">↗</span></a></li>`).join("")}</ul>` : "";
+};
+// the extra parts of a rescue's card, each only when it has something in it
+function extrasHTML(events, collabs, links) {
+  const more = linksHTML(links);
+  return (events.length ? `<div class="rsub"><h4>${h(t("js.rescue.events", "Upcoming events"))}</h4>${eventsHTML(events)}</div>` : "")
+    + (collabs.length ? `<div class="rsub"><h4>${h(t("js.rescue.collabs", "Working together"))}</h4>${collabsHTML(collabs)}</div>` : "")
+    + (more ? `<div class="rsub"><h4>${h(t("js.rescue.links", "More from them"))}</h4>${more}</div>` : "");
+}
+async function renderPartnerLinks(el) {
+  let more = "";
+  try { more = linksHTML((await getPartners()).find(p => p.slug === el.dataset.partnerLinks)?.links); } catch { return; }
+  if (!more) return;
+  el.innerHTML = more;
+  el.closest("[data-show-when-filled]")?.removeAttribute("hidden");
+}
+async function renderCollabs(el) {
+  let list = [];
+  try { list = (await getCollabs()).filter(c => c.partner?.slug === el.dataset.collabs); } catch { return; }
+  if (!list.length) return;
+  await wordingReady;
+  el.innerHTML = collabsHTML(list);
+  el.closest("[data-show-when-filled]")?.removeAttribute("hidden");
 }
 
 /* ---------- Sniffari programs ---------- */
@@ -360,11 +415,22 @@ async function renderSniffari(el) {
         ${p.address ? `<p class="small">${h(p.address)}</p>` : ""}
         ${(p.facts || []).length ? `<div class="facts">${p.facts.map(f => `<span>${h(f)}</span>`).join("")}</div>` : ""}
         ${p.checked_on ? `<p class="small">${h(t("js.program.checked", "Details checked {date}", { date: new Date(p.checked_on + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) }))}</p>` : ""}
-        ${url ? `<div class="btns"><a class="btn ocean" href="${h(url)}" target="_blank" rel="noopener">${h(t("js.program.signup", "Sign up on their page"))} <span class="ext" aria-hidden="true">↗</span></a></div>` : ""}</article>`;
+        ${url ? `<div class="btns"><a class="btn ocean" href="${h(url)}" target="_blank" rel="noopener">${h(t("js.program.signup", "Sign up on their page"))} <span class="ext" aria-hidden="true">↗</span></a></div>` : ""}
+        ${linksHTML(p.links)}</article>`;
     }).join("") : `<p class="empty">${h(programs.length ? t("js.program.no-match", "No programs match that yet.") : t("js.program.none", "The first programs are being confirmed with the shelters. Run one? Use the form below."))}</p>`;
     if (live) live.textContent = list.length === 1 ? t("js.program.showing-one", "Showing 1 program") : t("js.program.showing", "Showing {n} programs", { n: list.length });
   };
   draw("all");
+  // programs that offer sleepovers also get their own short list, which stays hidden until there's one
+  const sleep = $("[data-sleepovers]"), stays = programs.filter(p => (p.tags || []).includes("sleepover"));
+  if (sleep && stays.length) {
+    sleep.innerHTML = `<ul class="res">${stays.map(p => {
+      const url = safeUrl(p.signup_url);
+      return `<li>${url ? `<a href="${h(url)}" target="_blank" rel="noopener">${h(p.shelter_name)} <span class="ext" aria-hidden="true">↗</span></a>` : `<b>${h(p.shelter_name)}</b>`}
+        ${p.program_name || p.city ? `<small>${h([p.program_name, p.city].filter(Boolean).join(" · "))}</small>` : ""}</li>`;
+    }).join("")}</ul>`;
+    sleep.closest("[data-show-when-filled]")?.removeAttribute("hidden");
+  }
   if (group) {
     if (!programs.length) group.hidden = true;
     $$("button", group).forEach(b => { if (b.dataset.s !== "all" && !programs.some(p => (p.tags || []).includes(b.dataset.s))) b.hidden = true; });
@@ -499,7 +565,7 @@ async function renderHelp() {
   const boxes = $$("[data-help]");
   if (!boxes.length) return;
   let rows = [];
-  try { rows = await q("help_resources", "select=category,name,description,caution,link_url,more_url,more_label,phone,email,area&order=sort.asc,name.asc"); } catch { return; }
+  try { rows = await q("help_resources", "select=category,name,kind,description,best_for,caution,link_url,more_url,more_label,phone,email,area&order=sort.asc,name.asc"); } catch { return; }
   await wordingReady;
   boxes.forEach(box => {
     const list = rows.filter(r => r.category === box.dataset.help);
@@ -510,13 +576,15 @@ async function renderHelp() {
       const tel = (String(r.phone || "").match(/\+?\d[\d\s().-]{5,}\d/) || [""])[0].replace(/[^\d+]/g, "");
       const email = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(r.email || "") ? r.email : "";
       const reach = [r.area ? h(r.area) : "", r.phone ? (tel ? `<a href="tel:${h(tel)}">${h(r.phone)}</a>` : h(r.phone)) : "", email ? `<a href="mailto:${h(email)}">${h(email)}</a>` : ""].filter(Boolean);
-      return `<li>${link ? `<a href="${h(link)}" target="_blank" rel="noopener">${h(r.name)} <span class="ext" aria-hidden="true">↗</span></a>` : `<b>${h(r.name)}</b>`}
+      return `<li>${r.kind ? `<em class="kind">${h(r.kind)}</em>` : ""}${link ? `<a href="${h(link)}" target="_blank" rel="noopener">${h(r.name)} <span class="ext" aria-hidden="true">↗</span></a>` : `<b>${h(r.name)}</b>`}
         ${r.description ? `<span>${h(r.description)}</span>` : ""}
+        ${r.best_for ? `<span><b>${h(t("js.help.best-for", "Best for:"))}</b> ${h(r.best_for)}</span>` : ""}
         ${r.caution ? `<span class="caution" role="note">${h(r.caution)}</span>` : ""}
         ${more ? `<a class="more" href="${h(more)}" target="_blank" rel="noopener">${h(r.more_label || t("js.help.more", "More from them"))} <span class="ext" aria-hidden="true">↗</span></a>` : ""}
         ${reach.length ? `<small>${reach.join(" · ")}</small>` : ""}</li>`;
     }).join("")}</ul>`;
     box.closest("[data-help-wrap]")?.removeAttribute("hidden"); // a section that only shows once it has listings
+    $$(`[data-help-for="${box.dataset.help}"]`).forEach(el => el.removeAttribute("hidden")); // and its links from elsewhere on the page
   });
 }
 
@@ -600,6 +668,8 @@ $$("[data-rescues]").forEach(renderRescues);
 $$("[data-horses]").forEach(renderHorses);
 $$("[data-spotlight]").forEach(renderSpotlight);
 $$("[data-events]").forEach(renderEvents);
+$$("[data-collabs]").forEach(renderCollabs);
+$$("[data-partner-links]").forEach(renderPartnerLinks);
 $$("[data-sniffari]").forEach(renderSniffari);
 $$("[data-videos]").forEach(renderVideos);
 $$("[data-places]").forEach(renderPlaces);
