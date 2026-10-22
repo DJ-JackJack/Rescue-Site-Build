@@ -155,7 +155,8 @@ const LINK_COLS = [{ key: "label", label: "What it says", max: 80, ph: "Amazon w
 const collabWhen = c => { const now = today(); return c.starts_on > now ? "soon" : c.ongoing || (c.ends_on || c.starts_on) >= now ? "now" : "past"; };
 const WHEN = [["soon", "Coming up"], ["now", "Happening now"], ["past", "Done"]];
 const HELPCATS = [["food", "Food and supplies"], ["vet", "Vet bills"], ["behavior", "Behavior help"], ["housing", "Housing and pet deposits"], ["rehoming", "Rehoming without a shelter"], ["birds", "Bird care"], ["financing", "Credit cards and loans"], ["abuse", "Reporting animal abuse"],
-  ["wildlife", "Wild animal help: who to call"], ["wildgroups", "Wildlife groups and sanctuaries"]];
+  ["wildlife", "Wild animal help: who to call"], ["wildgroups", "Wildlife groups and sanctuaries"],
+  ["crisis", "Crisis lines (Caring for Yourself)"], ["dv", "Abuse at home (Caring for Yourself)"], ["mental", "Mental health (Caring for Yourself)"], ["grief", "Grieving a pet (Caring for Yourself)"]];
 const TOPICS = { partner: "Partnership", help: "Help keeping a pet", dog: "About a dog", sniffari: "Day-out program", request: "Video request or question", other: "Something else" };
 const RANK = { looking: 0, foster: 1, adopted: 2, sanctuary: 3, placed: 4, unknown: 5 };
 const stale = (d, days) => d === null || d === undefined || daysAgo(d) >= days;
@@ -405,7 +406,7 @@ const SECTIONS = {
   },
   help: {
     table: "help_resources", title: "Local help list", one: "help listing", icon: "🤝",
-    intro: "Shown on the “Help keeping your pet” page under each kind of help. Wild animal help shows there and on the Wildlife page. Credit cards and loans get their own section, which stays hidden until one is showing.",
+    intro: "Shown on the “Help keeping your pet” page under each kind of help. Wild animal help shows there and on the Wildlife page. Credit cards and loans get their own section, which stays hidden until one is showing. Help for people (crisis lines, abuse at home, mental health, grieving a pet) shows on Caring for Yourself.",
     query: "select=*&order=category.asc,sort.asc,name.asc",
     titleOf: r => r.name,
     filters: [["all", "All"], ...HELPCATS],
