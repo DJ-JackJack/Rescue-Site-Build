@@ -39,5 +39,5 @@ The website for TheTerr0rTw!ns (tae): rescue features, shelter goals, dog day ou
 
 ## Planning material
 
-- The planning questionnaire and its tools were removed once the site launched; they're in the git history. Her answers stay in the `questionnaire_responses` table.
+- The planning questionnaire and its tools were removed once the site launched; they're in the git history. Her answers were deleted from the `questionnaire_responses` table on 2026-10-24, once the site was built; the empty table stays.
 - `responses/` (git-ignored, never committed) holds working copies of her answers, the brief, the mockup and the review. This repo is public.
