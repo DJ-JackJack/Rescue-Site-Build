@@ -6,3 +6,7 @@
 create extension if not exists pg_cron;
 select cron.unschedule(jobid) from cron.job where jobname = 'clear-old-history';
 select cron.schedule('clear-old-history', '23 7 * * *', $$delete from public.content_history where at < now() - interval '90 days'$$);
+
+-- Also on 2026-10-24: the planning questionnaire's answers were deleted from questionnaire_responses (run by hand in the
+-- SQL editor: delete from public.questionnaire_responses;). The questionnaire is closed and everything in them had been
+-- used to build the site. The empty table stays.

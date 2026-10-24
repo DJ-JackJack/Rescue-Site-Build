@@ -730,6 +730,8 @@ function fieldHTML(f, v, ctx) {
 }
 
 const num = s => (s === "" || s === null || s === undefined ? null : Number(s));
+// an email address typed into a link box turns into "https://name@gmail.com", which only opens gmail.com
+const emailish = u => { try { return !!new URL(u).username; } catch { return false; } };
 function cleanUrl(s) {
   s = String(s || "").trim();
   // a share sheet often pastes the page's title in front of the link: keep just the link
@@ -779,6 +781,7 @@ function validate(form, fields, vals) {
     let msg = "";
     if (!box.hidden) {
       if (f.required && (v === null || v === "")) msg = "Please fill this in.";
+      else if (f.type === "url" && v && emailish(v)) msg = "That's an email address, not a web link. Put it in the Email box.";
       else if (f.type === "url" && v && !safeUrl(v)) msg = "That doesn't look like a web link. It should start with https://";
       else if (f.check && v && !f.check[0].test(v)) msg = f.check[1];
       else if (f.after && v && vals[f.after] && v < vals[f.after]) msg = "This can't be before the start date.";
@@ -791,7 +794,7 @@ function validate(form, fields, vals) {
         if (v.some(n => !n.text)) msg = "Each update needs some words.";
       }
       else if (f.type === "rows") {
-        const bad = o => f.cols.some(c => (c.need && !o[c.key]) || (c.url && o[c.key] && !safeUrl(o[c.key])));
+        const bad = o => f.cols.some(c => (c.need && !o[c.key]) || (c.url && o[c.key] && (!safeUrl(o[c.key]) || emailish(o[c.key]))));
         const rows = $$(".rows-row", box).filter(r => f.cols.some(c => $(`[name="r_${f.name}_${c.key}"]`, r).value.trim()));
         v.forEach((o, i) => rows[i]?.classList.toggle("bad", bad(o)));
         if (v.some(bad)) msg = f.bad || "Each one needs a name and a web link starting with https://";
