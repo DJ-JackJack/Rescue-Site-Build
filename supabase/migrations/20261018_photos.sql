@@ -1,4 +1,4 @@
--- Photos, plus content updates from the photo guide and Krys's answers (Oct 18).
+-- Photos, plus content updates from the photo guide and the owners' answers (Oct 18).
 -- Photo paths are relative to the site (for example "assets/photos/dog-zazu.jpg").
 -- The page resolves them against the site's base path and only ever shows http(s) images.
 -- Applied with execute_sql in one transaction.
@@ -35,7 +35,7 @@ insert into public.partners (slug, name, kind, feature_ok, published, sort)
 values ('frankies-friends-animal-rescue', 'Frankie''s Friends Animal Rescue', 'rescue', true, false, 25)
 on conflict (slug) do nothing;
 
--- Isle of Wight: proper name and link from Krys. Stays hidden until their dogs are added.
+-- Isle of Wight: proper name and link from the site's owners. Stays hidden until their dogs are added.
 update public.partners
   set name = 'Isle of Wight County Animal Services', kind = 'shelter',
       website_url = 'https://www.isleofwight.gov/our_services/animal_services/index.php'

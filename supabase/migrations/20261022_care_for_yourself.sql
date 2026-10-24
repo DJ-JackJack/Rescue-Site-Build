@@ -1,4 +1,4 @@
--- Caring for Yourself (Krys and Taea, 2026-10-22): help for people gets its own page, apart from help for pets.
+-- Caring for Yourself (2026-10-22): help for people gets its own page, apart from help for pets.
 -- New help categories: crisis lines, abuse at home, mental health, and grieving a pet. Numbers checked 2026-10-22
 -- on each organization's own site (988 and SAMHSA, Veterans Crisis Line, Crisis Text Line, The Trevor Project,
 -- Trans Lifeline, the National DV Hotline, the Virginia Action Alliance, NAMI, the VACSB directory, Tufts, Lap of Love).
