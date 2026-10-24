@@ -10,7 +10,8 @@ const S = window.SITE || {};
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
 const h = v => String(v ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-const safeUrl = u => { try { const x = new URL(u); return /^https?:$/.test(x.protocol) ? x.href : ""; } catch { return ""; } };
+// http(s) only, and never "https://someone@site": that's an email typed into a link box, and it would open the wrong site
+const safeUrl = u => { try { const x = new URL(u); return /^https?:$/.test(x.protocol) && !x.username && !x.password ? x.href : ""; } catch { return ""; } };
 // Photos can be full links or paths inside the site, like "assets/photos/dog-zazu.jpg".
 const photoUrl = u => { try { return u ? safeUrl(new URL(u, new URL(S.base || "/", location.href)).href) : ""; } catch { return ""; } };
 // A photo that fails to load removes itself, so the emoji underneath shows instead.
