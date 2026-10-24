@@ -1,5 +1,5 @@
 -- Applied to Supabase project "rescue-site" on 2026-10-17 (run as one transaction through the SQL tool,
--- because the migration tool timed out). Decisions from Krys:
+-- because the migration tool timed out). Decisions from the site's owners:
 -- * Animals are filmed only with the owner's or caretaker's consent, so organizations whose animals tae
 --   has filmed can be featured (feature_ok = true).
 -- * Rescues on Sniffari lists publicly advertised programs; no shelter OK is needed.

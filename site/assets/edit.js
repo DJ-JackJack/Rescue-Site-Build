@@ -140,6 +140,45 @@ async function upload(file, folder, name) {
   return `${API}/storage/v1/object/public/photos/${path}`;
 }
 
+/* ---------- photos nothing uses any more ----------
+   A photo file stays online at its address until it's deleted, even after it's replaced or removed on the edit page.
+   So once a day, and after a save that changes a photo, files nothing points to are deleted: not shown on the site,
+   not on a hidden item, and not on anything waiting in Recently deleted. Files from the last 2 days are left alone,
+   in case they were just added to a form that hasn't been saved yet. */
+const PHOTOS = `${API}/storage/v1/object/public/photos/`;
+async function storage(method, path, body) {
+  const r = await fetch(`${API}/storage/v1/object/${path}`, { method, headers: { apikey: KEY, Authorization: `Bearer ${await token()}`, "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  if (r.status === 401) { keep(null); throw new SignedOut(); }
+  if (!r.ok) throw new Error(`photos ${method} ${r.status}`);
+  return r.json();
+}
+const listPhotos = prefix => storage("POST", "list/photos", { prefix, limit: 1000, offset: 0, sortBy: { column: "name", order: "asc" } });
+async function tidyPhotos() {
+  const top = await listPhotos(""), files = top.filter(f => f.id);
+  for (const folder of top.filter(f => !f.id)) files.push(...(await listPhotos(folder.name)).filter(f => f.id).map(f => ({ ...f, name: `${folder.name}/${f.name}` })));
+  const used = new Set(), note = u => { if (typeof u === "string" && u.startsWith(PHOTOS)) used.add(decodeURIComponent(u.slice(PHOTOS.length).split("?")[0])); };
+  const [rows, days, deleted] = await Promise.all([
+    Promise.all(["animals", "goals", "collabs", "places", "videos"].map(t => api.list(t, "select=photo_url&photo_url=not.is.null"))),
+    api.list("adventures", "select=photos"),
+    api.list("content_history", "select=data&op=eq.delete&restored_at=is.null"),
+  ]);
+  rows.flat().forEach(r => note(r.photo_url));
+  days.forEach(r => (r.photos || []).forEach(note));
+  deleted.forEach(h => { note(h.data?.photo_url); (Array.isArray(h.data?.photos) ? h.data.photos : []).forEach(note); });
+  const before = Date.now() - 2 * 864e5;
+  const unused = files.filter(f => !used.has(f.name) && new Date(f.created_at).getTime() < before).map(f => f.name);
+  if (unused.length) await storage("DELETE", "photos", { prefixes: unused });
+  return unused.length;
+}
+// at most once a day per device, and never in the way: a problem here only shows in the browser's console
+function tidyPhotosNow(force) {
+  let last = "";
+  try { last = localStorage.getItem("tt-photo-tidy") || ""; } catch {}
+  if (!force && last === today()) return;
+  try { localStorage.setItem("tt-photo-tidy", today()); } catch {}
+  tidyPhotos().catch(e => { if (!(e instanceof SignedOut)) console.warn("tidying photos:", e.message); });
+}
+
 /* ---------- what can be edited ---------- */
 const STATUS = [["looking", "Still looking"], ["foster", "In foster"], ["adopted", "Adopted"], ["sanctuary", "In sanctuary"], ["placed", "Placed or released"],
   ["unknown", "Unknown (lost contact)"]];
@@ -558,6 +597,7 @@ async function showHome() {
   ];
   badge(msgs.length);
   recheckSub();
+  tidyPhotosNow();
   render(`<h1>Hi! What needs updating?</h1>
     <h2 class="sub">Needs attention</h2>
     ${todo.length ? `<ul class="todo">${todo.join("")}</ul>` : `<p class="allgood">All caught up ✓</p>`}
@@ -915,6 +955,7 @@ async function showForm(key, id) {
         catch (err) { if (err.code !== "23505" || !data.slug) throw err; saved = await api.add(S.table, { ...data, slug: data.slug + "-" + Date.now().toString(36).slice(-4) }); }
       } else if (Object.keys(patch).length) saved = await api.save(S.table, row.id, patch);
       await S.afterSave?.(saved, v, row);
+      if (!isNew && S.fields.some(f => (f.type === "photo" || f.type === "gallery") && f.name in patch)) tidyPhotosNow(true); // a replaced or removed photo goes
       dirty = false;
       toast(isNew ? "Added ✓" : "Saved ✓");
       go(`#/${key}`);
