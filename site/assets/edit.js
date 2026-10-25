@@ -194,6 +194,7 @@ const LINK_COLS = [{ key: "label", label: "What it says", max: 80, ph: "Amazon w
 const collabWhen = c => { const now = today(); return c.starts_on > now ? "soon" : c.ongoing || (c.ends_on || c.starts_on) >= now ? "now" : "past"; };
 const WHEN = [["soon", "Coming up"], ["now", "Happening now"], ["past", "Done"]];
 const HELPCATS = [["food", "Food and supplies"], ["vet", "Vet bills"], ["behavior", "Behavior help"], ["housing", "Housing and pet deposits"], ["rehoming", "Rehoming without a shelter"], ["birds", "Bird care"], ["financing", "Credit cards and loans"], ["abuse", "Reporting animal abuse"],
+  ["rescues", "Small local rescues"], ["tnr", "Spay, neuter and community cats"], ["breedhousing", "Breed-friendly apartments"],
   ["wildlife", "Wild animal help: who to call"], ["wildgroups", "Wildlife groups and sanctuaries"],
   ["crisis", "Crisis lines (Caring for Yourself)"], ["dv", "Abuse at home (Caring for Yourself)"], ["mental", "Mental health (Caring for Yourself)"], ["grief", "Grieving a pet (Caring for Yourself)"]];
 const TOPICS = { partner: "Partnership", help: "Help keeping a pet", dog: "About a dog", sniffari: "Day-out program", request: "Video request or question", other: "Something else" };
@@ -445,7 +446,7 @@ const SECTIONS = {
   },
   help: {
     table: "help_resources", title: "Local help list", one: "help listing", icon: "🤝",
-    intro: "Shown on the “Help keeping your pet” page under each kind of help. Wild animal help shows there and on the Wildlife page. Credit cards and loans get their own section, which stays hidden until one is showing. Help for people (crisis lines, abuse at home, mental health, grieving a pet) shows on Caring for Yourself.",
+    intro: "Shown on the “Help keeping your pet” page under each kind of help. Wild animal help shows there and on the Wildlife page. Credit cards and loans, small rescues, spay and neuter help, and breed-friendly apartments each get their own section, which stays hidden until one is showing. Help for people (crisis lines, abuse at home, mental health, grieving a pet) shows on Caring for Yourself.",
     query: "select=*&order=category.asc,sort.asc,name.asc",
     titleOf: r => r.name,
     filters: [["all", "All"], ...HELPCATS],
@@ -454,8 +455,9 @@ const SECTIONS = {
       flags: [!r.published && "Hidden", r.published && stale(r.checked_on, 180) && "!Check it's still running"] }),
     fields: [
       { name: "category", type: "choice", label: "What kind of help?", options: HELPCATS, dflt: "food" },
-      { name: "kind", type: "text", label: "What kind it is", max: 40, suggest: ["Credit card", "Loan", "Payment plan", "Line of credit"],
-        help: "Shown as a label, so nobody mistakes it for free help. Like “Credit card” or “Loan”.", when: v => v.category === "financing" },
+      { name: "kind", type: "text", label: "What kind it is", max: 40, suggest: ["Credit card", "Loan", "Payment plan", "Line of credit", "Dogs", "Cats", "Dogs and cats", "Cats and kittens", "Community cats"],
+        help: "Shown as a label above the name. For credit cards and loans, so nobody mistakes them for free help, like “Credit card”. For rescues and apartments, the animals they take, like “Cats” or “Dogs and cats”.",
+        when: v => ["financing", "rescues", "tnr", "breedhousing"].includes(v.category) },
       { name: "name", type: "text", label: "Name", required: true, max: 200 },
       { name: "description", type: "textarea", rows: 3, max: 600, label: "What they offer" },
       { name: "best_for", type: "textarea", rows: 2, max: 300, label: "Best used for", help: "Shown as “Best for: …”, like “Big vet bills you can pay off before the promo ends”.", when: v => v.category === "financing" },
