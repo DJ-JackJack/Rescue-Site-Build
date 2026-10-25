@@ -769,13 +769,155 @@ function countView() {
   }).catch(() => {});
 }
 
-/* ---------- for signed-in editors: a shortcut to this page's wording ---------- */
-try {
-  if (localStorage.getItem("tt-editor-session") && S.scope)
-    document.body.insertAdjacentHTML("beforeend", `<a class="editfab" href="${h(S.base)}edit/#/text/${h(S.scope)}">✏️ Edit this page's wording</a>`);
-} catch {}
+/* ---------- photos added to the pages (edit page → Photos on the pages) ----------
+   The page is built with the photos saved at the time (site/photospots.mjs, site/assets/pagephotos.js). If any have
+   been added, changed or taken away since, the built ones are undone and the saved ones put in here. */
+const PPH = window.PagePhotos;
+async function renderPagePhotos() {
+  if (!PPH || !S.scope) return;
+  let rows;
+  try { rows = await q("page_photos", `select=id,page,spot,layout,photos,caption,updated_at&page=eq.${encodeURIComponent(S.scope)}&order=sort.asc,created_at.asc`); } catch { return; }
+  if (PPH.stamp(rows) === (S.pp || "")) return; // built with these already
+  // back to the page as it was built without photos...
+  $$("[data-pp-side]").forEach(w => w.replaceWith(...(w.querySelector(":scope > .pp-side-text")?.childNodes || [])));
+  $$("figure[data-pp]").forEach(f => f.remove());
+  $$("[data-pp-hid]").forEach(el => { el.hidden = false; el.removeAttribute("data-pp-hid"); });
+  $$("img[data-pp-swap]").forEach(img => {
+    let o = {};
+    try { o = JSON.parse(img.dataset.ppOrig); } catch {}
+    for (const [a, k] of [["src", "src"], ["alt", "alt"], ["width", "w"], ["height", "h"], ["data-t-alt", "t"], ["data-t-orig", "o"]]) o[k] == null ? img.removeAttribute(a) : img.setAttribute(a, o[k]);
+    img.removeAttribute("data-pp-swap"); img.removeAttribute("data-pp-orig");
+  });
+  // ...then what's saved now
+  const { spots, swaps } = PPH.plan(rows);
+  const make = html => { const tp = document.createElement("template"); tp.innerHTML = html; return tp.content.firstElementChild; };
+  for (const [spot, list] of spots) {
+    const [pos, k] = spot.split(":"), el = $(`[data-b="${CSS.escape(k)}"]`);
+    if (!el) continue;
+    let box = el.parentNode;
+    const mark = pos === "before" ? el : el.nextSibling; // photos go in just before this (null: at the end)
+    for (const row of list) {
+      const html = PPH.figure(row);
+      if (!html) continue;
+      if (!PPH.side(row)) { box.insertBefore(make(html), mark); continue; }
+      // beside the text: in two columns with the part below the spot (and the text under it, if that part is a
+      // heading), or the part above it at the end of a section or box
+      const wrap = make(PPH.sideOpen(row) + PPH.TEXT_OPEN + "</div></div>"), text = wrap.firstElementChild;
+      if (pos === "before") {
+        const group = [el];
+        while (PPH.leadIn(group.at(-1).tagName, group.at(-1).className) && group.at(-1).nextElementSibling) group.push(group.at(-1).nextElementSibling);
+        box.insertBefore(wrap, el);
+        text.append(...group);
+        wrap.prepend(make(html));
+        box = text; // more photos at this spot go above the part, beside this one
+      } else {
+        const group = [];
+        for (let n = el; n && n !== mark; n = n.nextSibling) group.push(n);
+        box.insertBefore(wrap, mark);
+        text.append(...group);
+        wrap.append(make(html));
+      }
+    }
+  }
+  for (const [k, row] of swaps) {
+    const img = $(`img[data-pi="${CSS.escape(k)}"]`), to = PPH.swap(row);
+    if (!img) continue;
+    if (!to) { // hidden: the whole frame when the photo is all that's in it
+      const box = img.parentElement, only = /^(FIGURE|LI)$/.test(box.tagName) && box.children.length === 1 ? box : img;
+      only.hidden = true; only.dataset.ppHid = row.id;
+      continue;
+    }
+    const was = a => img.getAttribute(a) ?? undefined;
+    img.dataset.ppOrig = JSON.stringify({ src: was("src"), alt: was("alt"), w: was("width"), h: was("height"), t: was("data-t-alt"), o: was("data-t-orig") });
+    img.removeAttribute("data-t-alt"); img.removeAttribute("data-t-orig");
+    img.src = to.src; img.alt = to.alt;
+    if (to.w && to.h) { img.width = to.w; img.height = to.h; } else { img.removeAttribute("width"); img.removeAttribute("height"); }
+    img.dataset.ppSwap = row.id;
+  }
+}
+const photosReady = renderPagePhotos();
+
+// a row of photos: tap one to see it bigger, then step through them
+let ppLight;
+function openPhotos(list, at) {
+  if (!ppLight) {
+    document.body.insertAdjacentHTML("beforeend", `<dialog class="pplight"><img alt="">
+      <button class="lb-btn lb-x" type="button" aria-label="${h(t("js.photo.close", "Close the photo"))}">✕</button>
+      <button class="lb-btn lb-prev" type="button" aria-label="${h(t("js.photo.prev", "Previous photo"))}">‹</button>
+      <button class="lb-btn lb-next" type="button" aria-label="${h(t("js.photo.next", "Next photo"))}">›</button></dialog>`);
+    ppLight = document.body.lastElementChild;
+    const step = d => show(ppLight.at + d);
+    ppLight.addEventListener("click", e => {
+      if (e.target.closest(".lb-prev")) return step(-1);
+      if (e.target.closest(".lb-next")) return step(1);
+      ppLight.close(); // the close button, the photo or the dark around it
+    });
+    ppLight.addEventListener("keydown", e => { if (e.key === "ArrowLeft") step(-1); else if (e.key === "ArrowRight") step(1); });
+    ppLight.addEventListener("close", () => { $("img", ppLight).removeAttribute("src"); ppLight.back?.focus(); });
+  }
+  const show = i => {
+    const n = ppLight.list.length; ppLight.at = (i + n) % n;
+    const img = $("img", ppLight), p = ppLight.list[ppLight.at];
+    img.src = p.src; img.alt = p.alt || t("js.photo.n-of", "Photo {n} of {count}", { n: ppLight.at + 1, count: n });
+  };
+  ppLight.list = list; ppLight.back = document.activeElement;
+  $$(".lb-prev, .lb-next", ppLight).forEach(b => { b.hidden = list.length < 2; });
+  show(at);
+  ppLight.showModal();
+  $(".lb-x", ppLight).focus();
+}
+document.addEventListener("click", e => {
+  const b = e.target.closest("figure[data-pp] [data-pp-open]");
+  if (!b || document.body.classList.contains("ppmode")) return;
+  const imgs = $$("img", b.closest("figure"));
+  openPhotos(imgs.map(i => ({ src: i.currentSrc || i.src, alt: i.alt })), imgs.indexOf($("img", b)));
+});
+
+/* ---------- for signed-in editors: shortcuts to this page's wording and photos ----------
+   "Photos on this page" shows a "+ Add a photo here" link at every spot a photo can go, and a link on each photo to
+   change it. They open the edit page, which comes back here after saving. */
+let editor = false;
+try { editor = !!localStorage.getItem("tt-editor-session"); } catch {}
+if (editor && S.scope) {
+  const spotsHere = S.scope !== "404" && !!$("[data-b]");
+  document.body.insertAdjacentHTML("beforeend", `<div class="editfabs"><a class="editfab" href="${h(S.base)}edit/#/text/${h(S.scope)}">✏️ Edit this page's wording</a>`
+    + (spotsHere ? `<button class="editfab" type="button" data-ppmode aria-pressed="false">📷 Photos on this page</button>` : "") + `</div>`);
+  const btn = $("[data-ppmode]");
+  const link = (q, id) => `${h(S.base)}edit/#/photos/${id ? encodeURIComponent(id) : "new"}?${q ? q + "&" : ""}back=${encodeURIComponent(S.page)}`;
+  const spotLink = k => link(`page=${encodeURIComponent(S.scope)}&spot=${encodeURIComponent(k)}`);
+  const on = () => {
+    document.body.classList.add("ppmode");
+    $$("[data-b]").forEach(el => {
+      const k = el.dataset.b, pos = el.dataset.bs || "";
+      if (pos.includes("b")) el.insertAdjacentHTML("beforebegin", `<a class="ppadd" href="${spotLink("before:" + k)}">＋ Add a photo here</a>`);
+      if (pos.includes("a")) el.insertAdjacentHTML("afterend", `<a class="ppadd" href="${spotLink("after:" + k)}">＋ Add a photo here</a>`);
+    });
+    $$("[data-pp-hid]").forEach(el => { el.hidden = false; el.classList.add("ppghost"); });
+    $$("figure[data-pp]").forEach(f => f.insertAdjacentHTML("afterbegin", `<a class="ppfix" href="${link("", f.dataset.pp)}">✎ Change this photo</a>`));
+    $$("img[data-pi]").forEach(img => {
+      const row = img.dataset.ppSwap || img.closest("[data-pp-hid]")?.dataset.ppHid;
+      img.insertAdjacentHTML("beforebegin", `<a class="ppfix" href="${row ? link("", row) : spotLink(img.dataset.pi)}">${row && img.closest("[data-pp-hid]") ? "👁 Hidden: change or show it" : "✎ Change or hide this photo"}</a>`);
+    });
+    btn.textContent = "✓ Done with photos"; btn.setAttribute("aria-pressed", "true");
+    try { sessionStorage.setItem("tt-pp-mode", "1"); } catch {}
+  };
+  const off = () => {
+    document.body.classList.remove("ppmode");
+    $$(".ppadd, .ppfix").forEach(a => a.remove());
+    $$(".ppghost").forEach(el => { el.hidden = true; el.classList.remove("ppghost"); });
+    btn.textContent = "📷 Photos on this page"; btn.setAttribute("aria-pressed", "false");
+    try { sessionStorage.removeItem("tt-pp-mode"); } catch {}
+  };
+  if (btn) {
+    btn.addEventListener("click", () => photosReady.then(() => (document.body.classList.contains("ppmode") ? off() : on())));
+    let again = false;
+    try { again = sessionStorage.getItem("tt-pp-mode") === "1"; } catch {}
+    if (again) photosReady.then(on); // back from the edit page after saving a photo
+  }
+}
 
 /* ---------- start ---------- */
+// (photos added to the page start above, as soon as the script runs)
 renderHelp();
 $$("[data-goals]").forEach(renderGoals);
 renderStats();

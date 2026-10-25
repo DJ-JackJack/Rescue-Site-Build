@@ -26,6 +26,7 @@ Forgot your password? It can be reset in Supabase: Authentication → Users → 
   - A dog who isn't checked for 4 weeks hides itself, so the site never shows a dog who's already gone.
 - **Goal numbers that are getting old.** After 14 days, the site says "an update is coming" instead of showing old numbers.
 - **Day-out programs, foster programs and help listings** that haven't been checked in a while.
+- **A photo that needs a new spot**, when the part of the page it was added to has been rewritten.
 
 Below that, **Everything** has a button for each part of the site.
 
@@ -55,6 +56,10 @@ Below that, **Everything** has a button for each part of the site.
 | Add help for people | Local help list → **+ Add**, and pick one of the "(Caring for Yourself)" kinds: crisis lines, abuse at home, mental health, or grieving a pet. They show on the Caring for Yourself page, which keeps help for people apart from help for pets. |
 | Add a rescue, spay/neuter help or an apartment | Local help list → **+ Add**, and pick **Small local rescues**, **Spay, neuter and community cats** or **Breed-friendly apartments**. Each has its own section on the help page, which shows once one listing in it is switched on. Use **What kind it is** for the animals they take, like "Cats" or "Dogs and cats". Only list an apartment when its own website or office says there are no breed restrictions, and tap **Checked today** when you recheck it. |
 | Add local help | Local help list → **+ Add**. It shows on the "Help keeping your pet" page under its kind of help. A listing can also have an email, a second link (like a free resource library) and a **Caution**, which shows in a yellow box, like "This is a credit card, not financial assistance." Phone numbers can have extra words ("option 1"); the call button dials the first number. |
+| Add a photo anywhere on a page | While you're signed in, open the page on the site and tap **📷 Photos on this page** at the bottom. Every spot a photo can go shows **＋ Add a photo here**: tap the one you want. Add the photo, write a short description of what's in it (for people who can't see it), pick how it should look, and tap **Add**. You land back on the page with the photo in place. Tap **✓ Done with photos** when you're finished. |
+| Change how it looks | The looks are **Full width**, **Wide banner** (cropped to a long strip), **Beside the text** with the photo on the left or the right, **Small, in the middle**, and **A row of photos** (several at once; tapping one opens it bigger). On phones, every photo is full width, above or below the words. |
+| Change or move a photo you added | On the page, in **📷 Photos on this page**, tap **✎ Change this photo**. Or from the start screen: **Photos on the pages**. To move it, pick a new spot under **Where on the page?**. |
+| Swap or hide a photo that came with the site | In **📷 Photos on this page**, tap **✎ Change or hide this photo** on it. Add a new photo to put in its place, or leave it empty and tap **Add** to hide it. To bring the original back, delete what you saved (or turn off **Show on the site**). |
 | Change any wording | **Page wording**, then pick the page, or type a few of the words in the search box. Change the words and tap **Save changes**. Or, while you're signed in, open the page on the site and tap **✏️ Edit this page's wording** at the bottom. |
 | Undo a wording change | Open it in Page wording and tap **Use the original**, or empty the box, then save. |
 | Answer a message | Messages → **Reply by email** opens your email app. Then tap **Mark done**. |
@@ -71,6 +76,7 @@ Below that, **Everything** has a button for each part of the site.
 - **Notifications** show the topic and the sender's name, never the message itself. Tapping one opens Messages. To stop them on a device, open Messages there and tap **Turn off on this device**.
 - **Your own visits don't count** while you're signed in here. On the Visitors screen you can also skip a phone or computer when it's signed out.
 - **Photos:** pick any photo from your phone. The edit page shrinks it and strips hidden data (like where it was taken) before uploading. Still check the background: no house, street, plates or mail.
+- **Photo spots** go between the parts of each page, and at the top and bottom of each box. A photo stays with the part of the page it was added to, even if you change that part's wording. If that part is rewritten in the site's code, the photo stops showing and the start screen asks you to pick a new spot for it.
 - **Private stuff never goes in:** no home addresses, no wildlife rehab or release spots, no names of people who haven't said yes. Public buildings like shelters and vet hospitals are fine.
 - **Parts that wait for something to show:** on Rescues on Sniffari, day outs, sleepovers, videos and places stay hidden until there's at least one. On the help page, the credit cards and loans section stays hidden until one is switched on.
 - **Patreon** is linked from the Animal Guardian Alliance and Behind the Scenes pages and the footer. The link lives in the site's code settings, so changing it takes a small code update.
