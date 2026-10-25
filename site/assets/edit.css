@@ -186,3 +186,23 @@
 .worphans{margin-top:16px}
 .worphans ul{margin:8px 0 0;padding-left:18px}
 .wlist .sub{margin:14px 0 2px}
+
+/* photos on the pages: a description under each photo, and a small drawing of each look */
+.gal-ed.alts{grid-template-columns:repeat(auto-fill,minmax(160px,1fr))}
+.gal-item.with-alt{aspect-ratio:auto;overflow:visible;background:none;display:flex;flex-direction:column;gap:6px}
+.gal-item.with-alt:first-child{box-shadow:none}
+.gal-item.with-alt:first-child::after{content:none}
+.gal-pic{position:relative;display:block;aspect-ratio:1;border-radius:14px;overflow:hidden;background:var(--soft)}
+.gal-alt{display:flex;flex-direction:column;gap:4px;font-weight:800;font-size:.85rem}
+.gal-alt input{font-size:.95rem}
+.gal-item.with-alt.bad input{border-color:#B3261E}
+.choice.pics .opt span{gap:10px;border-radius:16px}
+.look{flex:none;width:46px;height:34px;border-radius:6px;background-color:#fff;border:1.5px solid var(--lavender);background-repeat:no-repeat;
+  --p:linear-gradient(var(--midviolet),var(--midviolet));--t:linear-gradient(#C9C2DA,#C9C2DA)}
+.look-full{background-image:var(--p),var(--t),var(--t);background-size:38px 17px,38px 3px,26px 3px;background-position:3px 3px,3px 23px,3px 28px}
+.look-banner{background-image:var(--p),var(--t),var(--t),var(--t);background-size:38px 8px,38px 3px,38px 3px,26px 3px;background-position:3px 3px,3px 15px,3px 21px,3px 27px}
+.look-left{background-image:var(--p),var(--t),var(--t),var(--t);background-size:16px 26px,19px 3px,19px 3px,13px 3px;background-position:3px 3px,22px 6px,22px 13px,22px 20px}
+.look-right{background-image:var(--p),var(--t),var(--t),var(--t);background-size:16px 26px,19px 3px,19px 3px,13px 3px;background-position:24px 3px,3px 6px,3px 13px,3px 20px}
+.look-small{background-image:var(--p),var(--t),var(--t);background-size:16px 14px,38px 3px,26px 3px;background-position:15px 3px,3px 22px,3px 27px}
+.look-row{background-image:var(--p),var(--p),var(--p),var(--t),var(--t);background-size:11px 11px,11px 11px,11px 11px,38px 3px,26px 3px;background-position:3px 3px,16px 3px,29px 3px,3px 21px,3px 27px}
+.opt input:checked+span .look{border-color:#fff}

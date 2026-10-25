@@ -81,6 +81,18 @@ The original files from the shared Drive folder are kept in `responses/drive-pho
 
 `help_resources`: `category` (food, vet, behavior, housing, rehoming, birds; financing for credit cards, loans and payment plans; abuse for where to report cruelty; wildlife for who to call about a wild animal; wildgroups for wildlife groups and sanctuaries; rescues for small local rescues; tnr for spay/neuter and community cat (TNR) help; breedhousing for apartments with no breed restrictions; and for people, on the Caring for Yourself page: crisis for crisis lines, dv for help when someone at home is hurting you, mental for mental health support, grief for pet loss support), `kind` and `best_for` (for financing: shown as a label like "Credit card", and as "Best for: …"), `name`, `description` (line breaks are kept), `link_url`, `phone` (extra words are fine; the call button dials the first number), `email`, `more_url` and `more_label` (a second link, like a free resource library), `caution` (shown in a yellow box, like "This is a credit card, not financial assistance"), `area` (a city, "All of Hampton Roads", or a public building's address; never a private home or a wildlife rehab or release site), `checked_on`, `sort`, `published`. Published rows show on the help page under their category; a category with none keeps its short description. The financing, small rescues, spay/neuter and breed-friendly apartment sections, and their links at the top of the page, each stay hidden until one of their rows is published. Wildlife rows show on both the help page and the Wildlife page.
 
+## Photos on the pages
+
+`page_photos`: photos added to any page from the edit page (Photos on the pages, or **📷 Photos on this page** on the site while signed in), and photos that came with the site that have been changed or hidden.
+
+- `page`: the page, like `help` or `home`.
+- `spot`: where it goes. The build marks every spot (`site/photospots.mjs`): `before:b.help.1a2b3c4d` is just above one part of the page, `after:…` just below the last part of a section or box. The key is a fingerprint of that part's own words, like a wording key, so a photo stays put when other parts move or the wording is changed from the edit page. If the words are rewritten in the code, the spot is gone: the photo stops showing and the edit page asks for a new spot. A photo that came with the site has a key like `i.stories.fa087f83`.
+- `layout`: `full`, `banner`, `left` or `right` (two columns, the photo beside the part of the page just below its spot, with the text under it when that part is a heading), `small`, `row` (up to 12 photos; tapped ones open bigger), or `swap` for a photo that came with the site (its one photo takes the original's place; no photo hides the original).
+- `photos`: `[{"url": "https://…", "alt": "…", "w": 1600, "h": 1200}]`. Uploads go to `pages/<page>/` in the photos bucket.
+- `caption`, `sort` (photos in the same spot, lower first), `published`.
+
+The build puts saved photos into the pages, the same way as saved wording, and site.js puts in anything saved since (both use `site/assets/pagephotos.js`). Deleted ones can be restored from Recently deleted.
+
 ## Page wording
 
 Every piece of wording on the site can be changed from the edit page (Page wording). Saved wording is in `site_text`, one row per `key`; an empty `body` means the original words.

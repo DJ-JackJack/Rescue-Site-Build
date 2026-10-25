@@ -24,12 +24,18 @@
 //                  "0" = launched.
 //   SITE_TEXT_FILE a JSON file of saved wording ({"key": "words"}) to build with instead of reading site_text,
 //                  for tests ({} builds the pages' own words).
+//   PAGE_PHOTOS_FILE a JSON file of page_photos rows to build with instead of reading the table, for tests.
+//
+// Photos added to the pages (page_photos) are built in the same way: site/photospots.mjs marks every spot a photo
+// can go, the edit page gets the list, and saved photos are put in. site.js puts in anything saved since.
 
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { annotate, blockHTML, esc as escText, scriptPhrases } from "./wording.mjs";
+import { markSpots, bakePhotos } from "./photospots.mjs";
+import { createRequire } from "node:module";
 
 const SRC = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(SRC, "..");
@@ -75,6 +81,22 @@ async function savedWording() {
   return Object.fromEntries(rows.filter(r => typeof r.body === "string" && r.body.trim()).map(r => [r.key, r.body.trim()]));
 }
 const saved = await savedWording();
+
+// Photos added to the pages from the edit page, shown ones only. Like the wording: if they can't be read, the pages
+// are built without them, and site.js still puts them in.
+const PP = createRequire(import.meta.url)("./assets/pagephotos.js");
+async function savedPhotos() {
+  if (process.env.PAGE_PHOTOS_FILE) return JSON.parse(fs.readFileSync(process.env.PAGE_PHOTOS_FILE, "utf8"));
+  try {
+    const r = await fetch(`${CONFIG.supabaseUrl}/rest/v1/page_photos?select=id,page,spot,layout,photos,caption,updated_at&order=sort.asc,created_at.asc`, { headers: { apikey: CONFIG.supabaseKey }, signal: AbortSignal.timeout(15000) });
+    if (!r.ok) throw new Error(`status ${r.status}`);
+    return await r.json();
+  } catch (e) {
+    console.warn(`! page photos not loaded (${e.message}); building without them`);
+    return [];
+  }
+}
+const photoRows = await savedPhotos();
 
 fs.rmSync(OUT, { recursive: true, force: true });
 fs.mkdirSync(OUT, { recursive: true });
@@ -151,7 +173,7 @@ const scriptSaved = Object.fromEntries([...phrases.keys()].filter(k => saved[k])
 const layoutItems = [];
 const layout = annotate(fill(fs.readFileSync(path.join(SRC, "layout.html"), "utf8")), "all", saved, layoutItems);
 const pagesDir = path.join(SRC, "pages");
-const built = [], pageItems = [], areas = [];
+const built = [], pageItems = [], areas = [], spots = {}, pics = {};
 for (const file of fs.readdirSync(pagesDir).filter(f => f.endsWith(".html")).sort()) {
   const raw = fs.readFileSync(path.join(pagesDir, file), "utf8");
   const m = raw.match(/^<!--(\{.*?\})-->\n/);
@@ -167,8 +189,11 @@ for (const file of fs.readdirSync(pagesDir).filter(f => f.endsWith(".html")).sor
   ];
   const title = saved[items[0].key] || tab, description = saved[items[1].key] || items[1].text;
   const preview = saved[items[0].key] || (meta.title === "Home" ? "TheTerr0rTw!ns" : tab);
-  const body = annotate(fill(raw.slice(m[0].length)), scope, saved, items);
-  const site = JSON.stringify({ ...CONFIG, page: "/" + (meta.path === "404" ? "404" : meta.path || ""), scope, t: scriptSaved, ...(saved[items[0].key] ? { titleOrig: tab } : {}) }).replace(/</g, "\\u003c");
+  const marked = markSpots(fill(raw.slice(m[0].length)), scope);
+  if (scope !== "404") { spots[scope] = marked.spots; pics[scope] = marked.pics; }
+  const photos = photoRows.filter(r => r.page === scope);
+  const body = bakePhotos(annotate(marked.html, scope, saved, items), photos);
+  const site = JSON.stringify({ ...CONFIG, page: "/" + (meta.path === "404" ? "404" : meta.path || ""), scope, t: scriptSaved, pp: PP.stamp(photos), ...(saved[items[0].key] ? { titleOrig: tab } : {}) }).replace(/</g, "\\u003c");
   let html = layout
     .replace("{{title}}", escText(title))
     .replace("{{description}}", escText(description))
@@ -198,7 +223,7 @@ for (const file of fs.readdirSync(pagesDir).filter(f => f.endsWith(".html")).sor
   areas.sort((a, b) => order(a) - order(b));
   areas.push({ scope: "all", title: "On every page (menu, footer and contact form)", path: "/" }, { scope: "js", title: "Messages and labels the site writes", path: null });
   const textDefaults = areas.flatMap(a => (a.scope === "all" ? layoutItems : a.scope === "js" ? scriptItems : pageItems.filter(i => i.scope === a.scope)));
-  const cfg = JSON.stringify({ ...CONFIG, siteUrl: SITE_URL, pages: pageNames, areas, textDefaults }).replace(/</g, "\\u003c");
+  const cfg = JSON.stringify({ ...CONFIG, siteUrl: SITE_URL, pages: pageNames, areas, textDefaults, spots, pics }).replace(/</g, "\\u003c");
   let html = fill(fs.readFileSync(path.join(SRC, "edit.html"), "utf8")).replace("{{config}}", () => cfg);
   const left = html.match(/\{\{[^}]*\}\}/);
   if (left) throw new Error(`edit.html: unfilled placeholder ${left[0]}`);

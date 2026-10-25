@@ -105,6 +105,7 @@ const api = {
 const amEditor = () => (editorCheck ??= db("POST", "rpc/is_admin", {}).catch(e => { editorCheck = null; throw e; }));
 
 /* ---------- photos ---------- */
+// returns the new JPEG and its size
 async function shrink(file) {
   if (file.type && !file.type.startsWith("image/")) throw new Error("That file isn't a photo.");
   const url = URL.createObjectURL(file);
@@ -121,11 +122,13 @@ async function shrink(file) {
     g.fillRect(0, 0, c.width, c.height);
     g.drawImage(img, 0, 0, c.width, c.height);
     // A new JPEG drawn from the canvas carries only the pixels: no GPS, camera or date data.
-    return await new Promise((ok, no) => c.toBlob(b => (b ? ok(b) : no(new Error("This photo couldn't be prepared."))), "image/jpeg", 0.82));
+    const blob = await new Promise((ok, no) => c.toBlob(b => (b ? ok(b) : no(new Error("This photo couldn't be prepared."))), "image/jpeg", 0.82));
+    return { blob, w: c.width, h: c.height };
   } finally { URL.revokeObjectURL(url); }
 }
+// returns the photo's address and size: { url, w, h }
 async function upload(file, folder, name) {
-  const blob = await shrink(file);
+  const { blob, w, h } = await shrink(file);
   const path = `${folder}/${Date.now().toString(36)}-${slugify(name)}.jpg`;
   let r;
   try {
@@ -137,14 +140,15 @@ async function upload(file, folder, name) {
   } catch { throw new Error("The photo didn't upload. Check your connection and try again."); }
   if (r.status === 401) { keep(null); throw new SignedOut(); }
   if (!r.ok) throw new Error("The photo didn't upload. " + ((await r.json().catch(() => ({}))).message || ""));
-  return `${API}/storage/v1/object/public/photos/${path}`;
+  return { url: `${API}/storage/v1/object/public/photos/${path}`, w, h };
 }
 
 /* ---------- photos nothing uses any more ----------
    A photo file stays online at its address until it's deleted, even after it's replaced or removed on the edit page.
    So once a day, and after a save that changes a photo, files nothing points to are deleted: not shown on the site,
    not on a hidden item, and not on anything waiting in Recently deleted. Files from the last 2 days are left alone,
-   in case they were just added to a form that hasn't been saved yet. */
+   in case they were just added to a form that hasn't been saved yet. Photos added to the pages are a folder deeper
+   (pages/help/…), and are {url, alt} rather than bare addresses. */
 const PHOTOS = `${API}/storage/v1/object/public/photos/`;
 async function storage(method, path, body) {
   const r = await fetch(`${API}/storage/v1/object/${path}`, { method, headers: { apikey: KEY, Authorization: `Bearer ${await token()}`, "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -154,16 +158,23 @@ async function storage(method, path, body) {
 }
 const listPhotos = prefix => storage("POST", "list/photos", { prefix, limit: 1000, offset: 0, sortBy: { column: "name", order: "asc" } });
 async function tidyPhotos() {
-  const top = await listPhotos(""), files = top.filter(f => f.id);
-  for (const folder of top.filter(f => !f.id)) files.push(...(await listPhotos(folder.name)).filter(f => f.id).map(f => ({ ...f, name: `${folder.name}/${f.name}` })));
-  const used = new Set(), note = u => { if (typeof u === "string" && u.startsWith(PHOTOS)) used.add(decodeURIComponent(u.slice(PHOTOS.length).split("?")[0])); };
-  const [rows, days, deleted] = await Promise.all([
+  const files = [];
+  const walk = async (prefix, depth) => {
+    for (const f of await listPhotos(prefix)) {
+      const name = prefix ? `${prefix}/${f.name}` : f.name;
+      if (f.id) files.push({ ...f, name });
+      else if (depth < 2) await walk(name, depth + 1);
+    }
+  };
+  await walk("", 0);
+  const used = new Set(), note = u => { u = u?.url ?? u; if (typeof u === "string" && u.startsWith(PHOTOS)) used.add(decodeURIComponent(u.slice(PHOTOS.length).split("?")[0])); };
+  const [rows, many, deleted] = await Promise.all([
     Promise.all(["animals", "goals", "collabs", "places", "videos"].map(t => api.list(t, "select=photo_url&photo_url=not.is.null"))),
-    api.list("adventures", "select=photos"),
+    Promise.all(["adventures", "page_photos"].map(t => api.list(t, "select=photos"))),
     api.list("content_history", "select=data&op=eq.delete&restored_at=is.null"),
   ]);
   rows.flat().forEach(r => note(r.photo_url));
-  days.forEach(r => (r.photos || []).forEach(note));
+  many.flat().forEach(r => (r.photos || []).forEach(note));
   deleted.forEach(h => { note(h.data?.photo_url); (Array.isArray(h.data?.photos) ? h.data.photos : []).forEach(note); });
   const before = Date.now() - 2 * 864e5;
   const unused = files.filter(f => !used.has(f.name) && new Date(f.created_at).getTime() < before).map(f => f.name);
@@ -206,6 +217,16 @@ const platform = u => {
   return /(^|\.)tiktok\.com$/.test(host) ? "TikTok" : /(^|\.)instagram\.com$/.test(host) ? "Instagram" : /(^|\.)(youtube\.com|youtu\.be)$/.test(host) ? "YouTube"
     : /(^|\.)(facebook\.com|fb\.watch)$/.test(host) ? "Facebook" : host;
 };
+
+// Photos on the pages: the pages, and every spot a photo can go on each, come from the build (site/photospots.mjs).
+const PAGES = (CFG.areas || []).filter(a => CFG.spots?.[a.scope]?.length).map(a => [a.scope, a.title]);
+const pageTitle = page => label(PAGES, page);
+const CHANGE_GROUP = "Change or hide a photo already on the page";
+const spotsOf = page => [...(CFG.spots?.[page] || []), ...(CFG.pics?.[page] || []).map(p => ({ ...p, g: CHANGE_GROUP }))];
+const spotName = r => spotsOf(r.page).find(s => s.k === r.spot)?.l || "";
+const isSwap = v => /^i\./.test(v.spot || "");
+const LOOKS = [["full", "Full width"], ["banner", "Wide banner"], ["left", "Beside the text, photo on the left"], ["right", "Beside the text, photo on the right"],
+  ["small", "Small, in the middle"], ["row", "A row of photos"]];
 
 const SHOW = { name: "published", type: "toggle", label: "Show on the site", help: "Turn this off to hide it without losing anything.", dflt: true };
 const SORT = { name: "sort", type: "number", label: "Order", help: "Lower numbers show first.", dflt: 100 };
@@ -472,6 +493,38 @@ const SECTIONS = {
       SHOW, SORT,
     ],
   },
+  photos: {
+    table: "page_photos", title: "Photos on the pages", one: "photo", icon: "🖼️",
+    intro: "Photos you've added to the pages, and photos on the pages you've changed or hidden. The easiest way to add one: open the page on the site while you're signed in, tap “📷 Photos on this page”, then tap “＋ Add a photo here” where you want it.",
+    query: "select=*&order=page.asc,sort.asc,created_at.asc",
+    titleOf: r => `${pageTitle(r.page) || r.page}: ${r.layout === "swap" ? (r.photos?.length ? "a changed photo" : "a hidden photo") : "a photo"}`,
+    row: r => ({ title: pageTitle(r.page) || r.page, emoji: "🖼️", photo: r.photos?.[0]?.url,
+      sub: [spotName(r), r.layout === "swap" ? (r.photos?.length ? "Changed" : "Hidden from the page") : label(LOOKS, r.layout)].filter(Boolean).join(" · "),
+      flags: [!r.published && "Hidden", !spotName(r) && "!Needs a new spot"] }),
+    fields: [
+      { name: "page", type: "select", label: "Which page?", options: () => PAGES, required: true, placeholder: "Pick a page…" },
+      { name: "spot", type: "select", label: "Where on the page?", options: v => spotsOf(v.page), dependsOn: "page", required: true, placeholder: "Pick a spot…",
+        missing: "A spot that isn't on the page any more: pick a new one",
+        help: "It's easiest from the page itself: open it while you're signed in and tap “📷 Photos on this page”.",
+        validate: (v, vals) => (v && !spotsOf(vals.page).some(s => s.k === v) ? "That spot isn't on the page any more. Pick a new one." : "") },
+      { name: "layout", type: "choice", label: "How should it look?", options: LOOKS, dflt: "full", pictures: true, when: v => !isSwap(v),
+        help: "On phones, every photo shows full width, above or below the words." },
+      { name: "photos", type: "gallery", alt: true, label: "Photo", max: 12, folder: v => `pages/${v.page || "other"}`,
+        help: "Add a short description for each one, for people who can't see it. Never photos of a home, or anything showing where someone lives. To hide a photo that's already on the page, pick it under “Where on the page?” and leave this empty.",
+        validate: (list, v) => isSwap(v)
+          ? (list.length > 1 ? "Pick just one photo to put in its place." : "")
+          : !list.length ? "Add a photo."
+          : v.layout !== "row" && list.length > 1 ? "This look shows one photo. To show several, pick “A row of photos”." : "" },
+      { name: "caption", type: "text", label: "Caption", max: 300, when: v => !isSwap(v), help: "Optional. Shown under the photo." },
+      SHOW, { ...SORT, help: "When there are a few photos in the same spot, lower numbers show first." },
+    ],
+    // a photo already on the page is changed, not added; nothing to pick for how it looks
+    prepare: (v, row, patch) => {
+      const want = isSwap(v) ? "swap" : v.layout || "full";
+      if (!row || row.layout !== want) patch.layout = want; else delete patch.layout;
+      if (isSwap(v) && (!row || row.caption)) patch.caption = null;
+    },
+  },
 };
 
 /* ---------- screens ---------- */
@@ -486,7 +539,8 @@ const go = hash => { if (location.hash === hash) route(); else location.hash = h
 
 const decode = s => { try { return decodeURIComponent(s); } catch { return ""; } };
 async function route() {
-  const [sec, id] = location.hash.replace(/^#\/?/, "").split("/").map(decode);
+  const [path, query = ""] = location.hash.replace(/^#\/?/, "").split("?");
+  const [sec, id] = path.split("/").map(decode), params = new URLSearchParams(query);
   dirty = false;
   $("#signout").hidden = !session;
   if (!session) return showSignIn();
@@ -498,7 +552,7 @@ async function route() {
     if (sec === "deleted") return await showDeleted();
     if (sec === "visitors") return await showVisitors(id || "7");
     if (!SECTIONS[sec]) return go("#/");
-    return id ? await showForm(sec, id) : await showList(sec);
+    return id ? await showForm(sec, id, params) : await showList(sec);
   } catch (e) {
     if (e instanceof SignedOut) return showSignIn("You've been signed out. Please sign in again.");
     render(`<h1>Something went wrong</h1><p class="note bad">${h(e.message)}</p><div class="btns"><a class="btn royal" href="#/">Back to the start</a></div>`);
@@ -526,7 +580,7 @@ function showSignIn(msg) {
     try {
       keep(await authCall("token?grant_type=password", { email, password }));
       editorCheck = null;
-      go("#/");
+      route(); // to wherever the page was opened, like a photo spot from the site
     } catch (err) {
       out.textContent = err.code === "email_not_confirmed" ? "This account hasn't been confirmed yet. Confirm it in Supabase under Authentication → Users."
         : err.status === 400 || err.code === "invalid_credentials" ? "That email and password don't match. Please try again."
@@ -543,7 +597,7 @@ function showNotEditor() {
 }
 
 async function showHome() {
-  const [msgs, animals, goals, progs, help, events, week, videos, places, collabs, fosters, advs] = await Promise.all([
+  const [msgs, animals, goals, progs, help, events, week, videos, places, collabs, fosters, advs, pics] = await Promise.all([
     api.list("messages", "select=id&handled=is.false"),
     api.list("animals", "select=id,name,status,published,checked_on"),
     api.list("goals", "select=id,title,status,published,figures_updated_at,bars:goal_bars(id)"),
@@ -556,6 +610,7 @@ async function showHome() {
     api.list("collabs", "select=id"),
     api.list("foster_programs", "select=id,program_name,shelter_name,published,checked_on"),
     api.list("adventures", "select=id"),
+    api.list("page_photos", "select=id,page,spot,layout,photos,published"),
   ]);
   const todo = [];
   if (msgs.length) todo.push(`<li><b>${plural(msgs.length, "new message")}</b><div class="btns"><a class="btn royal sm" href="#/messages">Read ${msgs.length === 1 ? "it" : "them"}</a></div></li>`);
@@ -576,6 +631,10 @@ async function showHome() {
     todo.push(`<li><b>${h(p.program_name || p.shelter_name)}: details still right?</b><small>${p.checked_on ? `Last checked ${h(nice(p.checked_on))}.` : "Never checked."}</small>
       <div class="btns"><button class="btn royal sm" type="button" data-act="checked" data-t="foster_programs" data-id="${h(p.id)}">Still right</button><a class="btn ghost sm" href="#/fosters/${h(p.id)}">Open</a></div></li>`);
   }
+  for (const r of pics.filter(r => r.published && !spotName(r))) {
+    todo.push(`<li><b>A photo on ${h(pageTitle(r.page) || r.page)} needs a new spot</b><small>That part of the page was rewritten, so the photo isn't showing. Pick where it should go now.</small>
+      <div class="btns"><a class="btn royal sm" href="#/photos/${h(r.id)}">Pick a spot</a></div></li>`);
+  }
   for (const r of help.filter(r => r.published && stale(r.checked_on, 180))) {
     todo.push(`<li><b>${h(r.name)}: still running?</b><small>${r.checked_on ? `Last checked ${h(nice(r.checked_on))}.` : "Never checked."}</small>
       <div class="btns"><button class="btn royal sm" type="button" data-act="checked" data-t="help_resources" data-id="${h(r.id)}">Still running</button><a class="btn ghost sm" href="#/help/${h(r.id)}">Open</a></div></li>`);
@@ -592,6 +651,7 @@ async function showHome() {
     ["adventures", "🦮", "Our day outs", plural(advs.length, "day out")],
     ["videos", "🎬", "Day-out videos", plural(videos.length, "video")],
     ["places", "📍", "Dog-friendly places", plural(places.length, "place")],
+    ["photos", "🖼️", "Photos on the pages", plural(pics.length, "photo")],
     ["help", "🤝", "Local help list", plural(help.length, "listing")],
     ["text", "✏️", "Page wording", ""],
     ["visitors", "📈", "Visitors", week ? plural(week.days.reduce((a, d) => a + d[1], 0), "view") + " this week" : ""],
@@ -680,6 +740,26 @@ const rowsRow = (f, r) => `<div class="step-row rows-row">
 const galItem = u => `<li class="gal-item" data-url="${h(u)}"><img src="${h(photoUrl(u))}" alt="">
   <span class="gal-btns"><button type="button" class="xbtn" data-gal-left aria-label="Move this photo earlier">‹</button><button type="button" class="xbtn" data-gal-right aria-label="Move this photo later">›</button><button type="button" class="xbtn" data-gal-remove aria-label="Remove this photo">✕</button></span></li>`;
 
+// a photo with its description, in a gallery that has them (photos on the pages): { url, alt, w, h }
+const altItem = p => `<li class="gal-item with-alt" data-url="${h(p.url)}"${p.w > 0 && p.h > 0 ? ` data-w="${h(p.w)}" data-h="${h(p.h)}"` : ""}>
+  <span class="gal-pic"><img src="${h(photoUrl(p.url))}" alt="">
+  <span class="gal-btns"><button type="button" class="xbtn" data-gal-left aria-label="Move this photo earlier">‹</button><button type="button" class="xbtn" data-gal-right aria-label="Move this photo later">›</button><button type="button" class="xbtn" data-gal-remove aria-label="Remove this photo">✕</button></span></span>
+  <label class="gal-alt">What's in it<input name="g_alt" maxlength="300" value="${h(p.alt || "")}" placeholder="A dog asleep in the grass" autocomplete="off"></label></li>`;
+
+// a dropdown's choices: [value, label] pairs or { k, l, g } (g: the group it's shown under). A saved value
+// that's no longer a choice stays, marked, so nothing is lost before it's changed.
+function selectOpts(f, opts, v) {
+  let out = `<option value="">${h(f.placeholder || "Pick one…")}</option>`, group = null;
+  for (const o of opts) {
+    const [val, l, g = null] = Array.isArray(o) ? o : [o.k, o.l, o.g];
+    if (g !== group) { if (group) out += "</optgroup>"; if (g) out += `<optgroup label="${h(g)}">`; group = g; }
+    out += `<option value="${h(val)}"${val === v ? " selected" : ""}>${h(l)}</option>`;
+  }
+  if (group) out += "</optgroup>";
+  if (v && !opts.some(o => (Array.isArray(o) ? o[0] : o.k) === v)) out += `<option value="${h(v)}" selected>${h(f.missing || v)}</option>`;
+  return out;
+}
+
 function fieldHTML(f, v, ctx) {
   const id = fid(f.name), help = f.help ? `<p class="hint" id="${id}-h">${h(f.help)}</p>` : "";
   const desc = f.help ? ` aria-describedby="${id}-h"` : "", req = f.required ? " required" : "", max = f.max ? ` maxlength="${f.max}"` : "";
@@ -697,8 +777,10 @@ function fieldHTML(f, v, ctx) {
       return wrap(lab + `<div class="inrow"><input id="${id}" name="${f.name}" type="date" value="${h(v ?? "")}"${req}${desc}>${f.today ? `<button type="button" class="btn ghost sm" data-today="${f.name}">${h(f.today)}</button>` : ""}</div>`);
     case "partner":
       return wrap(lab + `<select id="${id}" name="${f.name}"${req}${desc}>${f.required ? (v ? "" : '<option value="">Pick one…</option>') : '<option value="">None</option>'}${ctx.partners.map(p => `<option value="${h(p.id)}"${p.id === v ? " selected" : ""}>${h(p.name)}${p.published && p.feature_ok ? "" : " (hidden)"}</option>`).join("")}</select>`);
-    case "choice":
-      return wrap(`<fieldset class="choice"${desc}><legend>${h(f.label)}</legend><div class="opts">${f.options.map(([val, l]) => `<label class="opt"><input type="radio" name="${f.name}" value="${h(val)}"${val === v ? " checked" : ""}><span>${h(l)}</span></label>`).join("")}</div></fieldset>`);
+    case "select":
+      return wrap(lab + `<select id="${id}" name="${f.name}"${req}${desc}>${selectOpts(f, typeof f.options === "function" ? f.options(ctx.vals || {}) : f.options, v)}</select>`);
+    case "choice": // f.pictures: a small drawing of each choice, for how a photo looks on the page
+      return wrap(`<fieldset class="choice${f.pictures ? " pics" : ""}"${desc}><legend>${h(f.label)}</legend><div class="opts">${f.options.map(([val, l]) => `<label class="opt"><input type="radio" name="${f.name}" value="${h(val)}"${val === v ? " checked" : ""}><span>${f.pictures ? `<i class="look look-${h(val)}" aria-hidden="true"></i>` : ""}${h(l)}</span></label>`).join("")}</div></fieldset>`);
     case "tags":
       return wrap(`<fieldset class="checks-f"${desc}><legend>${h(f.label)}</legend><div class="checks">${f.options.map(([val, l]) => `<label><input type="checkbox" name="${f.name}" value="${h(val)}"${(v || []).includes(val) ? " checked" : ""}> ${h(l)}</label>`).join("")}</div></fieldset>`);
     case "toggle":
@@ -719,7 +801,7 @@ function fieldHTML(f, v, ctx) {
       return wrap(`<span class="flabel">${h(f.label)}</span><div class="notes-ed">${(v || []).map(noteRow).join("")}</div>
         <button type="button" class="btn ghost sm" data-note-add>+ Add an update</button>`);
     case "gallery":
-      return wrap(`<span class="flabel">${h(f.label)}</span><ul class="gal-ed" data-gallery="${f.name}">${(v || []).map(galItem).join("")}</ul>
+      return wrap(`<span class="flabel">${h(f.label)}</span><ul class="gal-ed${f.alt ? " alts" : ""}" data-gallery="${f.name}">${(v || []).map(x => (f.alt ? altItem(x) : galItem(x))).join("")}</ul>
         <label class="btn ghost sm pick">+ Add photos<input type="file" accept="image/*" multiple class="sr" data-gallery-add="${f.name}"></label>
         <p class="hint gal-status" aria-live="polite"></p>`);
     case "rows":
@@ -752,7 +834,10 @@ function readForm(form, fields) {
       case "lines": out[f.name] = el.value.split("\n").map(s => s.trim()).filter(Boolean); break;
       case "number": out[f.name] = el.value === "" ? (f.dflt ?? null) : Math.round(Number(el.value)); break;
       case "url": out[f.name] = cleanUrl(el.value) || null; break;
-      case "gallery": out[f.name] = $$(`[data-gallery="${f.name}"] .gal-item`, form).map(li => li.dataset.url); break;
+      case "gallery": // with descriptions: { url, alt, w, h } in the database's key order, so an unchanged one compares equal
+        out[f.name] = $$(`[data-gallery="${f.name}"] .gal-item`, form).map(li => !f.alt ? li.dataset.url
+          : jsonbOrder({ url: li.dataset.url, alt: $("[name=g_alt]", li).value.trim(), ...(li.dataset.w ? { w: Number(li.dataset.w), h: Number(li.dataset.h) } : {}) }));
+        break;
       case "rows": // empty rows are dropped
         out[f.name] = $$(`[data-rows-of="${f.name}"] .rows-row`, form)
           .map(r => jsonbOrder(Object.fromEntries(f.cols.map(c => { const x = $(`[name="r_${f.name}_${c.key}"]`, r).value; return [c.key, c.url ? cleanUrl(x) : x.trim()]; }))))
@@ -787,6 +872,11 @@ function validate(form, fields, vals) {
       else if (f.type === "url" && v && !safeUrl(v)) msg = "That doesn't look like a web link. It should start with https://";
       else if (f.check && v && !f.check[0].test(v)) msg = f.check[1];
       else if (f.after && v && vals[f.after] && v < vals[f.after]) msg = "This can't be before the start date.";
+      else if (f.type === "gallery" && f.alt && v.some(p => !p.alt)) {
+        $$(".gal-item", box).forEach(li => li.classList.toggle("bad", !$("[name=g_alt]", li).value.trim()));
+        msg = "Each photo needs a short description, for people who can't see it.";
+      }
+      else if (f.validate && (msg = f.validate(v, vals) || "")) { /* its own check */ }
       else if (f.type === "journey") {
         $$(".step-row", box).forEach(r => r.classList.toggle("bad", !$("[name=j_label]", r).value.trim() && !!($("[name=j_detail]", r).value.trim() || $("[name=j_date]", r).value)));
         if (v.some(s => !s.label)) msg = "Each step needs a “What happened”.";
@@ -817,8 +907,13 @@ function validate(form, fields, vals) {
 }
 const same = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 
-async function showForm(key, id) {
+// params (from the address): a new one's starting values (?page=help&spot=…), and back=/help/ to go back to that page
+// on the site when done, as when it was opened from "Photos on this page".
+async function showForm(key, id, params = new URLSearchParams()) {
   const S = SECTIONS[key], isNew = id === "new";
+  const backTo = (CFG.pages || []).find(p => p.path === params.get("back"));
+  const backUrl = backTo ? CFG.base + backTo.path.replace(/^\//, "") : "";
+  const done = () => (backUrl ? location.assign(backUrl) : go(`#/${key}`));
   const [found, partners, herds] = await Promise.all([
     isNew ? [null] : api.list(S.table, `${S.query.replace(/&order=[^&]*/, "")}&id=eq.${encodeURIComponent(id)}`),
     S.fields.some(f => f.type === "partner") ? api.list("partners", "select=id,name,published,feature_ok&order=name.asc") : [],
@@ -829,16 +924,17 @@ async function showForm(key, id) {
     render(`<a class="back" href="#/${key}">‹ ${h(S.title)}</a><h1>Not found</h1><p class="note">That one wasn't found. It may have been deleted.</p>`);
     return;
   }
-  const vals = row || Object.fromEntries(S.fields.map(f => [f.name, typeof f.dflt === "function" ? f.dflt() : f.dflt ?? (f.type === "toggle" ? false : ["tags", "lines", "bars", "journey", "updates", "rows", "gallery"].includes(f.type) ? [] : null)]));
-  const ctx = { partners };
-  render(`<a class="back" href="#/${key}">‹ ${h(S.title)}</a>
+  const vals = row || Object.fromEntries(S.fields.map(f => [f.name, params.has(f.name) && ["text", "select", "choice"].includes(f.type) ? params.get(f.name)
+    : typeof f.dflt === "function" ? f.dflt() : f.dflt ?? (f.type === "toggle" ? false : ["tags", "lines", "bars", "journey", "updates", "rows", "gallery"].includes(f.type) ? [] : null)]));
+  const ctx = { partners, vals };
+  render(`${backUrl ? `<a class="back" href="${h(backUrl)}">‹ Back to ${h(backTo.title)}</a>` : `<a class="back" href="#/${key}">‹ ${h(S.title)}</a>`}
     <h1>${isNew ? `Add ${h(S.one)}` : h(S.titleOf(row))}</h1>
     ${!isNew && row.updated_at ? `<p class="small">Last changed ${h(nice(row.updated_at.slice(0, 10)))}</p>` : ""}
     <form class="form eform" novalidate>
       ${S.fields.map(f => fieldHTML(f, vals[f.name], ctx)).join("")}
       ${herds.length ? `<datalist id="herds">${[...new Set(herds.map(x => x.herd))].map(x => `<option value="${h(x)}">`).join("")}</datalist>` : ""}
       <p class="formmsg err-msg" role="alert"></p>
-      <div class="savebar"><button class="btn royal" type="submit">${isNew ? "Add" : "Save changes"}</button><a class="btn ghost" href="#/${key}">Cancel</a></div>
+      <div class="savebar"><button class="btn royal" type="submit">${isNew ? "Add" : "Save changes"}</button><a class="btn ghost" href="${backUrl ? h(backUrl) : `#/${key}`}">Cancel</a></div>
     </form>
     ${isNew ? "" : S.noDelete ? `<p class="small danger">${h(S.noDelete)}</p>` : `<div class="danger"><button class="linkbtn" type="button" data-act="delete">Delete this ${h(S.one)}</button></div>`}`);
 
@@ -853,6 +949,8 @@ async function showForm(key, id) {
     dirty = true;
     const f = S.fields.find(x => x.name === e.target.name && x.onPick);
     if (f && e.target.checked) f.onPick(e.target.value, form.elements);
+    // a dropdown whose choices depend on this one (the spots on the page picked) starts again
+    for (const d of S.fields.filter(x => x.dependsOn === e.target.name)) form.elements[d.name].innerHTML = selectOpts(d, d.options(readForm(form, S.fields)), "");
     refresh();
   });
   form.addEventListener("click", async e => {
@@ -908,7 +1006,7 @@ async function showForm(key, id) {
     const f = S.fields.find(x => x.name === inp.dataset.photo), pic = $(".pf-pic", form);
     pic.innerHTML = "<span>Getting the photo ready…</span>";
     try {
-      const url = await upload(file, f.folder, form.elements.name?.value || form.elements.title?.value || f.folder);
+      const { url } = await upload(file, f.folder, form.elements.name?.value || form.elements.title?.value || f.folder);
       form.elements[f.name].value = url;
       pic.innerHTML = `<img src="${h(url)}" alt="New photo">`;
       $(".pick", form).firstChild.textContent = "Change photo";
@@ -926,14 +1024,15 @@ async function showForm(key, id) {
   // several photos at once, one after another, each shrunk and cleaned like any photo
   $$("[data-gallery-add]", form).forEach(inp => inp.addEventListener("change", async () => {
     const f = S.fields.find(x => x.name === inp.dataset.galleryAdd), list = $(`[data-gallery="${f.name}"]`, form), status = $(".gal-status", list.parentElement);
+    const folder = typeof f.folder === "function" ? f.folder(readForm(form, S.fields)) : f.folder;
     const files = [...inp.files], room = (f.max || 40) - $$(".gal-item", list).length;
     if (files.length > room) toast(room > 0 ? `Only ${room} more photo${room === 1 ? "" : "s"} fit, so the rest were skipped.` : `That's the most photos one can have (${f.max || 40}).`, true);
     let done = 0;
     try {
       for (const file of files.slice(0, Math.max(room, 0))) {
         status.textContent = `Adding photo ${done + 1} of ${Math.min(files.length, room)}…`;
-        const url = await upload(file, f.folder, form.elements.title?.value || f.folder);
-        list.insertAdjacentHTML("beforeend", galItem(url));
+        const { url, w, h: ht } = await upload(file, folder, form.elements.title?.value || folder.split("/").pop());
+        list.insertAdjacentHTML("beforeend", f.alt ? altItem({ url, w, h: ht }) : galItem(url));
         done++; dirty = true;
       }
       if (done) toast(`${done === 1 ? "Photo" : done + " photos"} added. Tap Save to keep ${done === 1 ? "it" : "them"}.`);
@@ -963,7 +1062,7 @@ async function showForm(key, id) {
       if (!isNew && S.fields.some(f => (f.type === "photo" || f.type === "gallery") && f.name in patch)) tidyPhotosNow(true); // a replaced or removed photo goes
       dirty = false;
       toast(isNew ? "Added ✓" : "Saved ✓");
-      go(`#/${key}`);
+      done();
     } catch (err) {
       if (err instanceof SignedOut) return route();
       out.textContent = err.message;
@@ -973,7 +1072,7 @@ async function showForm(key, id) {
 
   $('[data-act="delete"]', app)?.addEventListener("click", async () => {
     if (!confirm(`Delete “${S.titleOf(row)}”?\n\nYou can bring it back from Recently deleted for 90 days. To just hide it, turn off “Show on the site” instead.`)) return;
-    try { await api.drop(S.table, row.id); dirty = false; toast("Deleted"); go(`#/${key}`); }
+    try { await api.drop(S.table, row.id); dirty = false; toast("Deleted"); done(); }
     catch (err) { if (err instanceof SignedOut) return route(); toast(err.message, true); }
   });
 }
@@ -1234,7 +1333,7 @@ const KIND = {
   animals: ["Animal", r => r.name], goals: ["Shelter goal", r => r.title], goal_bars: ["Line on a shelter goal", r => r.label],
   events: ["Event", r => r.title], collabs: ["Collaboration", r => r.title], partners: ["Rescue or shelter", r => r.name], sniffari_programs: ["Day-out program", r => r.program_name || r.shelter_name],
   foster_programs: ["Foster program", r => r.program_name || r.shelter_name], adventures: ["Day out", r => r.title],
-  videos: ["Day-out video", r => r.title], places: ["Dog-friendly place", r => r.name],
+  videos: ["Day-out video", r => r.title], places: ["Dog-friendly place", r => r.name], page_photos: ["Photo on a page", r => SECTIONS.photos.titleOf(r)],
   help_resources: ["Help listing", r => r.name], messages: ["Message", r => (r.name ? `From ${r.name}` : `From ${r.email}`)],
 };
 async function showDeleted() {

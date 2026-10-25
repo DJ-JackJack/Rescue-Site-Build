@@ -11,7 +11,7 @@ import path from "node:path";
 const SUPABASE = JSON.parse(fs.readFileSync(new URL("../site/supabase.json", import.meta.url), "utf8"));
 const API = (process.env.SUPABASE_URL || SUPABASE.url).replace(/\/+$/, ""), KEY = process.env.SUPABASE_KEY || SUPABASE.key;
 const OUT = path.resolve(process.argv[2] || "backup");
-const TABLES = ["partners", "goals", "goal_bars", "animals", "events", "collabs", "sniffari_programs", "foster_programs", "adventures", "videos", "places", "help_resources", "site_text"];
+const TABLES = ["partners", "goals", "goal_bars", "animals", "events", "collabs", "sniffari_programs", "foster_programs", "adventures", "videos", "places", "page_photos", "help_resources", "site_text"];
 
 async function get(url, tries = 3) {
   for (let i = 1; ; i++) {
@@ -32,8 +32,8 @@ for (const t of TABLES) {
   const rows = await (await get(`${API}/rest/v1/${t}?select=*`)).json();
   fs.writeFileSync(path.join(OUT, `${t}.json`), JSON.stringify(rows, null, 2) + "\n");
   counts[t] = rows.length;
-  // a row's photo, and a day out's gallery
-  for (const r of rows) for (const u of [r.photo_url, ...(Array.isArray(r.photos) ? r.photos : [])]) if (typeof u === "string" && u.startsWith(`${API}/storage/v1/object/public/photos/`)) photos.add(u);
+  // a row's photo, a day out's gallery, and photos added to the pages (those are {url, alt, …})
+  for (const r of rows) for (const u of [r.photo_url, ...(Array.isArray(r.photos) ? r.photos : []).map(p => p?.url ?? p)]) if (typeof u === "string" && u.startsWith(`${API}/storage/v1/object/public/photos/`)) photos.add(u);
 }
 // Photos in assets/photos/ are in the repo already; these are the ones uploaded from the edit page.
 let saved = 0;

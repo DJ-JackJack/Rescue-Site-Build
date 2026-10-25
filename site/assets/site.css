@@ -531,6 +531,44 @@ h2.eyebrow{font-family:var(--f-body);line-height:1.55}
 .no-js .menubtn,.no-js [data-form],.no-js .sniff-filters,.no-js .filters,.no-js .wallhint{display:none}
 .nojs-note{background:var(--midnight);color:#fff;text-align:center;font-weight:700;padding:10px 16px;margin:0}
 /* a shortcut to the edit page's wording for this page, only on devices signed in to the edit page */
-.editfab{position:fixed;left:12px;bottom:12px;z-index:60;background:var(--plum);color:#fff;font-weight:800;font-size:.9rem;padding:10px 14px;border-radius:999px;box-shadow:var(--shadow);text-decoration:none}
+.editfabs{position:fixed;left:12px;bottom:12px;z-index:60;display:flex;flex-direction:column;align-items:flex-start;gap:8px}
+.editfab{background:var(--plum);color:#fff;font:800 .9rem var(--f-body);padding:10px 14px;border:0;border-radius:999px;box-shadow:var(--shadow);text-decoration:none;cursor:pointer}
 .editfab:hover{background:var(--royal)}
+
+/* photos added to the pages from the edit page (site/assets/pagephotos.js) */
+.pp{margin:18px 0}
+.pp img{display:block;width:100%;height:auto;border-radius:var(--r);background:var(--soft)}
+.pp figcaption{margin-top:8px;font-size:.88rem;color:var(--ink2)}
+.box>.pp:first-child,.need>.pp:first-child{margin-top:0}
+.box>.pp:last-child,.need>.pp:last-child{margin-bottom:0}
+.pp-banner img{aspect-ratio:3/1;object-fit:cover}
+.pp-small{max-width:320px;margin-left:auto;margin-right:auto}
+.pp-small figcaption{text-align:center}
+.pp-row ul{list-style:none;margin:0;padding:0;display:grid;gap:8px;grid-template-columns:repeat(auto-fill,minmax(110px,1fr))}
+.pp-row button{display:block;width:100%;aspect-ratio:1;padding:0;border:0;border-radius:14px;overflow:hidden;cursor:zoom-in;background:var(--wash)}
+.pp-row button img{width:100%;height:100%;object-fit:cover;border-radius:0}
+.pp-row button:focus-visible{outline:3px solid var(--ocean);outline-offset:2px}
+/* beside the text on wider screens: two columns, the photo and the part of the page it's attached to.
+   On phones every photo is full width, above or below the words. */
+.pp-side{margin:18px 0}
+.pp-side-text>:first-child{margin-top:0}
+@media (min-width:720px){
+  .pp-side{display:grid;gap:28px;align-items:start;grid-template-columns:minmax(0,3fr) minmax(0,2fr)}
+  .pp-side-left{grid-template-columns:minmax(0,2fr) minmax(0,3fr)}
+  .pp-side>.pp{margin:0;grid-row:1}
+  .pp-side>.pp-side-text{grid-row:1}
+  .pp-side-left>.pp,.pp-side-right>.pp-side-text{grid-column:1}
+  .pp-side-left>.pp-side-text,.pp-side-right>.pp{grid-column:2}
+}
+@media (max-width:560px){.pp-banner img{aspect-ratio:2/1}}
+.pplight{border:0;padding:0;margin:0;width:100vw;height:100vh;height:100dvh;max-width:none;max-height:none;background:rgba(25,19,51,.96)}
+.pplight[open]{display:flex;align-items:center;justify-content:center}
+.pplight::backdrop{background:rgba(25,19,51,.7)}
+.pplight img{max-width:calc(100% - 24px);max-height:calc(100% - 140px);object-fit:contain;border-radius:12px}
+/* "Photos on this page", for signed-in editors */
+.ppadd{display:block;margin:10px 0;padding:10px 14px;border:2px dashed var(--midviolet);border-radius:14px;background:rgba(255,255,255,.9);color:var(--royal);font-weight:800;font-size:.9rem;text-align:center;text-decoration:none;clear:both}
+.ppadd:hover{border-color:var(--royal);background:#fff}
+.ppfix{display:inline-block;margin:0 0 6px;padding:7px 12px;border-radius:999px;background:var(--plum);color:#fff!important;font-weight:800;font-size:.82rem;text-decoration:none;box-shadow:var(--shadow);position:relative;z-index:2}
+.ppmode figure[data-pp]{outline:3px solid var(--violet);outline-offset:4px;border-radius:var(--r)}
+.ppghost{opacity:.45}
 @media print{.editfab{display:none}}
