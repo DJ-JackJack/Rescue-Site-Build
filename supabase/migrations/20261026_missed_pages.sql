@@ -9,15 +9,17 @@ create table if not exists public.missed_pages (
   primary key (day, path)
 );
 alter table public.missed_pages enable row level security;
-drop policy if exists missed_pages_admin on public.missed_pages;
-create policy missed_pages_admin on public.missed_pages for select to authenticated using (public.is_admin());
+do $$ begin
+  if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'missed_pages' and policyname = 'missed_pages_admin') then
+    create policy missed_pages_admin on public.missed_pages for select to authenticated using (public.is_admin());
+  end if;
+end $$;
 revoke all on public.missed_pages from anon, authenticated;
 grant select on public.missed_pages to authenticated;
 
--- count_view takes the address that wasn't found as a third, optional value. The old two-value version goes, so
--- pages built before this (still calling with two) reach this one. A day holds at most 30 addresses not found.
-drop function if exists public.count_view(text, text);
-create or replace function public.count_view(p_path text, p_source text default null, p_missed text default null) returns void
+-- count_view with a third value, the address that wasn't found. The site sends all three (p_missed only from the
+-- "Page not found" page); a day holds at most 30 addresses not found.
+create or replace function public.count_view(p_path text, p_source text, p_missed text) returns void
 language plpgsql security definer set search_path = '' as $$
 declare d date := (now() at time zone 'America/New_York')::date;
 begin
@@ -40,6 +42,15 @@ begin
 end $$;
 revoke execute on function public.count_view(text, text, text) from public, authenticated;
 grant execute on function public.count_view(text, text, text) to anon;
+
+-- The two-value count_view stays for pages built before this, and passes its count on to the one above.
+create or replace function public.count_view(p_path text, p_source text default null) returns void
+language plpgsql security definer set search_path = '' as $$
+begin
+  perform public.count_view(p_path, p_source, null::text);
+end $$;
+revoke execute on function public.count_view(text, text) from public, authenticated;
+grant execute on function public.count_view(text, text) to anon;
 
 -- The Visitors screen's totals, now with the addresses not found (the 50 most tried).
 create or replace function public.visitor_summary(p_days int) returns jsonb
