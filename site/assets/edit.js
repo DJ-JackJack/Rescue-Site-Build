@@ -190,6 +190,128 @@ function tidyPhotosNow(force) {
   tidyPhotos().catch(e => { if (!(e instanceof SignedOut)) console.warn("tidying photos:", e.message); });
 }
 
+/* ---------- framing a photo: drag to move it, pinch to zoom ----------
+   Shows the photo in the shape it has on the site (a square card, a wide banner...) and saves where it's centered and
+   how far it's zoomed in, {x, y, z} (site/assets/pagephotos.js frames it the same way on the site). The photo itself
+   is never cut. One finger or the mouse drags it; two fingers pinch to zoom; the slider, − and +, the mouse wheel and
+   the + and − keys zoom too; arrow keys move it. A double tap, or "Center it", starts again.
+   shapes: [{ a: width ÷ height (0 for the photo's own), label }], the first being the big one to frame it in. */
+const PP = window.PagePhotos;
+const frameView = (img, f) => { Object.assign(img.style, { objectPosition: "", transform: "", transformOrigin: "", clipPath: "" }, PP.frameStyle(f)); };
+// framing shown on photos in the edit page's own lists and forms (data-frame="{x, y, z}")
+const showFrames = root => $$("img[data-frame]", root).forEach(i => { try { frameView(i, JSON.parse(i.dataset.frame)); } catch {} });
+const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+
+function openFramer({ url, shapes, frame }) {
+  return new Promise(done => {
+    const dlg = document.createElement("dialog");
+    dlg.className = "framer";
+    dlg.innerHTML = `<form method="dialog" class="fr">
+      <h2>Adjust the photo</h2>
+      <p class="hint">Drag the photo to move it. Pinch, or use the slider, to zoom in. Double-tap to start again.</p>
+      <div class="fr-stage" tabindex="0" role="img" aria-label="The photo, as it will show. Arrow keys move it; plus and minus zoom."><img alt="" draggable="false"><span class="fr-grid" aria-hidden="true"></span></div>
+      <div class="fr-zoom"><button type="button" class="xbtn" data-zoom="-1" aria-label="Zoom out">−</button>
+        <input type="range" min="1" max="4" step="0.01" value="1" aria-label="Zoom"><button type="button" class="xbtn" data-zoom="1" aria-label="Zoom in">+</button></div>
+      ${shapes.length > 1 ? `<div class="fr-also">${shapes.slice(1).map((s, i) => `<figure><span class="fr-mini" data-i="${i + 1}"><img alt=""></span><figcaption>${h(s.label || "")}</figcaption></figure>`).join("")}</div>` : ""}
+      <div class="fr-foot"><button type="button" class="btn ghost sm" data-reset>Center it</button>
+        <span class="fr-btns"><button class="btn royal" value="done">Done</button><button class="btn ghost" value="cancel">Cancel</button></span></div>
+    </form>`;
+    document.body.append(dlg);
+    const stage = $(".fr-stage", dlg), main = $("img", stage), slider = $("input[type=range]", dlg), imgs = $$("img", dlg);
+    let x = 50, y = 50, z = 1, ai = 1, af = 1;
+    const f0 = PP.frame(frame);
+    if (f0) ({ x, y, z } = f0);
+    // what part of the photo shows in the big frame: its width and height, and left and top edges, as fractions
+    const size = () => ({ w: Math.min(1, af / ai) / z, h: Math.min(1, ai / af) / z });
+    const crop = () => { const s = size(); return { ...s, L: x / 100 * (1 - s.w), T: y / 100 * (1 - s.h) }; };
+    const setCrop = (L, T) => {
+      const s = size();
+      if (s.w < 1) x = clamp(L, 0, 1 - s.w) / (1 - s.w) * 100;
+      if (s.h < 1) y = clamp(T, 0, 1 - s.h) / (1 - s.h) * 100;
+    };
+    const show = () => { imgs.forEach(i => frameView(i, { x, y, z })); slider.value = String(z); };
+    // zoom to nz, keeping the bit of the photo under (px, py) of the frame (fractions) at (tx, ty)
+    const zoomAt = (px, py, nz, tx = px, ty = py) => {
+      const c = crop(), ix = c.L + px * c.w, iy = c.T + py * c.h;
+      z = clamp(nz, 1, 4);
+      const s = size();
+      setCrop(ix - tx * s.w, iy - ty * s.h);
+      show();
+    };
+    const reset = () => { x = 50; y = 50; z = 1; show(); };
+
+    const pts = new Map(); let pinch = null, tap = null;
+    const at = e => { const r = stage.getBoundingClientRect(); return { x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height }; };
+    stage.addEventListener("pointerdown", e => {
+      try { stage.setPointerCapture(e.pointerId); } catch {}
+      pts.set(e.pointerId, at(e));
+      stage.classList.add("moving");
+      if (pts.size === 2) { const [a, b] = [...pts.values()]; pinch = { d: Math.hypot(a.x - b.x, a.y - b.y), m: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 } }; }
+      e.preventDefault();
+    });
+    stage.addEventListener("pointermove", e => {
+      if (!pts.has(e.pointerId)) return;
+      const was = pts.get(e.pointerId), now = at(e);
+      pts.set(e.pointerId, now);
+      if (pts.size === 1) { // drag: the photo follows the finger
+        const c = crop();
+        setCrop(c.L - (now.x - was.x) * c.w, c.T - (now.y - was.y) * c.h);
+        show();
+      } else if (pts.size === 2 && pinch) { // pinch: zoom around the fingers, and move with them
+        const [a, b] = [...pts.values()], d = Math.hypot(a.x - b.x, a.y - b.y), m = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+        if (pinch.d > 0.01) zoomAt(pinch.m.x, pinch.m.y, z * d / pinch.d, m.x, m.y);
+        pinch = { d, m };
+      }
+    });
+    const up = e => {
+      if (!pts.has(e.pointerId)) return;
+      const p = pts.get(e.pointerId);
+      pts.delete(e.pointerId);
+      if (pts.size < 2) pinch = null;
+      if (!pts.size) stage.classList.remove("moving");
+      // a double tap starts again
+      if (e.type === "pointerup") {
+        const now = Date.now();
+        if (tap && now - tap.t < 320 && Math.hypot(p.x - tap.x, p.y - tap.y) < 0.06) { reset(); tap = null; } else tap = { t: now, x: p.x, y: p.y };
+      }
+    };
+    stage.addEventListener("pointerup", up);
+    stage.addEventListener("pointercancel", up);
+    stage.addEventListener("wheel", e => { e.preventDefault(); const p = at(e); zoomAt(p.x, p.y, z * Math.exp(-e.deltaY * 0.0015)); }, { passive: false });
+    stage.addEventListener("keydown", e => {
+      const c = crop(), k = e.key;
+      if (k === "ArrowLeft" || k === "ArrowRight") setCrop(c.L + (k === "ArrowLeft" ? -0.04 : 0.04) * c.w, c.T);
+      else if (k === "ArrowUp" || k === "ArrowDown") setCrop(c.L, c.T + (k === "ArrowUp" ? -0.04 : 0.04) * c.h);
+      else if (k === "+" || k === "=") return zoomAt(0.5, 0.5, z * 1.15);
+      else if (k === "-" || k === "_") return zoomAt(0.5, 0.5, z / 1.15);
+      else if (k === "0") return reset();
+      else return;
+      e.preventDefault(); show();
+    });
+    slider.addEventListener("input", () => zoomAt(0.5, 0.5, Number(slider.value)));
+    $$("[data-zoom]", dlg).forEach(b => b.addEventListener("click", () => zoomAt(0.5, 0.5, Number(b.dataset.zoom) > 0 ? z * 1.25 : z / 1.25)));
+    $("[data-reset]", dlg).addEventListener("click", reset);
+    dlg.addEventListener("close", () => {
+      const ok = dlg.returnValue === "done";
+      dlg.remove();
+      const r1 = v => Math.round(v * 10) / 10;
+      done(ok ? PP.frame({ x: r1(x), y: r1(y), z: Math.round(z * 100) / 100 }) || null : undefined);
+    });
+    // the frames take the shapes the photo has on the site, once its own shape is known
+    imgs.forEach(i => { i.src = photoUrl(url); });
+    main.decode().catch(() => {}).then(() => {
+      ai = main.naturalWidth && main.naturalHeight ? main.naturalWidth / main.naturalHeight : 1;
+      af = shapes[0].a || ai;
+      stage.style.aspectRatio = String(af);
+      stage.style.width = `min(100%, ${Math.round(58 * af * 100) / 100}dvh)`; // tall photos fit on the screen too
+      $$(".fr-mini", dlg).forEach(m => { m.style.aspectRatio = String(shapes[m.dataset.i].a || ai); });
+      show();
+    });
+    dlg.showModal();
+    stage.focus();
+  });
+}
+
 /* ---------- what can be edited ---------- */
 const STATUS = [["looking", "Still looking"], ["foster", "In foster"], ["adopted", "Adopted"], ["sanctuary", "In sanctuary"], ["placed", "Placed or released"],
   ["unknown", "Unknown (lost contact)"]];
@@ -225,6 +347,8 @@ const CHANGE_GROUP = "Change or hide a photo already on the page";
 const spotsOf = page => [...(CFG.spots?.[page] || []), ...(CFG.pics?.[page] || []).map(p => ({ ...p, g: CHANGE_GROUP }))];
 const spotName = r => spotsOf(r.page).find(s => s.k === r.spot)?.l || "";
 const isSwap = v => /^i\./.test(v.spot || "");
+const picOf = v => (CFG.pics?.[v.page] || []).find(p => p.k === v.spot);
+const SHAPE_CHOICES = [["original", "As taken"], ["square", "Square"], ["wide", "Wide"], ["tall", "Tall"]];
 const LOOKS = [["full", "Full width"], ["banner", "Wide banner"], ["left", "Beside the text, photo on the left"], ["right", "Beside the text, photo on the right"],
   ["small", "Small, in the middle"], ["row", "A row of photos"]];
 
@@ -240,7 +364,7 @@ const SECTIONS = {
     filters: [["all", "All"], ["looking", "Still looking"], ["foster", "In foster"], ["adopted", "Adopted"], ["sanctuary", "In sanctuary"], ["unknown", "Unknown"], ["spotlight", "Spotlight"], ["hidden", "Hidden"]],
     tokens: r => [r.status, r.section === "spotlight" ? "spotlight" : "", r.published ? "" : "hidden"],
     order: (a, b) => (RANK[a.status] ?? 9) - (RANK[b.status] ?? 9) || a.name.localeCompare(b.name),
-    row: r => ({ title: r.name, sub: [label(STATUS, r.status), r.partner?.name, r.section === "spotlight" && "Story Spotlight"].filter(Boolean).join(" · "), photo: r.photo_url, emoji: EMOJI[r.species],
+    row: r => ({ title: r.name, sub: [label(STATUS, r.status), r.partner?.name, r.section === "spotlight" && "Story Spotlight"].filter(Boolean).join(" · "), photo: r.photo_url, frame: r.photo_frame, emoji: EMOJI[r.species],
       flags: [!r.published && "Hidden", r.status === "looking" && r.published && stale(r.checked_on, 21) && "!Needs a check"] }),
     fields: [
       { name: "name", type: "text", label: "Name", required: true, max: 120 },
@@ -255,7 +379,7 @@ const SECTIONS = {
       { name: "section", type: "choice", label: "Which part of the site?", options: SHOWN_ON, dflt: "helped",
         help: "Animals We've Helped is for animals you featured to find a home. Animal Story Spotlight is for animals already in a forever home or a sanctuary, like the Willow Woods horses. Pick the other one and save to move them." },
       { name: "partner_id", type: "partner", label: "Rescue or shelter" },
-      { name: "photo_url", type: "photo", label: "Photo", folder: "animals" },
+      { name: "photo_url", type: "photo", label: "Photo", folder: "animals", frame: "photo_frame", shapes: [{ a: 1, label: "On the card" }] },
       { name: "note", type: "textarea", rows: 2, max: 200, label: "Short note", help: "Shown under their name. Keep it to a line." },
       { name: "story", type: "textarea", rows: 8, max: 6000, label: "Their story", help: "Shown when people tap them on Happy Tails. Leave a blank line between paragraphs." },
       { name: "journey", type: "journey", label: "Their journey", help: "The steps people see when they tap this animal on Happy Tails, in order, like each visit until they leave the shelter. Leave it empty and the site uses the video and adoption dates." },
@@ -277,7 +401,7 @@ const SECTIONS = {
     intro: "Each goal belongs to a shelter, with their own numbers. Donations always go to their page.",
     query: "select=*,partner:partners(name),bars:goal_bars(*)&order=sort.asc",
     titleOf: r => r.title,
-    row: r => ({ title: r.title, photo: r.photo_url, emoji: "🌾",
+    row: r => ({ title: r.title, photo: r.photo_url, frame: r.photo_frame, emoji: "🌾",
       sub: [r.partner?.name, r.status === "met" ? `Met ${nice(r.met_on)}` : r.figures_updated_at ? `Numbers from ${nice(r.figures_updated_at)}` : "No numbers yet"].filter(Boolean).join(" · "),
       flags: [!r.published && "Hidden", r.featured && r.status === "active" && "On the homepage"] }),
     fields: [
@@ -287,7 +411,7 @@ const SECTIONS = {
       { name: "price_note", type: "text", label: "Price note", max: 120, help: "Like “About $100 buys one round bale”." },
       { name: "bars", type: "bars", label: "What they need", help: "Numbers come from the shelter. Saving new “so far” numbers updates the date shown on the site." },
       { name: "donate_url", type: "url", label: "The shelter's donation page", help: "Until there's a link, the goal says “Donation link coming soon”." },
-      { name: "photo_url", type: "photo", label: "Photo", folder: "goals" },
+      { name: "photo_url", type: "photo", label: "Photo", folder: "goals", frame: "photo_frame", shapes: [{ a: 1, label: "On the goal" }] },
       { name: "status", type: "choice", label: "Status", options: [["active", "Active"], ["met", "Goal met 🎉"]], dflt: "active",
         onPick: (v, el) => { if (v === "met" && !el.met_on.value) el.met_on.value = today(); } },
       { name: "met_on", type: "date", label: "Date it was met", when: v => v.status === "met" },
@@ -335,7 +459,7 @@ const SECTIONS = {
     titleOf: r => r.title,
     filters: [["all", "All"], ...WHEN],
     tokens: r => [collabWhen(r), r.published ? "" : "hidden"],
-    row: r => ({ title: r.title, emoji: "🎨", photo: r.photo_url, sub: [r.partner?.name, label(WHEN, collabWhen(r)), nice(r.starts_on)].filter(Boolean).join(" · "), flags: [!r.published && "Hidden"] }),
+    row: r => ({ title: r.title, emoji: "🎨", photo: r.photo_url, frame: r.photo_frame, sub: [r.partner?.name, label(WHEN, collabWhen(r)), nice(r.starts_on)].filter(Boolean).join(" · "), flags: [!r.published && "Hidden"] }),
     fields: [
       { name: "partner_id", type: "partner", label: "Which rescue or shelter?", required: true },
       { name: "title", type: "text", label: "What it is", required: true, max: 200, help: "Like “Holiday portraits of the adoptable dogs”." },
@@ -345,7 +469,7 @@ const SECTIONS = {
       { name: "ends_on", type: "date", label: "Ends", after: "starts_on", help: "Leave it empty for a one-day thing.", when: v => !v.ongoing },
       { name: "description", type: "textarea", rows: 4, max: 1000, label: "About it" },
       { name: "link_url", type: "url", label: "Link", help: "Like the video, the photos, or where to sign up." },
-      { name: "photo_url", type: "photo", label: "Photo", folder: "collabs" },
+      { name: "photo_url", type: "photo", label: "Photo", folder: "collabs", frame: "photo_frame", shapes: [{ a: 1, label: "On the card" }] },
       SHOW, { ...SORT, help: "Lower numbers show first in each group." },
     ],
     prepare(vals, row, patch) { if (vals.ongoing && vals.ends_on) patch.ends_on = null; },
@@ -418,7 +542,7 @@ const SECTIONS = {
     intro: "The day outs you go on, shown on Rescues on Sniffari: your write-up, videos, a photo gallery and the places you went. That part of the page stays hidden until there's one to show.",
     query: "select=*,partner:partners(name)&order=sort.asc,went_on.desc.nullslast",
     titleOf: r => r.title,
-    row: r => ({ title: r.title, emoji: "🦮", photo: r.photos?.[0], sub: [r.went_on && nice(r.went_on), r.dogs].filter(Boolean).join(" · "), flags: [!r.published && "Hidden"] }),
+    row: r => ({ title: r.title, emoji: "🦮", photo: r.photos?.[0], frame: r.frames?.[r.photos?.[0]], sub: [r.went_on && nice(r.went_on), r.dogs].filter(Boolean).join(" · "), flags: [!r.published && "Hidden"] }),
     fields: [
       { name: "title", type: "text", label: "Title", required: true, max: 200, help: "Like “Tyce's first beach day”." },
       { name: "went_on", type: "date", label: "The day you went" },
@@ -428,7 +552,9 @@ const SECTIONS = {
       { name: "videos", type: "rows", label: "Videos", add: "+ Add a video", bad: "Each video needs a link starting with https://",
         cols: [{ key: "title", label: "Title", max: 200, ph: "Beach day, part 1" }, { key: "url", label: "Link", url: true, need: true }],
         help: "YouTube videos play right on the page. Others, like TikTok, open where they were posted. Tap Share, then Copy link." },
-      { name: "photos", type: "gallery", label: "Photos", folder: "day-outs", max: 40, help: "The first photo is the cover. Never photos of a home, or anything showing where someone lives." },
+      { name: "photos", type: "gallery", label: "Photos", folder: "day-outs", max: 40, frames: "frames",
+        shapes: (v, i) => (i === 0 ? [{ a: 4 / 3, label: "The cover" }, { a: 1, label: "In the gallery" }] : [{ a: 1, label: "In the gallery" }]),
+        help: "The first photo is the cover. Tap ⤢ on a photo to move or zoom it in its frame. Never photos of a home, or anything showing where someone lives." },
       { name: "businesses", type: "rows", label: "Places you went", add: "+ Add a place", bad: "Each place needs a name, and links need to start with https://",
         cols: [{ key: "name", label: "Name", max: 120, ph: "The Dog Bakery", need: true }, { key: "url", label: "Their website", url: true }],
         help: "Businesses and public places only, with a link to their website." },
@@ -440,13 +566,13 @@ const SECTIONS = {
     intro: "Videos of the dogs' day outs, shown on Rescues on Sniffari. That part of the page stays hidden until there's a video to show.",
     query: "select=*&order=sort.asc,posted_on.desc.nullslast,created_at.desc",
     titleOf: r => r.title,
-    row: r => ({ title: r.title, emoji: "🎬", photo: r.photo_url, sub: [r.posted_on && nice(r.posted_on), platform(r.url)].filter(Boolean).join(" · "), flags: [!r.published && "Hidden"] }),
+    row: r => ({ title: r.title, emoji: "🎬", photo: r.photo_url, frame: r.photo_frame, sub: [r.posted_on && nice(r.posted_on), platform(r.url)].filter(Boolean).join(" · "), flags: [!r.published && "Hidden"] }),
     fields: [
       { name: "title", type: "text", label: "Title", required: true, max: 200, help: "Like “Biscuit's first beach day”." },
       { name: "url", type: "url", label: "Link to the video", required: true, help: "From TikTok, Instagram, YouTube or Facebook: tap Share, then Copy link.", check: [/^https:\/\//, "Video links need to start with https://"] },
       { name: "posted_on", type: "date", label: "Date posted" },
       { name: "note", type: "textarea", rows: 2, max: 300, label: "Short note", help: "Shown under the title." },
-      { name: "photo_url", type: "photo", label: "Cover photo", folder: "videos" },
+      { name: "photo_url", type: "photo", label: "Cover photo", folder: "videos", frame: "photo_frame", shapes: [{ a: 16 / 10, label: "On the video" }] },
       SHOW, { ...SORT, help: "Lower numbers show first. Videos with the same number show newest first." },
     ],
   },
@@ -455,13 +581,13 @@ const SECTIONS = {
     intro: "Your picks for places to take a dog, and why, shown on Rescues on Sniffari. That part of the page stays hidden until there's a place to show.",
     query: "select=*&order=sort.asc,name.asc",
     titleOf: r => r.name,
-    row: r => ({ title: r.name, emoji: "📍", photo: r.photo_url, sub: r.area || "", flags: [!r.published && "Hidden"] }),
+    row: r => ({ title: r.name, emoji: "📍", photo: r.photo_url, frame: r.photo_frame, sub: r.area || "", flags: [!r.published && "Hidden"] }),
     fields: [
       { name: "name", type: "text", label: "Name", required: true, max: 200 },
       { name: "area", type: "text", label: "Where", max: 100, help: "A city, or the public place itself. Never a private address." },
       { name: "why", type: "textarea", rows: 5, max: 1000, label: "Why you pick it" },
       { name: "link_url", type: "url", label: "Their website" },
-      { name: "photo_url", type: "photo", label: "Photo", folder: "places" },
+      { name: "photo_url", type: "photo", label: "Photo", folder: "places", frame: "photo_frame", shapes: [{ a: 1, label: "On the card" }] },
       SHOW, SORT,
     ],
   },
@@ -498,7 +624,7 @@ const SECTIONS = {
     intro: "Photos you've added to the pages, and photos on the pages you've changed or hidden. The easiest way to add one: open the page on the site while you're signed in, tap “📷 Photos on this page”, then tap “＋ Add a photo here” where you want it.",
     query: "select=*&order=page.asc,sort.asc,created_at.asc",
     titleOf: r => `${pageTitle(r.page) || r.page}: ${r.layout === "swap" ? (r.photos?.length ? "a changed photo" : "a hidden photo") : "a photo"}`,
-    row: r => ({ title: pageTitle(r.page) || r.page, emoji: "🖼️", photo: r.photos?.[0]?.url,
+    row: r => ({ title: pageTitle(r.page) || r.page, emoji: "🖼️", photo: r.photos?.[0]?.url, frame: PP.frame(r.photos?.[0]),
       sub: [spotName(r), r.layout === "swap" ? (r.photos?.length ? "Changed" : "Hidden from the page") : label(LOOKS, r.layout)].filter(Boolean).join(" · "),
       flags: [!r.published && "Hidden", !spotName(r) && "!Needs a new spot"] }),
     fields: [
@@ -509,8 +635,15 @@ const SECTIONS = {
         validate: (v, vals) => (v && !spotsOf(vals.page).some(s => s.k === v) ? "That spot isn't on the page any more. Pick a new one." : "") },
       { name: "layout", type: "choice", label: "How should it look?", options: LOOKS, dflt: "full", pictures: true, when: v => !isSwap(v),
         help: "On phones, every photo shows full width, above or below the words." },
+      { name: "shape", type: "choice", label: "Shape", options: SHAPE_CHOICES, dflt: "original", pictures: true, when: v => !isSwap(v) && ["full", "small", "left", "right"].includes(v.layout),
+        help: "Cut it to a shape, then tap ⤢ on the photo to choose what shows." },
       { name: "photos", type: "gallery", alt: true, label: "Photo", max: 12, folder: v => `pages/${v.page || "other"}`,
-        help: "Add a short description for each one, for people who can't see it. Never photos of a home, or anything showing where someone lives. To hide a photo that's already on the page, pick it under “Where on the page?” and leave this empty.",
+        shapes: v => (isSwap(v) ? [{ a: picOf(v)?.a || 0, label: "Where it shows" }]
+          : v.layout === "row" ? [{ a: 1, label: "In the row" }]
+          : v.layout === "banner" ? [{ a: 3, label: "On a computer" }, { a: 2, label: "On a phone" }]
+          : [{ a: PP.SHAPES[v.shape] || 0, label: "On the page" }]),
+        current: v => (isSwap(v) ? picOf(v) : null), // a photo that came with the site can be reframed without replacing it
+        help: "Add a short description for each one, for people who can't see it. Tap ⤢ on a photo to move or zoom it in its frame. Never photos of a home, or anything showing where someone lives. To hide a photo that's already on the page, pick it under “Where on the page?” and leave this empty.",
         validate: (list, v) => isSwap(v)
           ? (list.length > 1 ? "Pick just one photo to put in its place." : "")
           : !list.length ? "Add a photo."
@@ -672,7 +805,7 @@ function rowHTML(S, key, r) {
   const v = S.row(r), pic = photoUrl(v.photo);
   const flags = v.flags.filter(Boolean).map(f => f.startsWith("!") ? `<span class="flag warn">${h(f.slice(1))}</span>` : `<span class="flag">${h(f)}</span>`).join("");
   return `<li data-s="${h((v.title + " " + v.sub).toLowerCase())}" data-tok="${h((S.tokens ? S.tokens(r) : []).join(" "))}">
-    <a class="row" href="#/${key}/${h(r.id)}"><span class="thumb" aria-hidden="true">${v.emoji || ""}${pic ? `<img src="${h(pic)}" alt="" loading="lazy">` : ""}</span>
+    <a class="row" href="#/${key}/${h(r.id)}"><span class="thumb" aria-hidden="true">${v.emoji || ""}${pic ? `<img src="${h(pic)}" alt="" loading="lazy"${frameData(PP.frame(v.frame))}>` : ""}</span>
     <span class="rt"><b>${h(v.title)}</b><small>${h(v.sub)}</small>${flags ? `<span class="flags">${flags}</span>` : ""}</span><span class="chev" aria-hidden="true">›</span></a></li>`;
 }
 
@@ -706,6 +839,7 @@ async function showList(key) {
     apply();
   }));
   apply();
+  showFrames(app);
 }
 
 /* ---------- forms ---------- */
@@ -736,15 +870,18 @@ const rowsRow = (f, r) => `<div class="step-row rows-row">
   ${f.cols.map(c => `<label>${h(c.label)}<input name="r_${f.name}_${c.key}"${c.url ? ' type="url" inputmode="url" placeholder="https://"' : ` type="text"${c.ph ? ` placeholder="${h(c.ph)}"` : ""}`} maxlength="${c.max || 300}" value="${h(r[c.key] || "")}" autocomplete="off"></label>`).join("")}
   <div class="step-btns"><button type="button" class="xbtn" data-row-up aria-label="Move up">↑</button><button type="button" class="xbtn" data-row-down aria-label="Move down">↓</button><button type="button" class="xbtn" data-row-remove aria-label="Remove">✕</button></div></div>`;
 
-// one photo in a gallery: the first one is the cover
-const galItem = u => `<li class="gal-item" data-url="${h(u)}"><img src="${h(photoUrl(u))}" alt="">
-  <span class="gal-btns"><button type="button" class="xbtn" data-gal-left aria-label="Move this photo earlier">‹</button><button type="button" class="xbtn" data-gal-right aria-label="Move this photo later">›</button><button type="button" class="xbtn" data-gal-remove aria-label="Remove this photo">✕</button></span></li>`;
+// one photo in a gallery: the first one is the cover. fr: its framing ({x, y, z}), kept in data-frame.
+const frameData = fr => (fr ? ` data-frame="${h(JSON.stringify(fr))}"` : "");
+const galBtns = framed => `<span class="gal-btns"><button type="button" class="xbtn" data-gal-left aria-label="Move this photo earlier">‹</button><button type="button" class="xbtn" data-gal-right aria-label="Move this photo later">›</button><button type="button" class="xbtn" data-gal-remove aria-label="Remove this photo">✕</button></span>`
+  + (framed ? `<button type="button" class="xbtn gal-frame" data-gal-frame aria-label="Move or zoom this photo in its frame">⤢</button>` : "");
+const galItem = (u, fr, framed) => `<li class="gal-item" data-url="${h(u)}"${frameData(fr)}><img src="${h(photoUrl(u))}" alt=""${frameData(fr)}>
+  ${galBtns(framed)}</li>`;
 
-// a photo with its description, in a gallery that has them (photos on the pages): { url, alt, w, h }
-const altItem = p => `<li class="gal-item with-alt" data-url="${h(p.url)}"${p.w > 0 && p.h > 0 ? ` data-w="${h(p.w)}" data-h="${h(p.h)}"` : ""}>
-  <span class="gal-pic"><img src="${h(photoUrl(p.url))}" alt="">
-  <span class="gal-btns"><button type="button" class="xbtn" data-gal-left aria-label="Move this photo earlier">‹</button><button type="button" class="xbtn" data-gal-right aria-label="Move this photo later">›</button><button type="button" class="xbtn" data-gal-remove aria-label="Remove this photo">✕</button></span></span>
-  <label class="gal-alt">What's in it<input name="g_alt" maxlength="300" value="${h(p.alt || "")}" placeholder="A dog asleep in the grass" autocomplete="off"></label></li>`;
+// a photo with its description, in a gallery that has them (photos on the pages): { url, alt, w, h, x, y, z }
+const altItem = p => { const fr = PP.frame(p); return `<li class="gal-item with-alt" data-url="${h(p.url)}"${p.w > 0 && p.h > 0 ? ` data-w="${h(p.w)}" data-h="${h(p.h)}"` : ""}${frameData(fr)}>
+  <span class="gal-pic"><img src="${h(photoUrl(p.url))}" alt=""${frameData(fr)}>
+  ${galBtns(true)}</span>
+  <label class="gal-alt">What's in it<input name="g_alt" maxlength="300" value="${h(p.alt || "")}" placeholder="A dog asleep in the grass" autocomplete="off"></label></li>`; };
 
 // a dropdown's choices: [value, label] pairs or { k, l, g } (g: the group it's shown under). A saved value
 // that's no longer a choice stays, marked, so nothing is lost before it's changed.
@@ -785,14 +922,15 @@ function fieldHTML(f, v, ctx) {
       return wrap(`<fieldset class="checks-f"${desc}><legend>${h(f.label)}</legend><div class="checks">${f.options.map(([val, l]) => `<label><input type="checkbox" name="${f.name}" value="${h(val)}"${(v || []).includes(val) ? " checked" : ""}> ${h(l)}</label>`).join("")}</div></fieldset>`);
     case "toggle":
       return `<div class="field" data-f="${f.name}"><label class="switch"><input type="checkbox" name="${f.name}" role="switch"${v ? " checked" : ""}><span class="track" aria-hidden="true"></span><span class="lbl">${h(f.label)}${f.help ? `<small>${h(f.help)}</small>` : ""}</span></label></div>`;
-    case "photo": {
-      const pic = photoUrl(v);
+    case "photo": { // f.frame: the column its framing goes in; shown in the shape it has on the site
+      const pic = photoUrl(v), fr = f.frame ? PP.frame(ctx.vals?.[f.frame]) : null;
       return wrap(`<span class="flabel">${h(f.label)}</span><div class="photo-field">
-        <div class="pf-pic">${pic ? `<img src="${h(pic)}" alt="Current photo">` : `<span>No photo yet</span>`}</div>
+        <div class="pf-pic"${f.shapes ? ` data-shape="${h(f.shapes[0].a)}"` : ""}>${pic ? `<img src="${h(pic)}" alt="Current photo"${frameData(fr)}>` : `<span>No photo yet</span>`}</div>
         <div class="pf-side"><label class="btn ghost sm pick">${pic ? "Change photo" : "Choose a photo"}<input type="file" accept="image/*" class="sr" data-photo="${f.name}"></label>
+        ${f.frame ? `<button type="button" class="btn ghost sm" data-frame-btn="${f.name}"${pic ? "" : " hidden"}>⤢ Move or zoom</button>` : ""}
         <button type="button" class="btn ghost sm" data-photo-remove="${f.name}"${pic ? "" : " hidden"}>Remove photo</button>
         <p class="hint">Photos are shrunk, and hidden data like location is removed, before they upload.</p></div>
-        <input type="hidden" name="${f.name}" value="${h(v ?? "")}"></div>`);
+        <input type="hidden" name="${f.name}" value="${h(v ?? "")}">${f.frame ? `<input type="hidden" name="${f.frame}" value="${h(fr ? JSON.stringify(fr) : "")}">` : ""}</div>`);
     }
     case "journey":
       return wrap(`<span class="flabel">${h(f.label)}</span><div class="steps-ed">${(v || []).map(stepRow).join("")}</div>
@@ -800,10 +938,13 @@ function fieldHTML(f, v, ctx) {
     case "updates":
       return wrap(`<span class="flabel">${h(f.label)}</span><div class="notes-ed">${(v || []).map(noteRow).join("")}</div>
         <button type="button" class="btn ghost sm" data-note-add>+ Add an update</button>`);
-    case "gallery":
-      return wrap(`<span class="flabel">${h(f.label)}</span><ul class="gal-ed${f.alt ? " alts" : ""}" data-gallery="${f.name}">${(v || []).map(x => (f.alt ? altItem(x) : galItem(x))).join("")}</ul>
+    case "gallery": { // f.frames: the column its photos' framings go in, by address
+      const frs = f.frames ? ctx.vals?.[f.frames] || {} : {};
+      return wrap(`<span class="flabel">${h(f.label)}</span><ul class="gal-ed${f.alt ? " alts" : ""}" data-gallery="${f.name}">${(v || []).map(x => (f.alt ? altItem(x) : galItem(x, PP.frame(frs[x]), !!f.frames))).join("")}</ul>
+        ${f.current ? `<button type="button" class="btn ghost sm" data-use-current="${f.name}" hidden>⤢ Move or zoom the photo that's there now</button>` : ""}
         <label class="btn ghost sm pick">+ Add photos<input type="file" accept="image/*" multiple class="sr" data-gallery-add="${f.name}"></label>
         <p class="hint gal-status" aria-live="polite"></p>`);
+    }
     case "rows":
       return wrap(`<span class="flabel">${h(f.label)}</span><div class="rows-ed" data-rows-of="${f.name}">${(v || []).map(r => rowsRow(f, r)).join("")}</div>
         <button type="button" class="btn ghost sm" data-row-add="${f.name}">${h(f.add || "+ Add one")}</button>`);
@@ -834,10 +975,13 @@ function readForm(form, fields) {
       case "lines": out[f.name] = el.value.split("\n").map(s => s.trim()).filter(Boolean); break;
       case "number": out[f.name] = el.value === "" ? (f.dflt ?? null) : Math.round(Number(el.value)); break;
       case "url": out[f.name] = cleanUrl(el.value) || null; break;
-      case "gallery": // with descriptions: { url, alt, w, h } in the database's key order, so an unchanged one compares equal
-        out[f.name] = $$(`[data-gallery="${f.name}"] .gal-item`, form).map(li => !f.alt ? li.dataset.url
-          : jsonbOrder({ url: li.dataset.url, alt: $("[name=g_alt]", li).value.trim(), ...(li.dataset.w ? { w: Number(li.dataset.w), h: Number(li.dataset.h) } : {}) }));
+      case "gallery": { // with descriptions: { url, alt, w, h, x, y, z } in the database's key order, so an unchanged one compares equal
+        const items = $$(`[data-gallery="${f.name}"] .gal-item`, form), frameOf = li => (li.dataset.frame ? JSON.parse(li.dataset.frame) : null);
+        out[f.name] = items.map(li => !f.alt ? li.dataset.url
+          : jsonbOrder({ url: li.dataset.url, alt: $("[name=g_alt]", li).value.trim(), ...(li.dataset.w ? { w: Number(li.dataset.w), h: Number(li.dataset.h) } : {}), ...(frameOf(li) || {}) }));
+        if (f.frames) out[f.frames] = jsonbOrder(Object.fromEntries(items.filter(frameOf).map(li => [li.dataset.url, frameOf(li)])));
         break;
+      }
       case "rows": // empty rows are dropped
         out[f.name] = $$(`[data-rows-of="${f.name}"] .rows-row`, form)
           .map(r => jsonbOrder(Object.fromEntries(f.cols.map(c => { const x = $(`[name="r_${f.name}_${c.key}"]`, r).value; return [c.key, c.url ? cleanUrl(x) : x.trim()]; }))))
@@ -856,6 +1000,7 @@ function readForm(form, fields) {
         break;
       default: out[f.name] = (el?.value ?? "").trim() || null;
     }
+    if (f.frame) { const fe = form.elements[f.frame]; out[f.frame] = fe?.value ? JSON.parse(fe.value) : null; }
   }
   return out;
 }
@@ -939,9 +1084,17 @@ async function showForm(key, id, params = new URLSearchParams()) {
     ${isNew ? "" : S.noDelete ? `<p class="small danger">${h(S.noDelete)}</p>` : `<div class="danger"><button class="linkbtn" type="button" data-act="delete">Delete this ${h(S.one)}</button></div>`}`);
 
   const form = $(".eform", app);
+  // photos show their framing, in the shape they have on the site
+  const shapePics = () => { $$(".pf-pic[data-shape]", form).forEach(p => { p.style.aspectRatio = p.dataset.shape; }); showFrames(form); };
+  shapePics();
   const refresh = () => {
     const v = readForm(form, S.fields);
     for (const f of S.fields) if (f.when) $(`[data-f="${f.name}"]`, form).hidden = !f.when(v);
+    // reframing a photo that came with the site, while nothing has been put in its place
+    for (const f of S.fields.filter(x => x.current)) {
+      const b = $(`[data-use-current="${f.name}"]`, form), cur = f.current(v);
+      b.hidden = !cur?.src || $$(`[data-gallery="${f.name}"] .gal-item`, form).length > 0;
+    }
   };
   refresh();
   form.addEventListener("input", () => { dirty = true; refresh(); });
@@ -953,9 +1106,40 @@ async function showForm(key, id, params = new URLSearchParams()) {
     for (const d of S.fields.filter(x => x.dependsOn === e.target.name)) form.elements[d.name].innerHTML = selectOpts(d, d.options(readForm(form, S.fields)), "");
     refresh();
   });
+  // moving and zooming a photo in its frame (openFramer); the framing goes in the form until Save
+  const reframe = async (url, shapes, cur, apply) => {
+    const fr = await openFramer({ url, shapes, frame: cur });
+    if (fr === undefined) return; // cancelled
+    apply(fr);
+    dirty = true;
+  };
+  const setItemFrame = (li, fr) => {
+    if (fr) li.dataset.frame = JSON.stringify(fr); else delete li.dataset.frame;
+    const img = $("img", li); frameView(img, fr);
+  };
   form.addEventListener("click", async e => {
     const t = e.target.closest("button");
     if (!t) return;
+    if (t.dataset.frameBtn) {
+      const f = S.fields.find(x => x.name === t.dataset.frameBtn), box = form.elements[f.frame];
+      return reframe(form.elements[f.name].value, f.shapes, box.value ? JSON.parse(box.value) : null, fr => {
+        box.value = fr ? JSON.stringify(fr) : "";
+        frameView($(`[data-f="${f.name}"] .pf-pic img`, form), fr);
+      });
+    }
+    if (t.hasAttribute("data-gal-frame")) {
+      const li = t.closest(".gal-item"), f = S.fields.find(x => x.name === li.closest("[data-gallery]").dataset.gallery);
+      const i = $$(".gal-item", li.parentElement).indexOf(li), v = readForm(form, S.fields);
+      return reframe(li.dataset.url, f.shapes(v, i), li.dataset.frame ? JSON.parse(li.dataset.frame) : null, fr => setItemFrame(li, fr));
+    }
+    if (t.dataset.useCurrent) { // the photo that came with the site, in the gallery, ready to frame
+      const f = S.fields.find(x => x.name === t.dataset.useCurrent), cur = f.current(readForm(form, S.fields));
+      const list = $(`[data-gallery="${f.name}"]`, form);
+      list.insertAdjacentHTML("beforeend", altItem({ url: cur.src, alt: cur.alt || "" }));
+      refresh();
+      const li = list.lastElementChild;
+      return reframe(cur.src, f.shapes(readForm(form, S.fields), 0), null, fr => setItemFrame(li, fr));
+    }
     if (t.dataset.today) { form.elements[t.dataset.today].value = today(); dirty = true; return; }
     if (t.hasAttribute("data-bar-add")) { $(".bars", form).insertAdjacentHTML("beforeend", barRow({})); $(".bars .bar-row:last-child input", form).focus(); dirty = true; return; }
     if (t.hasAttribute("data-bar-remove")) { t.closest(".bar-row").remove(); dirty = true; return; }
@@ -993,8 +1177,9 @@ async function showForm(key, id, params = new URLSearchParams()) {
       return;
     }
     if (t.dataset.photoRemove) {
-      const name = t.dataset.photoRemove;
+      const name = t.dataset.photoRemove, f = S.fields.find(x => x.name === name);
       form.elements[name].value = "";
+      if (f.frame) { form.elements[f.frame].value = ""; $(`[data-frame-btn="${name}"]`, form).hidden = true; }
       $(".pf-pic", form).innerHTML = "<span>No photo yet</span>";
       $(".pick", form).firstChild.textContent = "Choose a photo";
       t.hidden = true; dirty = true;
@@ -1011,6 +1196,7 @@ async function showForm(key, id, params = new URLSearchParams()) {
       pic.innerHTML = `<img src="${h(url)}" alt="New photo">`;
       $(".pick", form).firstChild.textContent = "Change photo";
       $("[data-photo-remove]", form).hidden = false;
+      if (f.frame) { form.elements[f.frame].value = ""; $(`[data-frame-btn="${f.name}"]`, form).hidden = false; } // a new photo starts centered
       dirty = true;
       toast("Photo added. Tap Save to keep it.");
     } catch (err) {
@@ -1032,7 +1218,7 @@ async function showForm(key, id, params = new URLSearchParams()) {
       for (const file of files.slice(0, Math.max(room, 0))) {
         status.textContent = `Adding photo ${done + 1} of ${Math.min(files.length, room)}…`;
         const { url, w, h: ht } = await upload(file, folder, form.elements.title?.value || folder.split("/").pop());
-        list.insertAdjacentHTML("beforeend", f.alt ? altItem({ url, w, h: ht }) : galItem(url));
+        list.insertAdjacentHTML("beforeend", f.alt ? altItem({ url, w, h: ht }) : galItem(url, null, !!f.frames));
         done++; dirty = true;
       }
       if (done) toast(`${done === 1 ? "Photo" : done + " photos"} added. Tap Save to keep ${done === 1 ? "it" : "them"}.`);
@@ -1049,6 +1235,7 @@ async function showForm(key, id, params = new URLSearchParams()) {
     if (bad) { out.textContent = "Please fix the highlighted fields."; bad.scrollIntoView({ block: "center" }); $("input,textarea,select", bad)?.focus({ preventScroll: true }); return; }
     const patch = {};
     for (const f of S.fields) if (f.type !== "bars" && (isNew || !same(v[f.name], row[f.name]))) patch[f.name] = v[f.name];
+    for (const k of S.fields.flatMap(f => [f.frame, f.frames]).filter(Boolean)) if (isNew || !same(v[k] || null, row[k] || null)) patch[k] = v[k] ?? null; // framings
     S.prepare?.(v, row, patch);
     btn.disabled = true; btn.textContent = "Saving…"; out.textContent = "";
     try {

@@ -65,6 +65,14 @@ function boxName(el) {
   const hd = firstHeading(el), fill = fillName(el), w = words(el);
   return hd && meaningful(words(hd)) ? `“${clip(words(hd))}”` : fill ? `with ${fill}` : meaningful(w) ? `“${clip(w)}”` : "";
 }
+// the shape (width ÷ height) a photo already on a page is shown in, for framing a new one in its place: its frame's
+// (a card's photo is 16:10 and a book cover 3:4, in site.css), or its own size
+const shapeOf = (img, box) => {
+  if (has(box, "ph")) return 16 / 10;
+  if (has(box, "cover")) return 3 / 4;
+  const w = Number(attr(img, "width")), h = Number(attr(img, "height"));
+  return w > 0 && h > 0 ? w / h : 0;
+};
 const addAttrs = (el, more) => {
   el.attrs += more;
   el.start = el.start.replace(/\s*\/?>$/, m => more + m);
@@ -105,13 +113,13 @@ export function markSpots(html, scope) {
         const file = attr(c, "src").split("/assets/photos/")[1].split("?")[0];
         const k = keyOf("i", file), alt = decode(attr(c, "alt") || "").trim();
         addAttrs(c, ` data-pi="${k}"`);
-        pics.push({ k, l: alt ? `The photo “${clip(alt)}”` : here ? `The photo for “${here}”` : `The photo ${file}`, src: "assets/photos/" + file, g: group });
+        pics.push({ k, l: alt ? `The photo “${clip(alt)}”` : here ? `The photo for “${here}”` : `The photo ${file}`, src: "assets/photos/" + file, g: group, a: shapeOf(c, el), alt });
       }
       if (/\sdata-img="/.test(c.attrs || "")) { // a photo on the photo wall
         const src = decode(attr(c, "data-img") || ""), file = src.replace(/^.*assets\/photos\//, ""), label = clip(words(c));
         const k = keyOf("i", file || "wall " + label);
         addAttrs(c, ` data-pi="${k}"`);
-        pics.push({ k, l: `The photo wall: “${label}”`, src, g: group });
+        pics.push({ k, l: `The photo wall: “${label}”`, src, g: group, a: 4 / 5, alt: label });
       }
       if (photosOnly) { visit(c, here, true); continue; }
       // the part of the page each spot is in, for grouping them on the edit page: the section's first heading
@@ -152,9 +160,9 @@ export function markSpots(html, scope) {
 }
 
 // Puts saved photos into a page that's already had its wording put in. rows: the page's published page_photos,
-// in order. Photos already on the page that are changed keep what they were in data-pp-orig, so site.js can put
-// them back if the change is undone before the next build.
-export function bakePhotos(html, rows) {
+// in order; base: the site's base path. Photos already on the page that are changed keep what they were in
+// data-pp-orig, so site.js can put them back if the change is undone before the next build.
+export function bakePhotos(html, rows, base = "/") {
   if (!rows.length) return html;
   const root = parse(html), byB = new Map(), byI = new Map(), parent = new Map();
   const walk = n => { for (const c of n.children || []) if (c.tag) { parent.set(c, n); const b = attr(c, "data-b"), i = attr(c, "data-pi"); if (b) byB.set(b, c); if (i) byI.set(i, c); walk(c); } };
@@ -165,7 +173,7 @@ export function bakePhotos(html, rows) {
     if (!el) continue;
     let home = parent.get(el).children, at = home.indexOf(el) + (pos === "before" ? 0 : 1); // where the next photo goes
     for (const row of list) {
-      const fig = PP.figure(row);
+      const fig = PP.figure(row, base);
       if (!fig) continue;
       if (!PP.side(row)) { home.splice(at++, 0, { raw: fig }); continue; }
       const text = { tag: "div", start: PP.TEXT_OPEN, children: [], end: "</div>" };
@@ -190,10 +198,10 @@ export function bakePhotos(html, rows) {
   for (const [k, row] of swaps) {
     const img = byI.get(k);
     if (!img) continue;
-    const to = PP.swap(row);
-    if (img.tag !== "img") { // the photo wall: site.js draws the photo from data-img ("" for none)
+    const to = PP.swap(row, base);
+    if (img.tag !== "img") { // the photo wall: site.js draws the photo from data-img ("" for none), framed by data-frame
       const orig = { img: decode(attr(img, "data-img") || "") };
-      const a = img.attrs.replace(/\sdata-img="[^"]*"/, "") + ` data-img="${esc(to ? to.src : "")}" data-pp-swap="${esc(row.id)}" data-pp-orig="${esc(JSON.stringify(orig))}"`;
+      const a = img.attrs.replace(/\s(data-img|data-frame)="[^"]*"/g, "") + ` data-img="${esc(to ? to.url : "")}"${to?.frame ? ` data-frame="${esc(JSON.stringify(to.frame))}"` : ""} data-pp-swap="${esc(row.id)}" data-pp-orig="${esc(JSON.stringify(orig))}"`;
       img.start = img.start.replace(img.attrs, () => a);
       img.attrs = a;
       continue;
@@ -204,9 +212,11 @@ export function bakePhotos(html, rows) {
       continue;
     }
     const was = name => { const v = attr(img, name); return v === undefined ? undefined : decode(v); };
-    const orig = { src: was("src"), alt: was("alt"), w: was("width"), h: was("height"), t: was("data-t-alt"), o: was("data-t-orig") };
-    let a = img.attrs.replace(/\s(src|alt|width|height|data-t-alt|data-t-orig)="[^"]*"/g, "");
-    a += ` src="${esc(to.src)}" alt="${esc(to.alt)}"${to.w && to.h ? ` width="${to.w}" height="${to.h}"` : ""} data-pp-swap="${esc(row.id)}" data-pp-orig="${esc(JSON.stringify(orig))}"`;
+    // it keeps the old photo's size (so its shape), and is framed in it
+    const orig = { src: was("src"), alt: was("alt"), s: was("style"), t: was("data-t-alt"), o: was("data-t-orig") };
+    const css = PP.swapCSS(to, Number(was("width")), Number(was("height")));
+    let a = img.attrs.replace(/\s(src|alt|style|data-t-alt|data-t-orig)="[^"]*"/g, "");
+    a += ` src="${esc(to.src)}" alt="${esc(to.alt)}"${css ? ` style="${esc(css)}"` : ""} data-pp-swap="${esc(row.id)}" data-pp-orig="${esc(JSON.stringify(orig))}"`;
     img.start = img.start.replace(img.attrs, () => a);
     img.attrs = a;
   }

@@ -538,6 +538,9 @@ h2.eyebrow{font-family:var(--f-body);line-height:1.55}
 /* photos added to the pages from the edit page (site/assets/pagephotos.js) */
 .pp{margin:18px 0}
 .pp img{display:block;width:100%;height:auto;border-radius:var(--r);background:var(--soft)}
+/* the corner radius of a photo that rounds its own corners, so a zoomed-in one keeps them (pagephotos.js frameStyle) */
+.pp img{--ppr:var(--r)}
+.gallery img{--ppr:16px}
 .pp figcaption{margin-top:8px;font-size:.88rem;color:var(--ink2)}
 .box>.pp:first-child,.need>.pp:first-child{margin-top:0}
 .box>.pp:last-child,.need>.pp:last-child{margin-bottom:0}

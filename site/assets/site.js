@@ -14,8 +14,10 @@ const h = v => String(v ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&
 const safeUrl = u => { try { const x = new URL(u); return /^https?:$/.test(x.protocol) && !x.username && !x.password ? x.href : ""; } catch { return ""; } };
 // Photos can be full links or paths inside the site, like "assets/photos/dog-zazu.jpg".
 const photoUrl = u => { try { return u ? safeUrl(new URL(u, new URL(S.base || "/", location.href)).href) : ""; } catch { return ""; } };
-// A photo that fails to load removes itself, so the emoji underneath shows instead.
-const photoTag = (u, cls = "") => { const p = photoUrl(u); return p ? `<img${cls ? ` class="${cls}"` : ""} src="${h(p)}" alt="" loading="lazy" onerror="this.remove()">` : ""; };
+// A photo that fails to load removes itself, so the emoji underneath shows instead. f: its framing from the edit
+// page (where it's centered and how far it's zoomed in; site/assets/pagephotos.js).
+const frameAttr = f => { const css = window.PagePhotos?.frameCSS(f) || ""; return css ? ` style="${h(css)}"` : ""; };
+const photoTag = (u, cls = "", f = null) => { const p = photoUrl(u); return p ? `<img${cls ? ` class="${cls}"` : ""} src="${h(p)}" alt=""${frameAttr(f)} loading="lazy" onerror="this.remove()">` : ""; };
 const DAY = 864e5;
 const today = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; };
 const asDate = s => (s ? new Date(s + (s.length === 10 ? "T00:00:00" : "")) : null);
@@ -81,11 +83,11 @@ const wordingLoaded = q("site_text", "select=key,body").then(rows => {
 }).catch(() => {});
 // The live sections wait for it (at most a moment), so their phrases are the latest too.
 const wordingReady = Promise.race([wordingLoaded, new Promise(ok => setTimeout(ok, 1500))]);
-const getGoals = () => once("goals", () => q("goals", "select=id,title,why,price_note,donate_url,photo_url,status,featured,figures_updated_at,met_on,sort,partner:partners(name,slug),bars:goal_bars(label,target,current,sort)&order=sort.asc"));
-const getAnimals = () => once("animals", () => q("animals", "select=id,name,species,status,herd,sort,featured_on,adopted_on,transport,note,story,updates,section,listing_url,checked_on,photo_url,journey,created_at,partner:partners(name,slug)&order=featured_on.desc.nullslast,created_at.desc"));
+const getGoals = () => once("goals", () => q("goals", "select=id,title,why,price_note,donate_url,photo_url,photo_frame,status,featured,figures_updated_at,met_on,sort,partner:partners(name,slug),bars:goal_bars(label,target,current,sort)&order=sort.asc"));
+const getAnimals = () => once("animals", () => q("animals", "select=id,name,species,status,herd,sort,featured_on,adopted_on,transport,note,story,updates,section,listing_url,checked_on,photo_url,photo_frame,journey,created_at,partner:partners(name,slug)&order=featured_on.desc.nullslast,created_at.desc"));
 const getPartners = () => once("partners", () => q("partners", "select=id,slug,name,kind,mission,website_url,adopt_url,donate_url,links,sort&order=sort.asc"));
 const getSniffari = () => once("sniffari", () => q("sniffari_programs", "select=id,shelter_name,program_name,city,address,signup_url,links,facts,tags,checked_on,sort&order=sort.asc"));
-const getCollabs = () => once("collabs", () => q("collabs", "select=id,title,kind,starts_on,ends_on,ongoing,description,link_url,photo_url,sort,partner:partners(slug)&order=sort.asc,starts_on.desc"));
+const getCollabs = () => once("collabs", () => q("collabs", "select=id,title,kind,starts_on,ends_on,ongoing,description,link_url,photo_url,photo_frame,sort,partner:partners(slug)&order=sort.asc,starts_on.desc"));
 
 function failed(el, message) {
   el.innerHTML = `<p class="empty">${h(message)}</p>`;
@@ -118,7 +120,7 @@ function goalHTML(g, { heading = "h3", showAllLink = false } = {}) {
   const give = g.status === "met" ? "" : donate
     ? `<a class="btn light" href="${h(donate)}" target="_blank" rel="noopener">${h(t("js.goal.give", "Give on {shelter}'s page", { shelter: partner }))} <span class="ext" aria-hidden="true">↗</span></a>`
     : `<p class="note" style="margin-top:0">${h(t("js.goal.no-link", "Donation link coming soon."))}</p>`;
-  const pic = photoTag(g.photo_url);
+  const pic = photoTag(g.photo_url, "", g.photo_frame);
   return `<div class="goal feature">
     ${pic ? `<span class="gpic" aria-hidden="true">${pic}</span>` : ""}
     <p class="who">${showAllLink ? h(t("js.goal.label", "Shelter goal")) + " · " : ""}${h(partner)}</p>
@@ -197,7 +199,7 @@ function petHTML(a, i) {
   const cls = STATUS[a.status] || STATUS.placed, label = statusLabel(a.status);
   const d = daysToHome(a);
   const sub = a.note || (d !== null ? t("js.animal.home-in", "Home in {n} days", { n: d }) : "");
-  const pic = (EMOJI[a.species] || "🐾") + photoTag(a.photo_url);
+  const pic = (EMOJI[a.species] || "🐾") + photoTag(a.photo_url, "", a.photo_frame);
   return `<li><button class="pet" type="button" aria-haspopup="dialog" data-id="${h(a.id)}"><span class="ph ${BG[i % 6]}" aria-hidden="true">${pic}</span><span class="bd"><b>${h(a.name)}</b><span class="chip ${cls}">${h(label)}</span>${sub ? `<small>${h(sub)}</small>` : ""}</span></button></li>`;
 }
 function countsHTML(animals) {
@@ -239,7 +241,7 @@ document.addEventListener("click", async e => {
   $("#jname").textContent = a.name;
   const cls = STATUS[a.status] || STATUS.placed, label = statusLabel(a.status);
   const chip = $("#jchip"); chip.className = "chip " + cls; chip.textContent = label;
-  const pic = $("#jpic"); pic.className = "ph " + BG[0]; pic.innerHTML = (EMOJI[a.species] || "🐾") + photoTag(a.photo_url);
+  const pic = $("#jpic"); pic.className = "ph " + BG[0]; pic.innerHTML = (EMOJI[a.species] || "🐾") + photoTag(a.photo_url, "", a.photo_frame);
   let steps = Array.isArray(a.journey) ? a.journey.filter(s => s && s.label) : [];
   if (!steps.length) {
     if (a.featured_on) steps.push({ label: t("js.journey.featured", "Featured"), detail: t("js.journey.video", "Video posted {month}", { month: monthYear(a.featured_on) }) });
@@ -296,7 +298,7 @@ async function renderRescues(el) {
         <div class="bd">${p.mission ? `<p>${h(p.mission)}</p>` : ""}
         ${dogs.length ? `<div class="minis">${dogs.map((a, i) => {
           const live = safeUrl(a.listing_url), d = daysToHome(a);
-          return `<div class="mini"><div class="ph ${BG[i % 6]}" aria-hidden="true">${EMOJI[a.species] || "🐾"}${photoTag(a.photo_url)}</div><b>${h(a.name)}</b><span class="chip ${STATUS[a.status]}"${a.status === "looking" ? ' style="background:var(--wash)"' : ""}>${h(statusLabel(a.status))}</span>
+          return `<div class="mini"><div class="ph ${BG[i % 6]}" aria-hidden="true">${EMOJI[a.species] || "🐾"}${photoTag(a.photo_url, "", a.photo_frame)}</div><b>${h(a.name)}</b><span class="chip ${STATUS[a.status]}"${a.status === "looking" ? ' style="background:var(--wash)"' : ""}>${h(statusLabel(a.status))}</span>
             ${a.status === "looking" && a.checked_on ? `<small>${h(t("js.rescue.checked", "Checked {date}", { date: new Date(a.checked_on + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }) }))}</small>` : d !== null ? `<small>${h(t("js.animal.home-in", "Home in {n} days", { n: d }))}</small>` : ""}
             ${a.status === "looking" && live ? `<a href="${h(live)}" target="_blank" rel="noopener">${h(t("js.rescue.listing", "Live listing"))} ↗</a>` : ""}</div>`;
         }).join("")}</div>` : ""}
@@ -368,7 +370,7 @@ function collabsHTML(list) {
     const here = list.filter(c => collabWhen(c) === w).sort((a, b) => (a.sort ?? 100) - (b.sort ?? 100) || (w === "soon" ? a.starts_on.localeCompare(b.starts_on) : b.starts_on.localeCompare(a.starts_on)));
     if (!here.length) return "";
     return `<div class="cgroup"><p class="clabel">${h(label)}</p><ul class="collabs">${here.map((c, i) => {
-      const link = safeUrl(c.link_url), pic = photoTag(c.photo_url);
+      const link = safeUrl(c.link_url), pic = photoTag(c.photo_url, "", c.photo_frame);
       return `<li>${pic ? `<span class="ph ${BG[i % 6]}" aria-hidden="true">${pic}</span>` : ""}<div><b>${link ? `<a href="${h(link)}" target="_blank" rel="noopener">${h(c.title)} <span class="ext" aria-hidden="true">↗</span></a>` : h(c.title)}</b>
         <small>${h([c.kind, collabDates(c)].filter(Boolean).join(" · "))}</small>${c.description ? `<p>${h(c.description)}</p>` : ""}</div></li>`;
     }).join("")}</ul></div>`;
@@ -505,13 +507,16 @@ const HW_NARROW = { n: 3, map: [[0, 3, 6], [1, 4, 7], [2, 5, 8]],
   rot: [[-4, 3.5, -2], [5, -2.5, 4], [-2.5, 4.5, -3.5]], drop: [[0.14, 1.30, 2.46], [0.34, 1.50, 2.66], [0.04, 1.20, 2.36]] };
 const HW_WIDE = { n: 5, map: [[0, 5], [1, 6], [2, 7], [3, 8], [4]],
   rot: [[-4, 3], [5, -2.5], [-2.5, 4.5], [3.5, -4], [-3]], drop: [[0.14, 1.36], [0.40, 1.62], [0.22, 1.44], [0.48, 1.70], [0.08]] };
-// a photo on the wall: a path in the site ("assets/photos/…"), or one changed from the edit page (a full link)
-const wallImg = u => { const p = photoUrl(u); return p ? `<img src="${h(p)}" alt="" onerror="this.remove()">` : ""; };
+// a photo on the wall: a path in the site ("assets/photos/…"), or one changed from the edit page (a full link),
+// framed by data-frame when it's been framed on the edit page
+const wallFrame = d => { try { return d.frame ? JSON.parse(d.frame) : null; } catch { return null; } };
+const wallImg = (u, f) => { const p = photoUrl(u); return p ? `<img src="${h(p)}" alt=""${frameAttr(f)} onerror="this.remove()">` : ""; };
 // changing one after the wall is up (photos changed on the edit page since the page was built)
-const setWallPhoto = (li, u) => {
+const setWallPhoto = (li, u, f) => {
   li.dataset.img = u;
+  if (f) li.dataset.frame = JSON.stringify(f); else delete li.dataset.frame;
   const pic = $(".pic", li);
-  if (pic) { $("img", pic)?.remove(); pic.insertAdjacentHTML("beforeend", wallImg(u)); }
+  if (pic) { $("img", pic)?.remove(); pic.insertAdjacentHTML("beforeend", wallImg(u, f)); }
 };
 const hw = $("#hangwall");
 if (hw) {
@@ -519,7 +524,7 @@ if (hw) {
   const svgEl = (tag, attrs) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; };
   hangs.forEach(li => {
     const a = $(".snap", li), label = a.textContent.trim(), d = li.dataset;
-    const img = wallImg(d.img);
+    const img = wallImg(d.img, wallFrame(d));
     // the label keeps the link's wording key, so saved wording still finds it
     const key = a.dataset.t ? ` data-t="${h(a.dataset.t)}"${a.dataset.tOrig ? ` data-t-orig="${h(a.dataset.tOrig)}"` : ""}` : "";
     a.removeAttribute("data-t"); a.removeAttribute("data-t-orig");
@@ -635,24 +640,24 @@ const platform = u => {
 };
 async function renderVideos(el) {
   let rows = [];
-  try { rows = (await q("videos", "select=title,url,posted_on,note,photo_url&order=sort.asc,posted_on.desc.nullslast,created_at.desc")).filter(v => safeUrl(v.url)); } catch { return; }
+  try { rows = (await q("videos", "select=title,url,posted_on,note,photo_url,photo_frame&order=sort.asc,posted_on.desc.nullslast,created_at.desc")).filter(v => safeUrl(v.url)); } catch { return; }
   if (!rows.length) return;
   await wordingReady;
   el.innerHTML = rows.map((v, i) => {
     const where = platform(v.url), watch = where ? t("js.video.watch", "Watch on {site}", { site: where }) : t("js.video.watch-it", "Watch the video");
-    return `<li><a class="vid" href="${h(safeUrl(v.url))}" target="_blank" rel="noopener"><span class="ph ${BG[i % 6]}" aria-hidden="true">🎬${photoTag(v.photo_url)}<span class="play">▶</span></span>
+    return `<li><a class="vid" href="${h(safeUrl(v.url))}" target="_blank" rel="noopener"><span class="ph ${BG[i % 6]}" aria-hidden="true">🎬${photoTag(v.photo_url, "", v.photo_frame)}<span class="play">▶</span></span>
       <span class="bd"><b>${h(v.title)}</b>${v.note ? `<span>${h(v.note)}</span>` : ""}<small>${h([v.posted_on ? fullDate(v.posted_on) : "", watch].filter(Boolean).join(" · "))} <span aria-hidden="true">↗</span></small></span></a></li>`;
   }).join("");
   el.closest("[data-show-when-filled]")?.removeAttribute("hidden");
 }
 async function renderPlaces(el) {
   let rows = [];
-  try { rows = await q("places", "select=name,area,why,link_url,photo_url&order=sort.asc,name.asc"); } catch { return; }
+  try { rows = await q("places", "select=name,area,why,link_url,photo_url,photo_frame&order=sort.asc,name.asc"); } catch { return; }
   if (!rows.length) return;
   await wordingReady;
   el.innerHTML = rows.map((p, i) => {
     const link = safeUrl(p.link_url);
-    return `<li class="place"><span class="ph ${BG[(i + 2) % 6]}" aria-hidden="true">📍${photoTag(p.photo_url)}</span><div class="bd"><h3>${h(p.name)}</h3>
+    return `<li class="place"><span class="ph ${BG[(i + 2) % 6]}" aria-hidden="true">📍${photoTag(p.photo_url, "", p.photo_frame)}</span><div class="bd"><h3>${h(p.name)}</h3>
       ${p.area ? `<small>${h(p.area)}</small>` : ""}${p.why ? `<p>${h(p.why)}</p>` : ""}
       ${link ? `<a href="${h(link)}" target="_blank" rel="noopener">${h(t("js.place.website", "Their website"))} <span class="ext" aria-hidden="true">↗</span></a>` : ""}</div></li>`;
   }).join("");
@@ -674,13 +679,13 @@ let ADVS = [];
 function openAdventure(a) {
   const dlg = $("#adventure");
   if (!dlg || !a) return;
-  const photos = (Array.isArray(a.photos) ? a.photos : []).map(photoUrl).filter(Boolean);
+  const raw = (Array.isArray(a.photos) ? a.photos : []).filter(u => photoUrl(u)), photos = raw.map(photoUrl), fr = a.frames || {};
   const vids = (Array.isArray(a.videos) ? a.videos : []).filter(v => v && safeUrl(v.url));
   const places = (Array.isArray(a.businesses) ? a.businesses : []).filter(b => b && b.name);
   $("#aname").textContent = a.title;
   $("#ameta").textContent = [advDate(a), a.dogs, a.partner?.name].filter(Boolean).join(" · ");
   $("#apic").className = "ph " + BG[1];
-  $("#apic").innerHTML = "🦮" + (photos[0] ? `<img src="${h(photos[0])}" alt="">` : "");
+  $("#apic").innerHTML = "🦮" + photoTag(raw[0], "", fr[raw[0]]);
   const story = String(a.story || "").trim();
   $("#abody").innerHTML = (story ? `<div class="jstory">${blockHTML(story)}</div>` : "")
     + (vids.length ? `<h3 class="jsub">${h(t("js.adventure.videos", "Videos"))}</h3><div class="avids">${vids.map(v => {
@@ -688,7 +693,7 @@ function openAdventure(a) {
       return id ? `<div class="yt${/\/shorts\//.test(v.url) ? " tall" : ""}" data-yt="${h(id)}" data-title="${h(title)}"><button type="button" class="yt-play"><span class="yt-icon" aria-hidden="true">▶</span><b>${h(title)}</b><small>${h(t("js.adventure.yt", "Tap to play. It loads from YouTube."))}</small></button></div>`
         : `<a class="btn ghost" href="${h(safeUrl(v.url))}" target="_blank" rel="noopener">${h(v.title || (where ? t("js.video.watch", "Watch on {site}", { site: where }) : t("js.video.watch-it", "Watch the video")))} <span class="ext" aria-hidden="true">↗</span></a>`;
     }).join("")}</div>` : "")
-    + (photos.length ? `<h3 class="jsub">${h(t("js.adventure.photos", "Photos"))}</h3><ul class="agal">${photos.map((u, i) => `<li><button type="button" data-photo="${i}" aria-label="${h(t("js.adventure.photo", "Photo {n} of {count}", { n: i + 1, count: photos.length }))}"><img src="${h(u)}" alt="" loading="lazy"></button></li>`).join("")}</ul>` : "")
+    + (photos.length ? `<h3 class="jsub">${h(t("js.adventure.photos", "Photos"))}</h3><ul class="agal">${photos.map((u, i) => `<li><button type="button" data-photo="${i}" aria-label="${h(t("js.adventure.photo", "Photo {n} of {count}", { n: i + 1, count: photos.length }))}"><img src="${h(u)}" alt=""${frameAttr(fr[raw[i]])} loading="lazy"></button></li>`).join("")}</ul>` : "")
     + (places.length ? `<h3 class="jsub">${h(t("js.adventure.places", "Places we went"))}</h3><ul class="xlinks">${places.map(b => safeUrl(b.url)
       ? `<li><a href="${h(safeUrl(b.url))}" target="_blank" rel="noopener">${h(b.name)} <span class="ext" aria-hidden="true">↗</span></a></li>` : `<li><span>${h(b.name)}</span></li>`).join("")}</ul>` : "");
   dlg.photos = photos;
@@ -698,14 +703,14 @@ function openAdventure(a) {
   history.replaceState(null, "", "#day-out-" + a.id);
 }
 async function renderAdventures(el) {
-  try { ADVS = await q("adventures", "select=id,title,went_on,dogs,story,videos,photos,businesses,sort,partner:partners(name)&order=sort.asc,went_on.desc.nullslast,created_at.desc"); } catch { return; }
+  try { ADVS = await q("adventures", "select=id,title,went_on,dogs,story,videos,photos,frames,businesses,sort,partner:partners(name)&order=sort.asc,went_on.desc.nullslast,created_at.desc"); } catch { return; }
   if (!ADVS.length) return;
   await wordingReady;
   el.innerHTML = ADVS.map((a, i) => {
-    const photos = (Array.isArray(a.photos) ? a.photos : []).map(photoUrl).filter(Boolean), vids = (Array.isArray(a.videos) ? a.videos : []).filter(v => v && safeUrl(v.url));
+    const raw = (Array.isArray(a.photos) ? a.photos : []).filter(u => photoUrl(u)), photos = raw, vids = (Array.isArray(a.videos) ? a.videos : []).filter(v => v && safeUrl(v.url));
     const bits = [photos.length && (photos.length === 1 ? t("js.adventure.one-photo", "1 photo") : t("js.adventure.n-photos", "{n} photos", { n: photos.length })),
       vids.length && (vids.length === 1 ? t("js.adventure.one-video", "1 video") : t("js.adventure.n-videos", "{n} videos", { n: vids.length }))].filter(Boolean);
-    return `<li><button class="advcard" type="button" aria-haspopup="dialog" data-adv="${h(a.id)}"><span class="ph ${BG[i % 6]}" aria-hidden="true">🦮${photoTag(photos[0])}</span>
+    return `<li><button class="advcard" type="button" aria-haspopup="dialog" data-adv="${h(a.id)}"><span class="ph ${BG[i % 6]}" aria-hidden="true">🦮${photoTag(raw[0], "", (a.frames || {})[raw[0]])}</span>
       <span class="bd"><b>${h(a.title)}</b><small>${h([advDate(a), a.dogs].filter(Boolean).join(" · "))}</small>${bits.length ? `<span>${h(bits.join(" · "))}</span>` : ""}</span></button></li>`;
   }).join("");
   el.closest("[data-show-when-filled]")?.removeAttribute("hidden");
@@ -784,7 +789,7 @@ const PPH = window.PagePhotos;
 async function renderPagePhotos() {
   if (!PPH || !S.scope) return;
   let rows;
-  try { rows = await q("page_photos", `select=id,page,spot,layout,photos,caption,updated_at&page=eq.${encodeURIComponent(S.scope)}&order=sort.asc,created_at.asc`); } catch { return; }
+  try { rows = await q("page_photos", `select=id,page,spot,layout,shape,photos,caption,updated_at&page=eq.${encodeURIComponent(S.scope)}&order=sort.asc,created_at.asc`); } catch { return; }
   if (PPH.stamp(rows) === (S.pp || "")) return; // built with these already
   // back to the page as it was built without photos...
   $$("[data-pp-side]").forEach(w => w.replaceWith(...(w.querySelector(":scope > .pp-side-text")?.childNodes || [])));
@@ -793,13 +798,13 @@ async function renderPagePhotos() {
   $$("[data-pp-swap]:not(img)").forEach(li => { // the photo wall
     let o = {};
     try { o = JSON.parse(li.dataset.ppOrig); } catch {}
-    setWallPhoto(li, o.img || "");
+    setWallPhoto(li, o.img || "", null);
     li.removeAttribute("data-pp-swap"); li.removeAttribute("data-pp-orig");
   });
   $$("img[data-pp-swap]").forEach(img => {
     let o = {};
     try { o = JSON.parse(img.dataset.ppOrig); } catch {}
-    for (const [a, k] of [["src", "src"], ["alt", "alt"], ["width", "w"], ["height", "h"], ["data-t-alt", "t"], ["data-t-orig", "o"]]) o[k] == null ? img.removeAttribute(a) : img.setAttribute(a, o[k]);
+    for (const [a, k] of [["src", "src"], ["alt", "alt"], ["style", "s"], ["data-t-alt", "t"], ["data-t-orig", "o"]]) o[k] == null ? img.removeAttribute(a) : img.setAttribute(a, o[k]);
     img.removeAttribute("data-pp-swap"); img.removeAttribute("data-pp-orig");
   });
   // ...then what's saved now
@@ -811,7 +816,7 @@ async function renderPagePhotos() {
     let box = el.parentNode;
     const mark = pos === "before" ? el : el.nextSibling; // photos go in just before this (null: at the end)
     for (const row of list) {
-      const html = PPH.figure(row);
+      const html = PPH.figure(row, S.base);
       if (!html) continue;
       if (!PPH.side(row)) { box.insertBefore(make(html), mark); continue; }
       // beside the text: in two columns with the part below the spot (and the text under it, if that part is a
@@ -834,11 +839,11 @@ async function renderPagePhotos() {
     }
   }
   for (const [k, row] of swaps) {
-    const img = $(`[data-pi="${CSS.escape(k)}"]`), to = PPH.swap(row);
+    const img = $(`[data-pi="${CSS.escape(k)}"]`), to = PPH.swap(row, S.base);
     if (!img) continue;
     if (img.tagName !== "IMG") { // the photo wall
       img.dataset.ppOrig = JSON.stringify({ img: img.dataset.img || "" });
-      setWallPhoto(img, to ? to.src : "");
+      setWallPhoto(img, to ? to.url : "", to?.frame);
       img.dataset.ppSwap = row.id;
       continue;
     }
@@ -847,11 +852,13 @@ async function renderPagePhotos() {
       only.hidden = true; only.dataset.ppHid = row.id;
       continue;
     }
+    // it keeps the old photo's size (so its shape), and is framed in it
     const was = a => img.getAttribute(a) ?? undefined;
-    img.dataset.ppOrig = JSON.stringify({ src: was("src"), alt: was("alt"), w: was("width"), h: was("height"), t: was("data-t-alt"), o: was("data-t-orig") });
+    img.dataset.ppOrig = JSON.stringify({ src: was("src"), alt: was("alt"), s: was("style"), t: was("data-t-alt"), o: was("data-t-orig") });
     img.removeAttribute("data-t-alt"); img.removeAttribute("data-t-orig");
     img.src = to.src; img.alt = to.alt;
-    if (to.w && to.h) { img.width = to.w; img.height = to.h; } else { img.removeAttribute("width"); img.removeAttribute("height"); }
+    const css = PPH.swapCSS(to, Number(was("width")), Number(was("height")));
+    if (css) img.setAttribute("style", css); else img.removeAttribute("style");
     img.dataset.ppSwap = row.id;
   }
 }

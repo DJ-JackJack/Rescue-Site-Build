@@ -88,7 +88,7 @@ const PP = createRequire(import.meta.url)("./assets/pagephotos.js");
 async function savedPhotos() {
   if (process.env.PAGE_PHOTOS_FILE) return JSON.parse(fs.readFileSync(process.env.PAGE_PHOTOS_FILE, "utf8"));
   try {
-    const r = await fetch(`${CONFIG.supabaseUrl}/rest/v1/page_photos?select=id,page,spot,layout,photos,caption,updated_at&order=sort.asc,created_at.asc`, { headers: { apikey: CONFIG.supabaseKey }, signal: AbortSignal.timeout(15000) });
+    const r = await fetch(`${CONFIG.supabaseUrl}/rest/v1/page_photos?select=id,page,spot,layout,shape,photos,caption,updated_at&order=sort.asc,created_at.asc`, { headers: { apikey: CONFIG.supabaseKey }, signal: AbortSignal.timeout(15000) });
     if (!r.ok) throw new Error(`status ${r.status}`);
     return await r.json();
   } catch (e) {
@@ -192,7 +192,7 @@ for (const file of fs.readdirSync(pagesDir).filter(f => f.endsWith(".html")).sor
   const marked = markSpots(fill(raw.slice(m[0].length)), scope);
   if (scope !== "404") { spots[scope] = marked.spots; pics[scope] = marked.pics; }
   const photos = photoRows.filter(r => r.page === scope);
-  const body = bakePhotos(annotate(marked.html, scope, saved, items), photos);
+  const body = bakePhotos(annotate(marked.html, scope, saved, items), photos, BASE);
   const site = JSON.stringify({ ...CONFIG, page: "/" + (meta.path === "404" ? "404" : meta.path || ""), scope, t: scriptSaved, pp: PP.stamp(photos), ...(saved[items[0].key] ? { titleOrig: tab } : {}) }).replace(/</g, "\\u003c");
   let html = layout
     .replace("{{title}}", escText(title))
