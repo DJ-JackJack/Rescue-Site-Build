@@ -778,8 +778,19 @@ function countView() {
   fetch(`${S.supabaseUrl}/rest/v1/rpc/count_view`, {
     method: "POST", keepalive: true,
     headers: { apikey: S.supabaseKey, "Content-Type": "application/json" },
-    body: JSON.stringify({ p_path: S.page, p_source: source || null }),
+    body: JSON.stringify({ p_path: S.page, p_source: source || null, ...(missedPath() ? { p_missed: missedPath() } : {}) }),
   }).catch(() => {});
+}
+// On the "Page not found" page, the address that was tried, so a link people keep getting wrong can be spotted:
+// just the page part (like /happy-tails), never anything after a ? or #.
+function missedPath() {
+  if (S.page !== "/404") return "";
+  let p = location.pathname;
+  try { p = decodeURIComponent(p); } catch {}
+  const base = S.base || "/";
+  if (p.startsWith(base)) p = "/" + p.slice(base.length);
+  p = p.replace(/[^A-Za-z0-9/._-]+/g, "-").replace(/\/{2,}/g, "/").slice(0, 101);
+  return /^\/404(\.html)?$/.test(p) ? "" : p;
 }
 
 /* ---------- photos added to the pages (edit page → Photos on the pages) ----------

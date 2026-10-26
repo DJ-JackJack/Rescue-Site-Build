@@ -127,7 +127,7 @@ Editors can get a phone notification for each new message (Web Push, no app or e
 
 ## Visitor counts
 
-The site counts page views itself, with no cookies and nothing about the visitor: `count_view` adds 1 to today's row in `page_views` (page + day) and, when someone arrives from outside the site, to `visit_sources` (TikTok, google, direct, or the other site's name). `?from=tiktok` on a link sets the source and is taken off the address. A day holds at most 60 pages and 40 sources, so junk can't pile up. Bots, and devices signed in to the edit page (or set to skip), aren't counted. Only editors can read the numbers, through `visitor_summary` on the **Visitors** screen; **Start the counts fresh** (`clear_visitor_counts`) empties them, for launch day.
+The site counts page views itself, with no cookies and nothing about the visitor: `count_view` adds 1 to today's row in `page_views` (page + day) and, when someone arrives from outside the site, to `visit_sources` (TikTok, google, direct, or the other site's name). `?from=tiktok` on a link sets the source and is taken off the address. On the "Page not found" page it also adds 1 to the address that was tried in `missed_pages` (just the path, like `/happy-tails`, never anything after a `?` or `#`), so a mistyped or old link that people keep using shows up. A day holds at most 60 pages, 40 sources and 30 addresses not found, so junk can't pile up. Bots, and devices signed in to the edit page (or set to skip), aren't counted. Only editors can read the numbers, through `visitor_summary` on the **Visitors** screen; **Start the counts fresh** (`clear_visitor_counts`) empties them, for launch day.
 
 ## Checking the live site
 

@@ -1542,7 +1542,7 @@ async function showDeleted() {
 }
 
 /* ---------- visitors ---------- */
-// Counts kept by the site itself (public.page_views, public.visit_sources): a page, a day and a number.
+// Counts kept by the site itself (public.page_views, public.visit_sources, public.missed_pages): a page, a day and a number.
 // No cookies, and nothing about who visited.
 const SOURCES = { tiktok: "TikTok", facebook: "Facebook", instagram: "Instagram", youtube: "YouTube", google: "Google", bing: "Bing", duckduckgo: "DuckDuckGo",
   x: "X (Twitter)", reddit: "Reddit", pinterest: "Pinterest", linktree: "Linktree", direct: "Direct (typed in, bookmarks, some apps)" };
@@ -1580,6 +1580,9 @@ async function showVisitors(range) {
     </div>
     <h2 class="sub">Pages</h2>
     ${s.pages.length ? barList(s.pages, pageName) : `<p class="allgood">No views yet.</p>`}
+    ${s.missed?.length ? `<h2 class="sub">Addresses that weren't found</h2>
+    <p class="hint vmiss">Addresses people tried that aren't on the site, usually a link that was mistyped or cut short. If the same one keeps showing up, look for where that link was posted and fix it there.</p>
+    ${barList(s.missed, p => p)}` : ""}
     <h2 class="sub">Where visits came from</h2>
     ${s.sources.length ? barList(s.sources, k => SOURCES[k] || k) : `<p class="allgood">No visits yet.</p>`}
     <p class="hint vtip">Visits from inside the TikTok and Instagram apps often show as Direct. To count them, add <b>?from=tiktok</b> to the link in your bio, like <b>${h((CFG.siteUrl || "") + "?from=tiktok")}</b> (or ?from=instagram, ?from=youtube).</p>
