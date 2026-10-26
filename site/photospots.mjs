@@ -81,25 +81,37 @@ export function markSpots(html, scope) {
     const w = words(el);
     if (meaningful(w)) return w;
     const imgs = [];
-    const walk = n => { for (const c of n.children || []) if (c.tag) { if (c.tag === "img") imgs.push(attr(c, "src") || "", attr(c, "alt") || ""); walk(c); } };
+    // a photo by its file name, so the key doesn't change with the address the site is served from
+    const walk = n => { for (const c of n.children || []) if (c.tag) { if (c.tag === "img") imgs.push((attr(c, "src") || "").replace(/^.*\/assets\//, "assets/"), attr(c, "alt") || ""); walk(c); } };
     walk(el);
     return [el.tag, attr(el, "class"), attr(el, "id"), ...(el.attrs.match(/\sdata-[\w-]+/g) || []), ...imgs].join(" ");
   };
   let group = "Top of the page";
-  const visit = el => {
+  // near: the heading of the card or box a photo is in, to name a photo that has no description
+  // photosOnly: inside a frame marked decoration (aria-hidden), like a card's photo with an emoji behind it:
+  // its photo can still be changed, but there are no spots in it
+  const visit = (el, near = "", photosOnly = false) => {
     for (const c of el.children || []) {
-      if (!c.tag || SKIP_TAGS.has(c.tag) || filled(c)) continue;
+      if (!c.tag || SKIP_TAGS.has(c.tag)) continue;
+      if (filled(c)) {
+        const jsFilled = SKIP_ATTR.test((c.attrs || "").replace(/\saria-hidden="true"/g, ""));
+        if (!jsFilled) visit(c, near, true);
+        continue;
+      }
+      const hd = (c.tag === "article" || has(c, "card", "box")) && firstHeading(c);
+      const here = hd && meaningful(words(hd)) ? clip(words(hd)) : near;
+      if (c.tag === "img" && /\/assets\/photos\//.test(attr(c, "src") || "")) {
+        const file = attr(c, "src").split("/assets/photos/")[1].split("?")[0];
+        const k = keyOf("i", file), alt = decode(attr(c, "alt") || "").trim();
+        addAttrs(c, ` data-pi="${k}"`);
+        pics.push({ k, l: alt ? `The photo “${clip(alt)}”` : here ? `The photo for “${here}”` : `The photo ${file}`, src: "assets/photos/" + file, g: group });
+      }
+      if (photosOnly) { visit(c, here, true); continue; }
       // the part of the page each spot is in, for grouping them on the edit page: the section's first heading
       if (c.tag === "section") {
         const hd = firstHeading(c);
         group = hd && meaningful(words(hd)) ? clip(words(hd)) : "Further down the page";
       } else if (has(c, "phead", "hero")) group = "Top of the page";
-      if (c.tag === "img" && /\/assets\/photos\//.test(attr(c, "src") || "")) {
-        const file = attr(c, "src").split("/assets/photos/")[1].split("?")[0];
-        const k = keyOf("i", file), alt = decode(attr(c, "alt") || "").trim();
-        addAttrs(c, ` data-pi="${k}"`);
-        pics.push({ k, l: alt ? `The photo “${clip(alt)}”` : `The photo ${file}`, src: "assets/photos/" + file, g: group });
-      }
       if (FLOW(c) || CARD(c)) {
         const parts = c.children.filter(x => x.tag && !SKIP_TAGS.has(x.tag) && x.tag !== "noscript" && x.tag !== "br" && !has(x, "sr"));
         const card = CARD(c) && !FLOW(c), name = card ? boxName(c) : "";
@@ -114,7 +126,7 @@ export function markSpots(html, scope) {
             l: card ? `In the box ${name}, at the ${s === "b" ? "top" : "bottom"}` : `${s === "b" ? "Above" : "Below"} ${describe(p)}` })));
         });
       }
-      visit(c);
+      visit(c, here);
     }
   };
   visit(root);
