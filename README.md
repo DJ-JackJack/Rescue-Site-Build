@@ -22,7 +22,7 @@ The website for TheTerr0rTw!ns (tae): rescue features, shelter goals, dog day ou
 - **Launched** at https://terrortwinsflock.com. Preview mode (hidden from search engines, with a preview banner) is off: the repository variable `SITE_PREVIEW` is `0`. How the launch went, step by step: `docs/launch-checklist.md`.
 - **Database address and public key** are in `site/supabase.json`, read by the build, the weekly backup and the keep-awake job.
 
-**Editing:** the private edit page at `/edit/` (sign-in required) updates animals, goals, events, rescues, Sniffari programs, the local help list, any wording on the site, and photos, restores recent deletes, shows visitor counts, adds photos anywhere on any page (or changes or hides the ones that came with the site), and turns on notifications for new messages. Plain-language guide: `docs/editing-guide.md`. What each setting does underneath: `docs/updating-content.md`.
+**Editing:** the private edit page at `/edit/` (sign-in required) updates animals, goals, events, rescues, Sniffari programs, the local help list, any wording on the site, and photos, restores recent deletes, shows visitor counts, adds photos anywhere on any page (or changes or hides the ones that came with the site), frames any photo by dragging and pinching, and turns on notifications for new messages. Plain-language guide: `docs/editing-guide.md`. What each setting does underneath: `docs/updating-content.md`.
 
 ## Rules the site is built around
 

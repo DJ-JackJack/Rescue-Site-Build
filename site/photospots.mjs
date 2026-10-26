@@ -7,7 +7,8 @@
 //     when other parts move, and if those words are rewritten in the code, the edit page says it needs a new spot.
 //     (Taea's own wording changes don't count: they're applied after this, to the same keys.)
 //   - data-pi="i.home.1a2b3c4d": a photo already on the page (a fingerprint of its file name), so it can be
-//     changed or hidden.
+//     changed or hidden. That's every <img> from assets/photos, and each photo on the home page's photo wall, which
+//     site.js draws from data-img (keyed by its file name, or by its label when it has no photo yet).
 // It returns the HTML and, for the edit page, every spot and photo with a description of where it is.
 //
 // bakePhotos(html, rows) runs after the wording and puts the saved photos in, through site/assets/pagephotos.js,
@@ -64,6 +65,14 @@ function boxName(el) {
   const hd = firstHeading(el), fill = fillName(el), w = words(el);
   return hd && meaningful(words(hd)) ? `“${clip(words(hd))}”` : fill ? `with ${fill}` : meaningful(w) ? `“${clip(w)}”` : "";
 }
+// the shape (width ÷ height) a photo already on a page is shown in, for framing a new one in its place: its frame's
+// (a card's photo is 16:10 and a book cover 3:4, in site.css), or its own size
+const shapeOf = (img, box) => {
+  if (has(box, "ph")) return 16 / 10;
+  if (has(box, "cover")) return 3 / 4;
+  const w = Number(attr(img, "width")), h = Number(attr(img, "height"));
+  return w > 0 && h > 0 ? w / h : 0;
+};
 const addAttrs = (el, more) => {
   el.attrs += more;
   el.start = el.start.replace(/\s*\/?>$/, m => more + m);
@@ -81,25 +90,43 @@ export function markSpots(html, scope) {
     const w = words(el);
     if (meaningful(w)) return w;
     const imgs = [];
-    const walk = n => { for (const c of n.children || []) if (c.tag) { if (c.tag === "img") imgs.push(attr(c, "src") || "", attr(c, "alt") || ""); walk(c); } };
+    // a photo by its file name, so the key doesn't change with the address the site is served from
+    const walk = n => { for (const c of n.children || []) if (c.tag) { if (c.tag === "img") imgs.push((attr(c, "src") || "").replace(/^.*\/assets\//, "assets/"), attr(c, "alt") || ""); walk(c); } };
     walk(el);
     return [el.tag, attr(el, "class"), attr(el, "id"), ...(el.attrs.match(/\sdata-[\w-]+/g) || []), ...imgs].join(" ");
   };
   let group = "Top of the page";
-  const visit = el => {
+  // near: the heading of the card or box a photo is in, to name a photo that has no description
+  // photosOnly: inside a frame marked decoration (aria-hidden), like a card's photo with an emoji behind it:
+  // its photo can still be changed, but there are no spots in it
+  const visit = (el, near = "", photosOnly = false) => {
     for (const c of el.children || []) {
-      if (!c.tag || SKIP_TAGS.has(c.tag) || filled(c)) continue;
+      if (!c.tag || SKIP_TAGS.has(c.tag)) continue;
+      if (filled(c)) {
+        const jsFilled = SKIP_ATTR.test((c.attrs || "").replace(/\saria-hidden="true"/g, ""));
+        if (!jsFilled) visit(c, near, true);
+        continue;
+      }
+      const hd = (c.tag === "article" || has(c, "card", "box")) && firstHeading(c);
+      const here = hd && meaningful(words(hd)) ? clip(words(hd)) : near;
+      if (c.tag === "img" && /\/assets\/photos\//.test(attr(c, "src") || "")) {
+        const file = attr(c, "src").split("/assets/photos/")[1].split("?")[0];
+        const k = keyOf("i", file), alt = decode(attr(c, "alt") || "").trim();
+        addAttrs(c, ` data-pi="${k}"`);
+        pics.push({ k, l: alt ? `The photo “${clip(alt)}”` : here ? `The photo for “${here}”` : `The photo ${file}`, src: "assets/photos/" + file, g: group, a: shapeOf(c, el), alt });
+      }
+      if (/\sdata-img="/.test(c.attrs || "")) { // a photo on the photo wall
+        const src = decode(attr(c, "data-img") || ""), file = src.replace(/^.*assets\/photos\//, ""), label = clip(words(c));
+        const k = keyOf("i", file || "wall " + label);
+        addAttrs(c, ` data-pi="${k}"`);
+        pics.push({ k, l: `The photo wall: “${label}”`, src, g: group, a: 4 / 5, alt: label });
+      }
+      if (photosOnly) { visit(c, here, true); continue; }
       // the part of the page each spot is in, for grouping them on the edit page: the section's first heading
       if (c.tag === "section") {
         const hd = firstHeading(c);
         group = hd && meaningful(words(hd)) ? clip(words(hd)) : "Further down the page";
       } else if (has(c, "phead", "hero")) group = "Top of the page";
-      if (c.tag === "img" && /\/assets\/photos\//.test(attr(c, "src") || "")) {
-        const file = attr(c, "src").split("/assets/photos/")[1].split("?")[0];
-        const k = keyOf("i", file), alt = decode(attr(c, "alt") || "").trim();
-        addAttrs(c, ` data-pi="${k}"`);
-        pics.push({ k, l: alt ? `The photo “${clip(alt)}”` : `The photo ${file}`, src: "assets/photos/" + file, g: group });
-      }
       if (FLOW(c) || CARD(c)) {
         const parts = c.children.filter(x => x.tag && !SKIP_TAGS.has(x.tag) && x.tag !== "noscript" && x.tag !== "br" && !has(x, "sr"));
         const card = CARD(c) && !FLOW(c), name = card ? boxName(c) : "";
@@ -114,7 +141,7 @@ export function markSpots(html, scope) {
             l: card ? `In the box ${name}, at the ${s === "b" ? "top" : "bottom"}` : `${s === "b" ? "Above" : "Below"} ${describe(p)}` })));
         });
       }
-      visit(c);
+      visit(c, here);
     }
   };
   visit(root);
@@ -133,9 +160,9 @@ export function markSpots(html, scope) {
 }
 
 // Puts saved photos into a page that's already had its wording put in. rows: the page's published page_photos,
-// in order. Photos already on the page that are changed keep what they were in data-pp-orig, so site.js can put
-// them back if the change is undone before the next build.
-export function bakePhotos(html, rows) {
+// in order; base: the site's base path. Photos already on the page that are changed keep what they were in
+// data-pp-orig, so site.js can put them back if the change is undone before the next build.
+export function bakePhotos(html, rows, base = "/") {
   if (!rows.length) return html;
   const root = parse(html), byB = new Map(), byI = new Map(), parent = new Map();
   const walk = n => { for (const c of n.children || []) if (c.tag) { parent.set(c, n); const b = attr(c, "data-b"), i = attr(c, "data-pi"); if (b) byB.set(b, c); if (i) byI.set(i, c); walk(c); } };
@@ -146,7 +173,7 @@ export function bakePhotos(html, rows) {
     if (!el) continue;
     let home = parent.get(el).children, at = home.indexOf(el) + (pos === "before" ? 0 : 1); // where the next photo goes
     for (const row of list) {
-      const fig = PP.figure(row);
+      const fig = PP.figure(row, base);
       if (!fig) continue;
       if (!PP.side(row)) { home.splice(at++, 0, { raw: fig }); continue; }
       const text = { tag: "div", start: PP.TEXT_OPEN, children: [], end: "</div>" };
@@ -171,16 +198,25 @@ export function bakePhotos(html, rows) {
   for (const [k, row] of swaps) {
     const img = byI.get(k);
     if (!img) continue;
-    const to = PP.swap(row);
+    const to = PP.swap(row, base);
+    if (img.tag !== "img") { // the photo wall: site.js draws the photo from data-img ("" for none), framed by data-frame
+      const orig = { img: decode(attr(img, "data-img") || "") };
+      const a = img.attrs.replace(/\s(data-img|data-frame)="[^"]*"/g, "") + ` data-img="${esc(to ? to.url : "")}"${to?.frame ? ` data-frame="${esc(JSON.stringify(to.frame))}"` : ""} data-pp-swap="${esc(row.id)}" data-pp-orig="${esc(JSON.stringify(orig))}"`;
+      img.start = img.start.replace(img.attrs, () => a);
+      img.attrs = a;
+      continue;
+    }
     if (!to) { // hidden: the whole frame when the photo is all that's in it
       const box = parent.get(img), only = /^(figure|li)$/.test(box.tag) && box.children.filter(c => c.tag).length === 1 ? box : img;
       addAttrs(only, ` hidden data-pp-hid="${esc(row.id)}"`);
       continue;
     }
     const was = name => { const v = attr(img, name); return v === undefined ? undefined : decode(v); };
-    const orig = { src: was("src"), alt: was("alt"), w: was("width"), h: was("height"), t: was("data-t-alt"), o: was("data-t-orig") };
-    let a = img.attrs.replace(/\s(src|alt|width|height|data-t-alt|data-t-orig)="[^"]*"/g, "");
-    a += ` src="${esc(to.src)}" alt="${esc(to.alt)}"${to.w && to.h ? ` width="${to.w}" height="${to.h}"` : ""} data-pp-swap="${esc(row.id)}" data-pp-orig="${esc(JSON.stringify(orig))}"`;
+    // it keeps the old photo's size (so its shape), and is framed in it
+    const orig = { src: was("src"), alt: was("alt"), s: was("style"), t: was("data-t-alt"), o: was("data-t-orig") };
+    const css = PP.swapCSS(to, Number(was("width")), Number(was("height")));
+    let a = img.attrs.replace(/\s(src|alt|style|data-t-alt|data-t-orig)="[^"]*"/g, "");
+    a += ` src="${esc(to.src)}" alt="${esc(to.alt)}"${css ? ` style="${esc(css)}"` : ""} data-pp-swap="${esc(row.id)}" data-pp-orig="${esc(JSON.stringify(orig))}"`;
     img.start = img.start.replace(img.attrs, () => a);
     img.attrs = a;
   }
