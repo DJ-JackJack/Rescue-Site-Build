@@ -570,5 +570,6 @@ h2.eyebrow{font-family:var(--f-body);line-height:1.55}
 .ppadd:hover{border-color:var(--royal);background:#fff}
 .ppfix{display:inline-block;margin:0 0 6px;padding:7px 12px;border-radius:999px;background:var(--plum);color:#fff!important;font-weight:800;font-size:.82rem;text-decoration:none;box-shadow:var(--shadow);position:relative;z-index:2}
 .ppmode figure[data-pp]{outline:3px solid var(--violet);outline-offset:4px;border-radius:var(--r)}
+.hang>.ppfix{position:absolute;top:-4px;left:50%;transform:translateX(-50%);z-index:3;white-space:nowrap;font-size:.72rem;padding:5px 9px}
 .ppghost{opacity:.45}
 @media print{.editfab{display:none}}

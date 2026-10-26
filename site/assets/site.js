@@ -505,13 +505,21 @@ const HW_NARROW = { n: 3, map: [[0, 3, 6], [1, 4, 7], [2, 5, 8]],
   rot: [[-4, 3.5, -2], [5, -2.5, 4], [-2.5, 4.5, -3.5]], drop: [[0.14, 1.30, 2.46], [0.34, 1.50, 2.66], [0.04, 1.20, 2.36]] };
 const HW_WIDE = { n: 5, map: [[0, 5], [1, 6], [2, 7], [3, 8], [4]],
   rot: [[-4, 3], [5, -2.5], [-2.5, 4.5], [3.5, -4], [-3]], drop: [[0.14, 1.36], [0.40, 1.62], [0.22, 1.44], [0.48, 1.70], [0.08]] };
+// a photo on the wall: a path in the site ("assets/photos/…"), or one changed from the edit page (a full link)
+const wallImg = u => { const p = photoUrl(u); return p ? `<img src="${h(p)}" alt="" onerror="this.remove()">` : ""; };
+// changing one after the wall is up (photos changed on the edit page since the page was built)
+const setWallPhoto = (li, u) => {
+  li.dataset.img = u;
+  const pic = $(".pic", li);
+  if (pic) { $("img", pic)?.remove(); pic.insertAdjacentHTML("beforeend", wallImg(u)); }
+};
 const hw = $("#hangwall");
 if (hw) {
   const hwsvg = $("#hwsvg"), hangs = $$("#hwlist .hang"), NS = "http://www.w3.org/2000/svg";
   const svgEl = (tag, attrs) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; };
   hangs.forEach(li => {
     const a = $(".snap", li), label = a.textContent.trim(), d = li.dataset;
-    const img = d.img ? `<img src="${h(S.base + d.img)}" alt="" onerror="this.remove()">` : "";
+    const img = wallImg(d.img);
     // the label keeps the link's wording key, so saved wording still finds it
     const key = a.dataset.t ? ` data-t="${h(a.dataset.t)}"${a.dataset.tOrig ? ` data-t-orig="${h(a.dataset.tOrig)}"` : ""}` : "";
     a.removeAttribute("data-t"); a.removeAttribute("data-t-orig");
@@ -782,6 +790,12 @@ async function renderPagePhotos() {
   $$("[data-pp-side]").forEach(w => w.replaceWith(...(w.querySelector(":scope > .pp-side-text")?.childNodes || [])));
   $$("figure[data-pp]").forEach(f => f.remove());
   $$("[data-pp-hid]").forEach(el => { el.hidden = false; el.removeAttribute("data-pp-hid"); });
+  $$("[data-pp-swap]:not(img)").forEach(li => { // the photo wall
+    let o = {};
+    try { o = JSON.parse(li.dataset.ppOrig); } catch {}
+    setWallPhoto(li, o.img || "");
+    li.removeAttribute("data-pp-swap"); li.removeAttribute("data-pp-orig");
+  });
   $$("img[data-pp-swap]").forEach(img => {
     let o = {};
     try { o = JSON.parse(img.dataset.ppOrig); } catch {}
@@ -820,8 +834,14 @@ async function renderPagePhotos() {
     }
   }
   for (const [k, row] of swaps) {
-    const img = $(`img[data-pi="${CSS.escape(k)}"]`), to = PPH.swap(row);
+    const img = $(`[data-pi="${CSS.escape(k)}"]`), to = PPH.swap(row);
     if (!img) continue;
+    if (img.tagName !== "IMG") { // the photo wall
+      img.dataset.ppOrig = JSON.stringify({ img: img.dataset.img || "" });
+      setWallPhoto(img, to ? to.src : "");
+      img.dataset.ppSwap = row.id;
+      continue;
+    }
     if (!to) { // hidden: the whole frame when the photo is all that's in it
       const box = img.parentElement, only = /^(FIGURE|LI)$/.test(box.tagName) && box.children.length === 1 ? box : img;
       only.hidden = true; only.dataset.ppHid = row.id;
@@ -894,6 +914,10 @@ if (editor && S.scope) {
     });
     $$("[data-pp-hid]").forEach(el => { el.hidden = false; el.classList.add("ppghost"); });
     $$("figure[data-pp]").forEach(f => f.insertAdjacentHTML("afterbegin", `<a class="ppfix" href="${link("", f.dataset.pp)}">✎ Change this photo</a>`));
+    $$("[data-pi]:not(img)").forEach(li => { // the photo wall
+      const row = li.dataset.ppSwap;
+      li.insertAdjacentHTML("beforeend", `<a class="ppfix" href="${row ? link("", row) : spotLink(li.dataset.pi)}">${row && !li.dataset.img ? "👁 Hidden" : "✎ Change photo"}</a>`);
+    });
     $$("img[data-pi]").forEach(img => {
       const row = img.dataset.ppSwap || img.closest("[data-pp-hid]")?.dataset.ppHid;
       img.insertAdjacentHTML("beforebegin", `<a class="ppfix" href="${row ? link("", row) : spotLink(img.dataset.pi)}">${row && img.closest("[data-pp-hid]") ? "👁 Hidden: change or show it" : "✎ Change or hide this photo"}</a>`);

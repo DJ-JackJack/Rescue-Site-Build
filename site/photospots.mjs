@@ -7,7 +7,8 @@
 //     when other parts move, and if those words are rewritten in the code, the edit page says it needs a new spot.
 //     (Taea's own wording changes don't count: they're applied after this, to the same keys.)
 //   - data-pi="i.home.1a2b3c4d": a photo already on the page (a fingerprint of its file name), so it can be
-//     changed or hidden.
+//     changed or hidden. That's every <img> from assets/photos, and each photo on the home page's photo wall, which
+//     site.js draws from data-img (keyed by its file name, or by its label when it has no photo yet).
 // It returns the HTML and, for the edit page, every spot and photo with a description of where it is.
 //
 // bakePhotos(html, rows) runs after the wording and puts the saved photos in, through site/assets/pagephotos.js,
@@ -106,6 +107,12 @@ export function markSpots(html, scope) {
         addAttrs(c, ` data-pi="${k}"`);
         pics.push({ k, l: alt ? `The photo “${clip(alt)}”` : here ? `The photo for “${here}”` : `The photo ${file}`, src: "assets/photos/" + file, g: group });
       }
+      if (/\sdata-img="/.test(c.attrs || "")) { // a photo on the photo wall
+        const src = decode(attr(c, "data-img") || ""), file = src.replace(/^.*assets\/photos\//, ""), label = clip(words(c));
+        const k = keyOf("i", file || "wall " + label);
+        addAttrs(c, ` data-pi="${k}"`);
+        pics.push({ k, l: `The photo wall: “${label}”`, src, g: group });
+      }
       if (photosOnly) { visit(c, here, true); continue; }
       // the part of the page each spot is in, for grouping them on the edit page: the section's first heading
       if (c.tag === "section") {
@@ -184,6 +191,13 @@ export function bakePhotos(html, rows) {
     const img = byI.get(k);
     if (!img) continue;
     const to = PP.swap(row);
+    if (img.tag !== "img") { // the photo wall: site.js draws the photo from data-img ("" for none)
+      const orig = { img: decode(attr(img, "data-img") || "") };
+      const a = img.attrs.replace(/\sdata-img="[^"]*"/, "") + ` data-img="${esc(to ? to.src : "")}" data-pp-swap="${esc(row.id)}" data-pp-orig="${esc(JSON.stringify(orig))}"`;
+      img.start = img.start.replace(img.attrs, () => a);
+      img.attrs = a;
+      continue;
+    }
     if (!to) { // hidden: the whole frame when the photo is all that's in it
       const box = parent.get(img), only = /^(figure|li)$/.test(box.tag) && box.children.filter(c => c.tag).length === 1 ? box : img;
       addAttrs(only, ` hidden data-pp-hid="${esc(row.id)}"`);
