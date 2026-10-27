@@ -521,6 +521,22 @@ footer .formmsg.is-err{color:#FFB4AB}
 .callbox{max-width:66ch;margin-top:22px}
 /* from the pre-launch review */
 html{scroll-padding-top:84px} /* jump links land below the sticky header */
+/* the help lists, city by city (Help, Caring for Yourself, Wildlife): buttons to jump to a city, then a section for each */
+.citynav{display:flex;flex-direction:column;gap:10px;margin-top:22px}
+.citynav p{margin:0;font-weight:800;color:var(--plum)}
+.placebtns{display:flex;flex-wrap:wrap;gap:8px}
+.placebtns a{display:inline-flex;align-items:center;min-height:44px;padding:9px 16px;border-radius:999px;background:var(--royal);color:#fff;font-weight:800;font-size:.95rem;text-decoration:none}
+.placebtns a[href="#hampton-roads"],.placebtns a[href="#further"]{background:var(--ocean)}
+.placebtns a:hover,.placebtns a:focus-visible{background:var(--plum)}
+.cities{display:flex;flex-direction:column;gap:30px;margin-top:26px}
+.city+.city{border-top:2px solid var(--wash);padding-top:26px}
+.city>h3{font-size:1.7rem;color:var(--plum)}
+.city .groups{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));margin-top:14px;align-items:start}
+.city .group{background:#fff;border-radius:var(--r);box-shadow:var(--shadow);padding:18px 20px;display:flex;flex-direction:column;gap:6px}
+.city .group h4{font:600 1.15rem/1.2 var(--f-disp);margin:0}
+.city .group>p{margin:0}
+.city .group .res{margin-top:8px}
+.city .totop{display:inline-block;margin-top:14px;font-weight:800;font-size:.9rem;color:var(--royal)}
 :is(.stat,.wallsec,.goal.feature,footer,.anniv) :focus-visible{outline-color:#fff}
 [data-hide-empty][hidden]+section{padding-top:44px!important} /* keep a gap when the goal between is hidden */
 .goal>.who,.goal>h2,.goal>h3{display:flow-root} /* titles sit beside the goal photo, not wrapped around it */

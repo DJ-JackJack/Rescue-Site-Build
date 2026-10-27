@@ -330,6 +330,10 @@ const HELPCATS = [["food", "Food and supplies"], ["vet", "Vet bills"], ["behavio
   ["rescues", "Small local rescues"], ["tnr", "Spay, neuter and community cats"], ["breedhousing", "Breed-friendly apartments"],
   ["wildlife", "Wild animal help: who to call"], ["wildgroups", "Wildlife groups and sanctuaries"],
   ["crisis", "Crisis lines (Caring for Yourself)"], ["dv", "Abuse at home (Caring for Yourself)"], ["mental", "Mental health (Caring for Yourself)"], ["grief", "Grieving a pet (Caring for Yourself)"]];
+// The city sections on the help pages a listing goes in (help_resources.cities), in the order the site lists them.
+const CITIES = [["virginia-beach", "Virginia Beach"], ["norfolk", "Norfolk"], ["chesapeake", "Chesapeake"], ["portsmouth", "Portsmouth"], ["suffolk", "Suffolk"],
+  ["hampton", "Hampton"], ["newport-news", "Newport News"], ["hampton-roads", "All of Hampton Roads"], ["further", "Further Abroad"]];
+const citiesOf = r => (r.cities || []).map(c => label(CITIES, c)).join(", ");
 const TOPICS = { partner: "Partnership", help: "Help keeping a pet", dog: "About a dog", sniffari: "Day-out program", request: "Video request or question", other: "Something else" };
 const RANK = { looking: 0, foster: 1, adopted: 2, sanctuary: 3, placed: 4, unknown: 5 };
 const stale = (d, days) => d === null || d === undefined || daysAgo(d) >= days;
@@ -593,13 +597,13 @@ const SECTIONS = {
   },
   help: {
     table: "help_resources", title: "Local help list", one: "help listing", icon: "🤝",
-    intro: "Shown on the “Help keeping your pet” page under each kind of help. Wild animal help shows there and on the Wildlife page. Credit cards and loans, small rescues, spay and neuter help, and breed-friendly apartments each get their own section, which stays hidden until one is showing. Help for people (crisis lines, abuse at home, mental health, grieving a pet) shows on Caring for Yourself.",
+    intro: "The help pages list these city by city, with buttons at the top to jump to each city, and each listing shows under its kind of help in its city's section. Help for pets shows on “Help keeping your pet”, wild animal help there and on the Wildlife page, and help for people (crisis lines, abuse at home, mental health, grieving a pet) on Caring for Yourself.",
     query: "select=*&order=category.asc,sort.asc,name.asc",
     titleOf: r => r.name,
     filters: [["all", "All"], ...HELPCATS],
     tokens: r => [r.category, r.published ? "" : "hidden"],
-    row: r => ({ title: r.name, emoji: "🤝", sub: [label(HELPCATS, r.category), r.area].filter(Boolean).join(" · "),
-      flags: [!r.published && "Hidden", r.published && stale(r.checked_on, 180) && "!Check it's still running"] }),
+    row: r => ({ title: r.name, emoji: "🤝", sub: [label(HELPCATS, r.category), citiesOf(r)].filter(Boolean).join(" · "),
+      flags: [!r.published && "Hidden", r.published && !r.cities?.length && "!Pick its city", r.published && stale(r.checked_on, 180) && "!Check it's still running"] }),
     fields: [
       { name: "category", type: "choice", label: "What kind of help?", options: HELPCATS, dflt: "food" },
       { name: "kind", type: "text", label: "What kind it is", max: 40, suggest: ["Credit card", "Loan", "Payment plan", "Line of credit", "Dogs", "Cats", "Dogs and cats", "Cats and kittens", "Community cats"],
@@ -614,7 +618,10 @@ const SECTIONS = {
       { name: "more_label", type: "text", label: "What the second link says", max: 80, help: "Like “Free pet care library”.", when: v => !!v.more_url },
       { name: "phone", type: "text", label: "Phone", max: 40, inputmode: "tel", help: "Extra words are fine, like “(757) 427-0071, option 1”. The call button uses the first number." },
       { name: "email", type: "text", label: "Email", max: 120, inputmode: "email", check: [/^[^@\s]+@[^@\s]+\.[^@\s]+$/, "That doesn't look like an email address."] },
-      { name: "area", type: "text", label: "Area", max: 100, help: "A city, “All of Hampton Roads”, or a public building's address. Never a private home, and never a wildlife rehab or release site." },
+      { name: "cities", type: "tags", label: "Which city it's listed under", options: CITIES,
+        help: "Pick one, or more if it helps more than one city. Smaller places go with the closest city: Williamsburg, Yorktown and Gloucester with Newport News, Poquoson with Hampton, Smithfield and Isle of Wight with Suffolk. Help you can get online, nationwide or statewide, or from somewhere outside the area, goes under Further Abroad.",
+        validate: v => (v.length ? "" : "Pick at least one, so it shows on the site.") },
+      { name: "area", type: "text", label: "Where", max: 100, help: "Shown with it, like “Smithfield”, “Online” or a public building's address. Never a private home, and never a wildlife rehab or release site. Leave it empty when it's just the city it's listed under." },
       { name: "checked_on", type: "date", label: "Last checked it's still running", today: "Checked today", dflt: today },
       SHOW, SORT,
     ],
@@ -735,7 +742,7 @@ async function showHome() {
     api.list("animals", "select=id,name,status,published,checked_on"),
     api.list("goals", "select=id,title,status,published,figures_updated_at,bars:goal_bars(id)"),
     api.list("sniffari_programs", "select=id,program_name,shelter_name,published,checked_on"),
-    api.list("help_resources", "select=id,name,published,checked_on"),
+    api.list("help_resources", "select=id,name,published,checked_on,cities"),
     api.list("events", `select=id&starts_on=gte.${today()}`),
     db("POST", "rpc/visitor_summary", { p_days: 7 }).catch(e => { if (e instanceof SignedOut) throw e; return null; }),
     api.list("videos", "select=id"),
@@ -767,6 +774,10 @@ async function showHome() {
   for (const r of pics.filter(r => r.published && !spotName(r))) {
     todo.push(`<li><b>A photo on ${h(pageTitle(r.page) || r.page)} needs a new spot</b><small>That part of the page was rewritten, so the photo isn't showing. Pick where it should go now.</small>
       <div class="btns"><a class="btn royal sm" href="#/photos/${h(r.id)}">Pick a spot</a></div></li>`);
+  }
+  for (const r of help.filter(r => r.published && !r.cities?.length)) {
+    todo.push(`<li><b>${h(r.name)} isn't showing on the site</b><small>It needs a city, so the help pages know which section to list it in.</small>
+      <div class="btns"><a class="btn royal sm" href="#/help/${h(r.id)}">Pick its city</a></div></li>`);
   }
   for (const r of help.filter(r => r.published && stale(r.checked_on, 180))) {
     todo.push(`<li><b>${h(r.name)}: still running?</b><small>${r.checked_on ? `Last checked ${h(nice(r.checked_on))}.` : "Never checked."}</small>

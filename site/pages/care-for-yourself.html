@@ -14,7 +14,8 @@
       <p>If you're thinking about suicide, or you're worried about someone who might be, call or text 988, or chat at 988lifeline.org. It's free, confidential and open all day, every day, in English and Spanish. If someone is in danger right now, call 911.</p>
       <div class="btns" style="margin-top:14px"><a class="btn light" href="tel:988">Call 988</a><a class="btn light" href="sms:988">Text 988</a><a class="btn light" href="https://988lifeline.org/chat/" rel="noopener">Chat online <span class="ext" aria-hidden="true">↗</span></a></div>
     </div>
-    <nav class="jump" aria-label="On this page"><a href="#crisis">Crisis lines</a><a href="#home">If someone is hurting you</a><a href="#mental">Mental health</a><a href="#grief">Grieving a pet</a><a href="#your-pet">Help with your pet</a></nav>
+    <nav class="citynav" id="city-nav" aria-labelledby="city-nav-l" data-city-nav hidden><p id="city-nav-l">Support in your city:</p></nav>
+    <nav class="jump" aria-label="On this page"><a href="#crisis">Crisis lines</a><a href="#home">If someone is hurting you</a><a href="#mental">Mental health</a><a href="#grief">Grieving a pet</a><a href="#by-city">Support by city</a><a href="#your-pet">Help with your pet</a></nav>
   </div>
 </section>
 
@@ -22,7 +23,7 @@
   <div class="wrap">
     <p class="eyebrow">Crisis lines</p>
     <h2 class="h2">Someone to talk to, any time.</h2>
-    <div class="box callbox"><div data-help="crisis"><p>988 Suicide &amp; Crisis Lifeline: call or text <a href="tel:988">988</a>, any time.</p></div></div>
+    <div class="box callbox"><p>988 Suicide &amp; Crisis Lifeline: call or text <a href="tel:988">988</a>, any time.</p><p class="small">More crisis lines are in the <a href="#by-city">support list</a> below, under Further Abroad.</p></div>
   </div>
 </section>
 
@@ -43,7 +44,8 @@
       </div>
       <div class="box">
         <h3>Who to call</h3>
-        <div data-help="dv"><p>The National Domestic Violence Hotline: <a href="tel:18007997233">1-800-799-7233</a>, or text START to 88788.</p></div>
+        <p>The National Domestic Violence Hotline: <a href="tel:18007997233">1-800-799-7233</a>, or text START to 88788.</p>
+        <p class="small">More hotlines, and help keeping your pet safe while you leave, are in the <a href="#by-city">support list</a> below.</p>
       </div>
     </div>
     <div class="btns" style="margin-top:14px"><a class="btn ghost" href="https://www.google.com/" rel="noopener" data-quick-exit>Leave this page quickly</a></div>
@@ -57,7 +59,7 @@
     <p class="eyebrow">Mental health</p>
     <h2 class="h2">You don't have to be in crisis to ask for help.</h2>
     <p class="lede">Stress, money worries, depression and burnout make everything harder, including caring for a pet. These are places to start.</p>
-    <div class="box callbox"><div data-help="mental"><p>Mental health support is being added here. In a crisis, call or text 988.</p></div></div>
+    <p class="small" style="margin-top:14px">Your city's mental health services, and help lines you can call from anywhere, are in the <a href="#by-city">support list</a> below. In a crisis, call or text <a href="tel:988">988</a>.</p>
   </div>
 </section>
 
@@ -66,7 +68,24 @@
     <p class="eyebrow">Grieving a pet</p>
     <h2 class="h2">Losing a pet is real grief.</h2>
     <p class="lede">So is having to give one up, or not knowing where a lost pet is. Nobody should tell you it's “just a pet”. These lines are for exactly this.</p>
-    <div class="box callbox"><div data-help="grief"><p>Pet loss support is being added here.</p></div></div>
+    <p class="small" style="margin-top:14px">Pet loss support lines are in the <a href="#by-city">support list</a> below.</p>
+  </div>
+</section>
+
+<section id="by-city" style="padding-top:0">
+  <div class="wrap">
+    <p class="eyebrow">Support by city</p>
+    <h2 class="h2">Support near you, and from anywhere.</h2>
+    <p class="lede">Local services are listed by city. Hotlines and online support you can reach from anywhere are under Further Abroad.</p>
+    <div class="bycity">
+      <div data-needs hidden>
+        <div data-need="crisis"><h4><span aria-hidden="true">📞</span> Crisis lines</h4></div>
+        <div data-need="dv"><h4><span aria-hidden="true">🏠</span> If someone at home is hurting you</h4></div>
+        <div data-need="mental"><h4><span aria-hidden="true">💬</span> Mental health</h4></div>
+        <div data-need="grief"><h4><span aria-hidden="true">🕯️</span> Grieving a pet</h4></div>
+      </div>
+      <div class="cities" data-cities><p class="small">The support list is loading. In a crisis, call or text <a href="tel:988">988</a>.</p></div>
+    </div>
   </div>
 </section>
 
