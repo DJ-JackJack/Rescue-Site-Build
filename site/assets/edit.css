@@ -167,6 +167,7 @@
 .vlist span,.vlist b{position:relative;z-index:1}
 .vname{overflow-wrap:anywhere;font-weight:700}
 .vtip{margin:16px 0}
+.vmiss{margin:-4px 0 10px}
 .vdev{margin-top:16px}
 .vdev h2{font-size:1.1rem;margin:0 0 6px}
 /* notifications */

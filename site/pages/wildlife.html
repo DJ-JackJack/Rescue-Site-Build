@@ -14,6 +14,7 @@
       <div class="box"><h2>Bird care basics</h2><ul><li>Care guides from my bird education work are being written up for this page.</li></ul></div>
       <div class="box"><h2>Found a wild animal?</h2><ul><li><a href="#found">What to do, and who to call</a></li></ul></div>
     </div>
+    <nav class="citynav" id="city-nav" aria-labelledby="city-nav-l" data-city-nav hidden><p id="city-nav-l">Who to call, by city:</p></nav>
   </div>
 </section>
 
@@ -24,15 +25,13 @@
     <div class="prose" data-text="wildlife.found" data-label="Wildlife page: what to do if you find a wild animal">
       <p>Guidance on what to do, and who to call, is coming here soon.</p>
     </div>
-    <div class="box callbox" data-help-wrap hidden><h3>Who to call</h3><div data-help="wildlife"></div></div>
+    <div class="bycity" id="by-city">
+      <div data-needs hidden>
+        <div data-need="wildlife"><h4><span aria-hidden="true">📞</span> Who to call</h4></div>
+        <div data-need="wildgroups"><h4><span aria-hidden="true">🌿</span> Groups that help wildlife</h4><p class="small">Sanctuaries, learning and conservation.</p></div>
+      </div>
+      <div class="cities" data-cities><p class="small">The list of who to call is loading. If it doesn't show up, refresh the page.</p></div>
+    </div>
     <p class="small" style="margin-top:14px">Found a pet, not a wild animal? <a href="{{base}}help/#wild">How to tell the difference</a>, and <a href="{{base}}help/">help for pets</a>.</p>
-  </div>
-</section>
-
-<section style="padding-top:0" data-help-wrap hidden>
-  <div class="wrap">
-    <p class="eyebrow">Groups that help wildlife</p>
-    <h2 class="h2">Sanctuaries, learning and conservation.</h2>
-    <div class="box callbox"><div data-help="wildgroups"></div></div>
   </div>
 </section>

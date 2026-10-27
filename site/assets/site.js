@@ -601,32 +601,53 @@ if (hw) {
   layout();
 }
 
-/* ---------- local help: under each need on the help page, and "who to call" on the Wildlife page ---------- */
+/* ---------- the help lists, city by city: Help Keeping Your Pet, Caring for Yourself and Wildlife ----------
+   Each listing says which places it helps (help_resources.cities): the seven cities, all of Hampton Roads, or
+   Further Abroad (online, nationwide, statewide, or based outside the area). A page lists the kinds of help it shows
+   in [data-needs], each with its heading, and gets a section per place that has some, with buttons to jump to each. */
+const PLACES = () => [["virginia-beach", t("js.place.virginia-beach", "Virginia Beach")], ["norfolk", t("js.place.norfolk", "Norfolk")],
+  ["chesapeake", t("js.place.chesapeake", "Chesapeake")], ["portsmouth", t("js.place.portsmouth", "Portsmouth")], ["suffolk", t("js.place.suffolk", "Suffolk")],
+  ["hampton", t("js.place.hampton", "Hampton")], ["newport-news", t("js.place.newport-news", "Newport News")],
+  ["hampton-roads", t("js.place.hampton-roads", "All of Hampton Roads")], ["further", t("js.place.further", "Further Abroad")]];
+function helpItem(r, place) {
+  const link = safeUrl(r.link_url), more = safeUrl(r.more_url);
+  // the call button dials the first number, so a phone like "(757) 427-0071, option 1" still works; 988 and 211 too
+  const tel = (String(r.phone || "").match(/\+?\d[\d\s().-]{5,}\d/) || String(r.phone || "").match(/^(?:988|[2-9]11)\b/) || [""])[0].replace(/[^\d+]/g, "");
+  const email = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(r.email || "") ? r.email : "";
+  // where it is, unless that's just the city it's listed under
+  const area = r.area && r.area.trim().toLowerCase() !== place.toLowerCase() ? r.area : "";
+  const reach = [area ? h(area) : "", r.phone ? (tel ? `<a href="tel:${h(tel)}">${h(r.phone)}</a>` : h(r.phone)) : "", email ? `<a href="mailto:${h(email)}">${h(email)}</a>` : ""].filter(Boolean);
+  return `<li>${r.kind ? `<em class="kind">${h(r.kind)}</em>` : ""}${link ? `<a href="${h(link)}" target="_blank" rel="noopener">${h(r.name)} <span class="ext" aria-hidden="true">↗</span></a>` : `<b>${h(r.name)}</b>`}
+    ${r.description ? `<span>${h(r.description)}</span>` : ""}
+    ${r.best_for ? `<span><b>${h(t("js.help.best-for", "Best for:"))}</b> ${h(r.best_for)}</span>` : ""}
+    ${r.caution ? `<span class="caution" role="note">${h(r.caution)}</span>` : ""}
+    ${more ? `<a class="more" href="${h(more)}" target="_blank" rel="noopener">${h(r.more_label || t("js.help.more", "More from them"))} <span class="ext" aria-hidden="true">↗</span></a>` : ""}
+    ${reach.length ? `<small>${reach.join(" · ")}</small>` : ""}</li>`;
+}
 async function renderHelp() {
-  const boxes = $$("[data-help]");
-  if (!boxes.length) return;
+  const out = $("[data-cities]"), defs = $("[data-needs]"), shows = $$("[data-help-for]");
+  if (!(out && defs) && !shows.length) return;
   let rows = [];
-  try { rows = await q("help_resources", "select=category,name,kind,description,best_for,caution,link_url,more_url,more_label,phone,email,area&order=sort.asc,name.asc"); } catch { return; }
+  try { rows = await q("help_resources", "select=category,name,kind,description,best_for,caution,link_url,more_url,more_label,phone,email,area,cities&order=sort.asc,name.asc"); } catch { return; }
   await wordingReady;
-  boxes.forEach(box => {
-    const list = rows.filter(r => r.category === box.dataset.help);
-    if (!list.length) return;
-    box.innerHTML = `<ul class="res">${list.map(r => {
-      const link = safeUrl(r.link_url), more = safeUrl(r.more_url);
-      // the call button dials the first number, so a phone like "(757) 427-0071, option 1" still works; 988 and 211 too
-      const tel = (String(r.phone || "").match(/\+?\d[\d\s().-]{5,}\d/) || String(r.phone || "").match(/^(?:988|[2-9]11)\b/) || [""])[0].replace(/[^\d+]/g, "");
-      const email = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(r.email || "") ? r.email : "";
-      const reach = [r.area ? h(r.area) : "", r.phone ? (tel ? `<a href="tel:${h(tel)}">${h(r.phone)}</a>` : h(r.phone)) : "", email ? `<a href="mailto:${h(email)}">${h(email)}</a>` : ""].filter(Boolean);
-      return `<li>${r.kind ? `<em class="kind">${h(r.kind)}</em>` : ""}${link ? `<a href="${h(link)}" target="_blank" rel="noopener">${h(r.name)} <span class="ext" aria-hidden="true">↗</span></a>` : `<b>${h(r.name)}</b>`}
-        ${r.description ? `<span>${h(r.description)}</span>` : ""}
-        ${r.best_for ? `<span><b>${h(t("js.help.best-for", "Best for:"))}</b> ${h(r.best_for)}</span>` : ""}
-        ${r.caution ? `<span class="caution" role="note">${h(r.caution)}</span>` : ""}
-        ${more ? `<a class="more" href="${h(more)}" target="_blank" rel="noopener">${h(r.more_label || t("js.help.more", "More from them"))} <span class="ext" aria-hidden="true">↗</span></a>` : ""}
-        ${reach.length ? `<small>${reach.join(" · ")}</small>` : ""}</li>`;
-    }).join("")}</ul>`;
-    box.closest("[data-help-wrap]")?.removeAttribute("hidden"); // a section that only shows once it has listings
-    $$(`[data-help-for="${box.dataset.help}"]`).forEach(el => el.removeAttribute("hidden")); // and its links from elsewhere on the page
-  });
+  // parts of the page about one kind of help, and links to them, show once some is listed
+  shows.forEach(el => { if (rows.some(r => r.category === el.dataset.helpFor)) el.removeAttribute("hidden"); });
+  if (!out || !defs) return;
+  const needs = $$("[data-need]", defs);
+  const places = PLACES().map(([k, name]) => ({ k, name,
+    groups: needs.map(n => [n, rows.filter(r => r.category === n.dataset.need && (r.cities || []).includes(k))]).filter(([, list]) => list.length) }))
+    .filter(p => p.groups.length);
+  if (!places.length) { out.hidden = true; return; } // nothing listed yet: no "loading" note either
+  const nav = $("[data-city-nav]");
+  out.innerHTML = places.map(p => `<div class="city" id="${p.k}"><h3>${h(p.name)}</h3><div class="groups">${p.groups.map(([n, list]) =>
+    `<div class="group">${n.innerHTML}<ul class="res">${list.map(r => helpItem(r, p.name)).join("")}</ul></div>`).join("")}</div>${nav ? `<a class="totop" href="#city-nav">${h(t("js.place.top", "↑ Pick another city"))}</a>` : ""}</div>`).join("");
+  if (nav) {
+    nav.insertAdjacentHTML("beforeend", `<span class="placebtns">${places.map(p => `<a href="#${p.k}">${h(p.name)}</a>`).join("")}</span>`);
+    nav.hidden = false;
+  }
+  // a link straight to a city (like …/help/#norfolk) lands there once its section is in
+  const want = location.hash && document.getElementById(decodeURIComponent(location.hash.slice(1)));
+  if (want && out.contains(want)) want.scrollIntoView();
 }
 
 /* ---------- Rescues on Sniffari: day-out videos and her dog-friendly places ----------
@@ -778,8 +799,19 @@ function countView() {
   fetch(`${S.supabaseUrl}/rest/v1/rpc/count_view`, {
     method: "POST", keepalive: true,
     headers: { apikey: S.supabaseKey, "Content-Type": "application/json" },
-    body: JSON.stringify({ p_path: S.page, p_source: source || null }),
+    body: JSON.stringify({ p_path: S.page, p_source: source || null, ...(missedPath() ? { p_missed: missedPath() } : {}) }),
   }).catch(() => {});
+}
+// On the "Page not found" page, the address that was tried, so a link people keep getting wrong can be spotted:
+// just the page part (like /happy-tails), never anything after a ? or #.
+function missedPath() {
+  if (S.page !== "/404") return "";
+  let p = location.pathname;
+  try { p = decodeURIComponent(p); } catch {}
+  const base = S.base || "/";
+  if (p.startsWith(base)) p = "/" + p.slice(base.length);
+  p = p.replace(/[^A-Za-z0-9/._-]+/g, "-").replace(/\/{2,}/g, "/").slice(0, 101);
+  return /^\/404(\.html)?$/.test(p) ? "" : p;
 }
 
 /* ---------- photos added to the pages (edit page → Photos on the pages) ----------
