@@ -777,9 +777,27 @@ async function renderAdventures(el) {
 // One count per page view, kept in the site's own database (count_view): just the page, the day and where
 // the visit came from (TikTok, Google, ...). No cookies, and nothing about the visitor is stored or sent.
 // Skipped for bots, and on devices signed in to the edit page or set not to count.
-const SOURCE_OF = [[/(^|\.)tiktok\.com$/, "tiktok"], [/(^|\.)(facebook\.com|fb\.com|fb\.me)$/, "facebook"], [/(^|\.)instagram\.com$/, "instagram"],
-  [/(^|\.)(youtube\.com|youtu\.be)$/, "youtube"], [/(^|\.)google\.[a-z.]+$/, "google"], [/(^|\.)bing\.com$/, "bing"], [/(^|\.)duckduckgo\.com$/, "duckduckgo"],
-  [/(^|\.)(t\.co|x\.com|twitter\.com)$/, "x"], [/(^|\.)reddit\.com$/, "reddit"], [/(^|\.)pinterest\.[a-z.]+$/, "pinterest"], [/(^|\.)linktr\.ee$/, "linktree"]];
+const SOURCE_OF = [[/(^|\.)tiktok\.com$/, "tiktok"], [/(^|\.)(facebook\.com|fb\.com|fb\.me)$/, "facebook"], [/(^|\.)(messenger\.com|m\.me)$/, "messenger"],
+  [/(^|\.)instagram\.com$/, "instagram"], [/(^|\.)threads\.(net|com)$/, "threads"], [/(^|\.)meta\.ai$/, "meta-ai"], [/(^|\.)(youtube\.com|youtu\.be)$/, "youtube"],
+  [/^mail\.google\.com$/, "gmail"], [/^gemini\.google\.com$/, "gemini"], [/(^|\.)google\.[a-z.]+$/, "google"], [/(^|\.)bing\.com$/, "bing"], [/(^|\.)duckduckgo\.com$/, "duckduckgo"],
+  [/(^|\.)yahoo\.com$/, "yahoo"], [/^search\.brave\.com$/, "brave"], [/(^|\.)(t\.co|x\.com|twitter\.com)$/, "x"], [/(^|\.)reddit\.com$/, "reddit"],
+  [/(^|\.)pinterest\.[a-z.]+$/, "pinterest"], [/(^|\.)linktr\.ee$/, "linktree"], [/(^|\.)snapchat\.com$/, "snapchat"], [/(^|\.)(linkedin\.com|lnkd\.in)$/, "linkedin"],
+  [/(^|\.)(discord\.com|discordapp\.com)$/, "discord"], [/(^|\.)(t\.me|telegram\.org)$/, "telegram"], [/(^|\.)(whatsapp\.com|wa\.me)$/, "whatsapp"],
+  [/^outlook\.(live|office|office365)\.com$/, "outlook"], [/(^|\.)bsky\.app$/, "bluesky"], [/(^|\.)nextdoor\.com$/, "nextdoor"],
+  [/(^|\.)(chatgpt\.com|chat\.openai\.com)$/, "chatgpt"], [/(^|\.)perplexity\.ai$/, "perplexity"], [/^copilot\.microsoft\.com$/, "copilot"]];
+// A link opened inside an app's own browser (TikTok, Instagram, Facebook...) usually comes with no "came from", but the
+// app adds its name to the browser's description of itself. Only the app's name is sent, never the description.
+const APP_OF = [[/musical_ly|BytedanceWebview|\bTikTok\b|\btrill_/i, "tiktok"], [/\bInstagram\b/, "instagram"],
+  [/MessengerForiOS|FBAN\/Messenger|\bOrca-Android\b/, "messenger"], [/\bFBAN\/|\bFBAV\/|\bFB_IAB\b|\bFBIOS\b/, "facebook"],
+  [/\bSnapchat\b/, "snapchat"], [/\bPinterest\b/, "pinterest"], [/\bLinkedInApp\b/, "linkedin"], [/\bGSA\/\d/, "google"]];
+// On Android, an app that opens a link in the phone's browser passes its own name (android-app://com.whatsapp/).
+const ANDROID_APP = { "com.zhiliaoapp.musically": "tiktok", "com.ss.android.ugc.trill": "tiktok", "com.ss.android.ugc.aweme": "tiktok",
+  "com.instagram.android": "instagram", "com.instagram.barcelona": "threads", "com.facebook.katana": "facebook", "com.facebook.lite": "facebook",
+  "com.facebook.orca": "messenger", "com.facebook.mlite": "messenger", "com.google.android.gm": "gmail", "com.microsoft.office.outlook": "outlook",
+  "com.whatsapp": "whatsapp", "com.whatsapp.w4b": "whatsapp", "com.discord": "discord", "org.telegram.messenger": "telegram",
+  "com.snapchat.android": "snapchat", "com.reddit.frontpage": "reddit", "com.pinterest": "pinterest", "com.twitter.android": "x",
+  "com.linkedin.android": "linkedin", "com.google.android.youtube": "youtube", "com.google.android.googlequicksearchbox": "google",
+  "com.google.android.apps.messaging": "texts", "com.samsung.android.messaging": "texts", "xyz.blueskyweb.app": "bluesky", "com.nextdoor": "nextdoor" };
 function countView() {
   try { if (localStorage.getItem("tt-editor-session") || localStorage.getItem("tt-no-count")) return; } catch {}
   if (!S.page || navigator.webdriver || /bot|crawl|spider|slurp|headless|lighthouse|preview/i.test(navigator.userAgent)) return;
@@ -791,10 +809,15 @@ function countView() {
     try { history.replaceState(history.state, "", url.pathname + url.search + url.hash); } catch {}
   }
   if (!source) {
-    let ref = "";
-    try { ref = document.referrer ? new URL(document.referrer).hostname.replace(/^www\./, "") : ""; } catch {}
+    let ref = "", app = "";
+    try {
+      const r = document.referrer ? new URL(document.referrer) : null;
+      if (r?.protocol === "android-app:") app = r.hostname.toLowerCase(); else if (r) ref = r.hostname.replace(/^www\./, "");
+    } catch {}
     if (ref === location.hostname.replace(/^www\./, "")) source = ""; // moving around the site: a page view, not a new visit
-    else source = !ref ? "direct" : (SOURCE_OF.find(([re]) => re.test(ref)) || [, ref])[1];
+    else if (ref) source = (SOURCE_OF.find(([re]) => re.test(ref)) || [, ref])[1];
+    else if (app) source = (ANDROID_APP[app] || app).slice(0, 40);
+    else source = (APP_OF.find(([re]) => re.test(navigator.userAgent)) || [, "direct"])[1];
   }
   fetch(`${S.supabaseUrl}/rest/v1/rpc/count_view`, {
     method: "POST", keepalive: true,
