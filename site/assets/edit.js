@@ -1556,7 +1556,14 @@ async function showDeleted() {
 // Counts kept by the site itself (public.page_views, public.visit_sources, public.missed_pages): a page, a day and a number.
 // No cookies, and nothing about who visited.
 const SOURCES = { tiktok: "TikTok", facebook: "Facebook", instagram: "Instagram", youtube: "YouTube", google: "Google", bing: "Bing", duckduckgo: "DuckDuckGo",
-  x: "X (Twitter)", reddit: "Reddit", pinterest: "Pinterest", linktree: "Linktree", direct: "Direct (typed in, bookmarks, some apps)" };
+  x: "X (Twitter)", reddit: "Reddit", pinterest: "Pinterest", linktree: "Linktree", messenger: "Messenger", threads: "Threads", "meta-ai": "Meta AI",
+  "l.meta.ai": "Meta AI", gmail: "Gmail", gemini: "Gemini", yahoo: "Yahoo", brave: "Brave Search", snapchat: "Snapchat", linkedin: "LinkedIn",
+  discord: "Discord", telegram: "Telegram", whatsapp: "WhatsApp", outlook: "Outlook", bluesky: "Bluesky", nextdoor: "Nextdoor", chatgpt: "ChatGPT",
+  perplexity: "Perplexity", copilot: "Copilot", texts: "Text messages",
+  direct: "Direct (typed in, bookmarks, texts and other apps)" };
+// visits counted under different names for the same place (like l.meta.ai before it had a name) show as one line
+const srcName = k => SOURCES[k] || k;
+const bySource = list => Object.entries(list.reduce((a, [k, n]) => ((a[srcName(k)] = (a[srcName(k)] || 0) + n), a), {})).sort((x, y) => y[1] - x[1] || x[0].localeCompare(y[0]));
 const RANGES = [["7", "7 days"], ["30", "30 days"], ["365", "12 months"]];
 const NOCOUNT = "tt-no-count";
 function barList(rows, name) {
@@ -1595,8 +1602,8 @@ async function showVisitors(range) {
     <p class="hint vmiss">Addresses people tried that aren't on the site, usually a link that was mistyped or cut short. If the same one keeps showing up, look for where that link was posted and fix it there.</p>
     ${barList(s.missed, p => p)}` : ""}
     <h2 class="sub">Where visits came from</h2>
-    ${s.sources.length ? barList(s.sources, k => SOURCES[k] || k) : `<p class="allgood">No visits yet.</p>`}
-    <p class="hint vtip">Visits from inside the TikTok and Instagram apps often show as Direct. To count them, add <b>?from=tiktok</b> to the link in your bio, like <b>${h((CFG.siteUrl || "") + "?from=tiktok")}</b> (or ?from=instagram, ?from=youtube).</p>
+    ${s.sources.length ? barList(bySource(s.sources), k => k) : `<p class="allgood">No visits yet.</p>`}
+    <p class="hint vtip">The site can usually tell when a link was opened inside TikTok, Instagram, Facebook, Messenger or Snapchat. Links sent in texts, WhatsApp, Discord or email on an iPhone still show as Direct. To count a link you share, add <b>?from=</b> and a name to it, like <b>${h((CFG.siteUrl || "") + "?from=tiktok")}</b> (or ?from=instagram, ?from=flyer).</p>
     <div class="card vdev">
       <h2>This phone or computer</h2>
       <p class="small">Visits from a device that's signed in here never count. ${off ? "This one is also skipped when signed out." : "When signed out, this one counts like any visitor."}</p>
