@@ -1559,7 +1559,7 @@ const SOURCES = { tiktok: "TikTok", facebook: "Facebook", instagram: "Instagram"
   x: "X (Twitter)", reddit: "Reddit", pinterest: "Pinterest", linktree: "Linktree", messenger: "Messenger", threads: "Threads", "meta-ai": "Meta AI",
   "l.meta.ai": "Meta AI", gmail: "Gmail", gemini: "Gemini", yahoo: "Yahoo", brave: "Brave Search", snapchat: "Snapchat", linkedin: "LinkedIn",
   discord: "Discord", telegram: "Telegram", whatsapp: "WhatsApp", outlook: "Outlook", bluesky: "Bluesky", nextdoor: "Nextdoor", chatgpt: "ChatGPT",
-  perplexity: "Perplexity", copilot: "Copilot", texts: "Text messages",
+  perplexity: "Perplexity", copilot: "Copilot", texts: "Text messages", "qr-card": "QR code: shelter cards", "qr-key": "QR code: keychains",
   direct: "Direct (typed in, bookmarks, texts and other apps)" };
 // visits counted under different names for the same place (like l.meta.ai before it had a name) show as one line
 const srcName = k => SOURCES[k] || k;
