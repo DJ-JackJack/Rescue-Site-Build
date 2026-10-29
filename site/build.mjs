@@ -25,9 +25,14 @@
 //   SITE_TEXT_FILE a JSON file of saved wording ({"key": "words"}) to build with instead of reading site_text,
 //                  for tests ({} builds the pages' own words).
 //   PAGE_PHOTOS_FILE a JSON file of page_photos rows to build with instead of reading the table, for tests.
+//   ARTICLES_FILE  a JSON file of Twin Squawk posts to build with instead of reading the live ones, for tests.
 //
 // Photos added to the pages (page_photos) are built in the same way: site/photospots.mjs marks every spot a photo
 // can go, the edit page gets the list, and saved photos are put in. site.js puts in anything saved since.
+//
+// Every live Twin Squawk post gets a page of its own, /twin-squawk/<slug>/ (site/posts.mjs): the Twin Squawk page with
+// that post open, and its headline, summary and photo for link previews. twin-squawk/stamp.txt says which posts the
+// pages were built from, so tools/posts-changed.mjs can tell when a post has gone live or changed since.
 
 import fs from "node:fs";
 import path from "node:path";
@@ -35,6 +40,7 @@ import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { annotate, blockHTML, esc as escText, scriptPhrases } from "./wording.mjs";
 import { markSpots, bakePhotos } from "./photospots.mjs";
+import { livePosts, postsStamp, SLUG } from "./posts.mjs";
 import { createRequire } from "node:module";
 
 const SRC = path.dirname(fileURLToPath(import.meta.url));
@@ -98,6 +104,15 @@ async function savedPhotos() {
 }
 const photoRows = await savedPhotos();
 
+// The live Twin Squawk posts. If they can't be read, the posts get no pages of their own this time (their addresses
+// still open them on the Twin Squawk page), and the stamp says so, so the next check builds them.
+async function posts() {
+  if (process.env.ARTICLES_FILE) return JSON.parse(fs.readFileSync(process.env.ARTICLES_FILE, "utf8")).filter(p => SLUG.test(p.slug || ""));
+  try { return await livePosts(CONFIG.supabaseUrl, CONFIG.supabaseKey); }
+  catch (e) { console.warn(`! Twin Squawk posts not loaded (${e.message}); building without their own pages`); return null; }
+}
+const postRows = await posts();
+
 fs.rmSync(OUT, { recursive: true, force: true });
 fs.mkdirSync(OUT, { recursive: true });
 
@@ -126,18 +141,21 @@ function fill(html) {
 // Wording marked data-text="key" data-label="..." can be changed from the edit page. The page's own words
 // are the default, handed to the edit page as plain text ("## " starts a heading, a blank line a paragraph).
 const decode = s => s.replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim();
-// Returns the HTML with any saved wording built in, and fills in the block's entry in items.
+// Returns the HTML with any saved wording built in, and fills in the block's entry in items. again: the same page
+// built once more (a Twin Squawk post's own page), so its wording is already listed.
 const blockKeys = new Set();
-function collectText(html, page, items) {
+function collectText(html, page, items, again = false) {
   return html.replace(/(<(p|div)\b[^>]*\bdata-text="([^"]+)"[^>]*\bdata-label="([^"]+)"[^>]*>)([\s\S]*?)(<\/\2>)/g, (all, open, tag, key, label, inner, close) => {
     if (tag === "div" && /<div\b/.test(inner)) throw new Error(`${page}: data-text block "${key}" can't contain another <div>`);
-    if (blockKeys.has(key)) throw new Error(`${page}: data-text key "${key}" is used twice`);
-    blockKeys.add(key);
     const text = tag === "p" ? decode(inner)
       : [...inner.matchAll(/<(h2|p)\b[^>]*>([\s\S]*?)<\/\1>/g)].map(([, t, s]) => (t === "h2" ? "## " : "") + decode(s)).join("\n\n");
-    const item = items.find(i => i.key === key);
-    if (!item) throw new Error(`${page}: data-text block "${key}" wasn't found in the page's wording`);
-    Object.assign(item, { kind: tag === "div" ? "A few paragraphs" : "Paragraph", label: decode(label), multi: tag === "div", text });
+    if (!again) {
+      if (blockKeys.has(key)) throw new Error(`${page}: data-text key "${key}" is used twice`);
+      blockKeys.add(key);
+      const item = items.find(i => i.key === key);
+      if (!item) throw new Error(`${page}: data-text block "${key}" wasn't found in the page's wording`);
+      Object.assign(item, { kind: tag === "div" ? "A few paragraphs" : "Paragraph", label: decode(label), multi: tag === "div", text });
+    }
     return saved[key] ? open.replace(/>$/, ` data-text-orig="${escText(text)}">`) + blockHTML(saved[key], tag === "p") + close : all;
   });
 }
@@ -145,23 +163,37 @@ function collectText(html, page, items) {
 // Link previews (Facebook, texts, TikTok bio links): each page's title and description, and a share image
 // from assets/share/ named after the page (willow-woods.jpg), or default.jpg.
 const pageUrls = [], pageNames = []; // pageNames: for the edit page's Visitors screen
-function social(meta, title, description) {
+// A Twin Squawk post (post: { photo: {src, alt, w, h}, time }) is an article with its own photo, when it has one.
+function social(meta, title, description, post) {
   const url = SITE_URL + (meta.path === "404" ? "" : meta.path || "");
   const name = (meta.path || "").replace(/\/$/, "");
-  const img = hashes[`share/${name}.jpg`] ? `share/${name}.jpg` : "share/default.jpg";
+  const img = hashes[`share/${name}.jpg`] ? `share/${name}.jpg` : "share/default.jpg", photo = post?.photo;
   return [
     meta.path === "404" ? "" : `<link rel="canonical" href="${esc(url)}">`,
     `<meta property="og:site_name" content="TheTerr0rTw!ns">`,
-    `<meta property="og:type" content="website">`,
+    `<meta property="og:type" content="${post ? "article" : "website"}">`,
     `<meta property="og:title" content="${escText(title)}">`,
     `<meta property="og:description" content="${escText(description)}">`,
     `<meta property="og:url" content="${esc(url)}">`,
-    `<meta property="og:image" content="${esc(SITE_URL + "assets/" + img + "?v=" + hashes[img])}">`,
-    `<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">`,
-    `<meta property="og:image:alt" content="Snapshots of animals from TheTerr0rTw!ns">`,
+    photo ? `<meta property="og:image" content="${esc(photo.src)}">` : `<meta property="og:image" content="${esc(SITE_URL + "assets/" + img + "?v=" + hashes[img])}">`,
+    photo ? (photo.w > 0 && photo.h > 0 ? `<meta property="og:image:width" content="${photo.w}"><meta property="og:image:height" content="${photo.h}">` : "")
+      : `<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">`,
+    `<meta property="og:image:alt" content="${escText(photo ? photo.alt || title : "Snapshots of animals from TheTerr0rTw!ns")}">`,
+    post?.time ? `<meta property="article:published_time" content="${esc(post.time)}">` : "",
     `<meta name="twitter:card" content="summary_large_image">`,
   ].filter(Boolean).join("\n");
 }
+// A post's photo for its link preview: the cover, else the first photo in its gallery. Photos are on https:// (the
+// database's photo storage) or in the site's own assets/photos/.
+const httpsUrl = u => { try { const x = u && new URL(String(u), SITE_URL); return x?.protocol === "https:" || x?.href.startsWith(SITE_URL) ? x.href : ""; } catch { return ""; } };
+function postPhoto(p) {
+  if (httpsUrl(p.photo_url)) return { src: httpsUrl(p.photo_url), alt: p.photo_alt || "" };
+  const g = (Array.isArray(p.photos) ? p.photos : []).find(x => httpsUrl(x?.url));
+  return g ? { src: httpsUrl(g.url), alt: g.alt || "", w: Number(g.w) || 0, h: Number(g.h) || 0 } : null;
+}
+// what a link preview says about a post: its summary, else the start of the post (without "## " headings)
+const clip = (s, n) => (s.length > n ? s.slice(0, n - 1).replace(/\s+\S*$/, "") + "…" : s);
+const postBlurb = p => clip((p.summary || String(p.body || "").split(/\n\s*\n/).map(b => b.replace(/^##\s.*(\n|$)/, "")).join(" ")).replace(/\s+/g, " ").trim(), 200);
 
 // The phrases site.js writes as pages load (labels, empty lists, form replies), from its t("js.key", "...") calls.
 // Saved versions go to every page in window.SITE.t, so they're right from the start.
@@ -193,20 +225,25 @@ for (const file of fs.readdirSync(pagesDir).filter(f => f.endsWith(".html")).sor
   if (scope !== "404") { spots[scope] = marked.spots; pics[scope] = marked.pics; }
   const photos = photoRows.filter(r => r.page === scope);
   const body = bakePhotos(annotate(marked.html, scope, saved, items), photos, BASE);
-  const site = JSON.stringify({ ...CONFIG, page: "/" + (meta.path === "404" ? "404" : meta.path || ""), scope, t: scriptSaved, pp: PP.stamp(photos), ...(saved[items[0].key] ? { titleOrig: tab } : {}) }).replace(/</g, "\\u003c");
-  let html = layout
-    .replace("{{title}}", escText(title))
-    .replace("{{description}}", escText(description))
-    .replace("{{robots}}", PREVIEW ? '<meta name="robots" content="noindex, nofollow">' : "")
-    .replace("{{social}}", () => social(meta, preview, description))
-    .replace("{{preview}}", PREVIEW ? '<div class="preview" role="note"><b>PREVIEW</b> · This site isn\'t launched yet.</div>' : "")
-    .replace("{{config}}", () => `<script>window.SITE=${site};</script>`)
-    .replace("{{bodyclass}}", esc(meta.bodyclass || ""))
-    .replace("{{content}}", () => body);
-  if (meta.nav) html = html.replaceAll(`data-nav="${meta.nav}"`, `data-nav="${meta.nav}" aria-current="page"`);
-  const left = html.match(/\{\{[^}]*\}\}/);
-  if (left) throw new Error(`${file}: unfilled placeholder ${left[0]}`);
-  html = collectText(html, page, items);
+  const squawk = scope === "twin-squawk" && postRows ? postRows : [];
+  const site = { ...CONFIG, page: "/" + (meta.path === "404" ? "404" : meta.path || ""), scope, t: scriptSaved, pp: PP.stamp(photos), ...(saved[items[0].key] ? { titleOrig: tab } : {}),
+    ...(scope === "twin-squawk" ? { posts: squawk.map(p => p.slug) } : {}) };
+  const make = (title, description, socialTags, site) => {
+    let html = layout
+      .replace("{{title}}", escText(title))
+      .replace("{{description}}", escText(description))
+      .replace("{{robots}}", PREVIEW ? '<meta name="robots" content="noindex, nofollow">' : "")
+      .replace("{{social}}", () => socialTags)
+      .replace("{{preview}}", PREVIEW ? '<div class="preview" role="note"><b>PREVIEW</b> · This site isn\'t launched yet.</div>' : "")
+      .replace("{{config}}", () => `<script>window.SITE=${JSON.stringify(site).replace(/</g, "\\u003c")};</script>`)
+      .replace("{{bodyclass}}", esc(meta.bodyclass || ""))
+      .replace("{{content}}", () => body);
+    if (meta.nav) html = html.replaceAll(`data-nav="${meta.nav}"`, `data-nav="${meta.nav}" aria-current="page"`);
+    const left = html.match(/\{\{[^}]*\}\}/);
+    if (left) throw new Error(`${file}: unfilled placeholder ${left[0]}`);
+    return html;
+  };
+  let html = collectText(make(title, description, social(meta, preview, description), site), page, items);
   pageItems.push(...items);
   areas.push({ scope, title: meta.title === "Home" ? "Home" : fill(meta.title), path: meta.path === "404" ? null : "/" + (meta.path || "") });
   const outFile = meta.path === "404" ? path.join(OUT, "404.html") : path.join(OUT, meta.path || "", "index.html");
@@ -214,6 +251,17 @@ for (const file of fs.readdirSync(pagesDir).filter(f => f.endsWith(".html")).sor
   fs.writeFileSync(outFile, html);
   built.push("/" + (meta.path === "404" ? "404.html" : meta.path || ""));
   if (meta.path !== "404") { pageUrls.push(SITE_URL + (meta.path || "")); pageNames.push({ path: "/" + (meta.path || ""), title: fill(meta.title) }); }
+  // each live Twin Squawk post: this page with that post open, and the post's own link preview
+  for (const p of squawk) {
+    const at = `${meta.path}${p.slug}/`, blurb = postBlurb(p) || description;
+    const own = make(`${p.title} · TheTerr0rTw!ns`, blurb, social({ ...meta, path: at }, p.title, blurb, { photo: postPhoto(p), time: p.publish_at || p.created_at }), { ...site, page: "/" + at, post: p.slug });
+    fs.mkdirSync(path.join(OUT, at), { recursive: true });
+    fs.writeFileSync(path.join(OUT, at, "index.html"), collectText(own, "/" + at, items, true));
+    built.push("/" + at);
+    pageUrls.push(SITE_URL + at);
+    pageNames.push({ path: "/" + at, title: `Twin Squawk: ${p.title}` });
+  }
+  if (scope === "twin-squawk") fs.writeFileSync(path.join(OUT, meta.path, "stamp.txt"), (postRows ? postsStamp(postRows) : "not loaded") + "\n");
 }
 
 // the edit page (/edit/): its own page, not linked from the site, never indexed
