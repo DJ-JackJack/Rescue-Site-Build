@@ -11,7 +11,7 @@ import path from "node:path";
 const SUPABASE = JSON.parse(fs.readFileSync(new URL("../site/supabase.json", import.meta.url), "utf8"));
 const API = (process.env.SUPABASE_URL || SUPABASE.url).replace(/\/+$/, ""), KEY = process.env.SUPABASE_KEY || SUPABASE.key;
 const OUT = path.resolve(process.argv[2] || "backup");
-const TABLES = ["partners", "goals", "goal_bars", "animals", "events", "collabs", "sniffari_programs", "foster_programs", "adventures", "videos", "places", "page_photos", "help_resources", "site_text"];
+const TABLES = ["partners", "goals", "goal_bars", "animals", "events", "collabs", "sniffari_programs", "foster_programs", "adventures", "videos", "places", "page_photos", "help_resources", "articles", "site_text"];
 
 async function get(url, tries = 3) {
   for (let i = 1; ; i++) {
