@@ -7,6 +7,10 @@
    - Wording saved on the edit page is put in as the page loads (see "wording" below). */
 (() => {
 const S = window.SITE || {};
+// A Twin Squawk post's own page (/twin-squawk/its-name/) is built a few minutes after it goes live. Until then, its
+// address opens it on the Twin Squawk page instead of "Page not found".
+const early = S.scope === "404" && location.pathname.match(/\/twin-squawk\/([a-z0-9][a-z0-9-]{0,79})\/?$/);
+if (early) { location.replace(`${S.base || "/"}twin-squawk/#${early[1]}`); return; }
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
 const h = v => String(v ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -77,7 +81,7 @@ const wordingLoaded = q("site_text", "select=key,body").then(rows => {
   $$("[data-t-alt]").forEach(el => { const b = by[el.dataset.tAlt] ?? el.dataset.tOrig; if (b !== undefined) el.alt = b; });
   $$("[data-t-ph]").forEach(el => { const b = by[el.dataset.tPh] ?? el.dataset.tOrig; if (b !== undefined) el.placeholder = b; });
   const title = by[`p.${S.scope}.title`] ?? S.titleOrig;
-  if (title) document.title = title;
+  if (title && !S.post) document.title = title; // a Twin Squawk post's own page keeps the post's title
   for (const k of Object.keys(PHRASES)) if (!(k in by)) delete PHRASES[k];
   for (const k in by) if (k.startsWith("js.")) PHRASES[k] = by[k];
 }).catch(() => {});
@@ -743,8 +747,9 @@ async function renderAdventures(el) {
   addEventListener("hashchange", fromHash);
 }
 // A reader (a day out, a Twin Squawk post): YouTube plays once tapped, photos open larger (arrow keys go through them,
-// Escape closes the photo first), and closing stops any video and takes the post off the address (ownHash).
-function setupReader(dlg, ownHash) {
+// Escape closes the photo first), and closing stops any video and takes the post off the address (away(): the address
+// to go back to, or nothing to leave it).
+function setupReader(dlg, away) {
   if (!dlg) return;
   const body = $(".jbody", dlg), light = $(".lightbox", dlg), img = $("img", light);
   const show = i => { const n = dlg.photos.length; dlg.at = (i + n) % n; img.src = dlg.photos[dlg.at]; img.alt = dlg.alts?.[dlg.at] || t("js.adventure.photo", "Photo {n} of {count}", { n: dlg.at + 1, count: n }); light.hidden = false; $(".lb-x", light).focus(); };
@@ -770,17 +775,21 @@ function setupReader(dlg, ownHash) {
     else if (e.key === "ArrowRight") show(dlg.at + 1);
   });
   $(".jclose", dlg).addEventListener("click", () => dlg.close());
-  dlg.addEventListener("close", () => { body.innerHTML = ""; shut(); if (ownHash(location.hash)) history.replaceState(null, "", location.pathname + location.search); });
+  dlg.addEventListener("close", () => { body.innerHTML = ""; shut(); const back = away(); if (back) history.replaceState(null, "", back); });
 }
-setupReader($("#adventure"), hash => /^#day-out-/.test(hash));
+setupReader($("#adventure"), () => (/^#day-out-/.test(location.hash) ? location.pathname + location.search : ""));
 document.addEventListener("click", e => { const b = e.target.closest(".advcard"); if (b) openAdventure(ADVS.find(a => a.id === b.dataset.adv)); });
 
 /* ---------- Twin Squawk: the news page ----------
    Newest first, by when each one went live (a post waiting for its time isn't sent to visitors at all). Each opens in a
-   reader at its own address (/twin-squawk/#its-name), so it can be shared: its photos open larger, and YouTube videos
-   play there once tapped. */
+   reader at its own address, so it can be shared: its photos open larger, and YouTube videos play there once tapped.
+   That address is the post's own page (/twin-squawk/its-name/, with its own link preview) once the site has been built
+   with it (S.posts), a few minutes after it goes live; until then, /twin-squawk/#its-name. On a post's own page (S.post)
+   it opens straight away. */
 let POSTS = [];
 const postDate = p => p.publish_at || p.created_at;
+const squawkHome = `${S.base || "/"}twin-squawk/`;
+const postAddress = p => ((S.posts || []).includes(p.slug) ? `${squawkHome}${p.slug}/` : `${squawkHome}#${p.slug}`);
 // a post's words: a blank line starts a new paragraph; a line starting "## " is a heading, with the lines under it as text
 const postHTML = s => s.trim().split(/\n\s*\n/).map(b => {
   const [first, ...rest] = b.trim().split("\n"), head = /^##\s/.test(first) ? `<h3 class="sqhead">${h(first.replace(/^##\s+/, ""))}</h3>` : "";
@@ -809,28 +818,30 @@ function openArticle(p) {
   $("#sqlight").hidden = true;
   if (!dlg.open) dlg.showModal ? dlg.showModal() : dlg.setAttribute("open", "");
   $("#sqbody").scrollTop = 0;
-  history.replaceState(null, "", "#" + p.slug);
+  history.replaceState(null, "", postAddress(p));
 }
 async function renderArticles(el) {
   try { POSTS = await q("articles", "select=id,slug,title,summary,body,photo_url,photo_frame,photo_alt,photos,videos,links,publish_at,created_at"); } catch { return; }
   POSTS.sort((a, b) => new Date(postDate(b)) - new Date(postDate(a)));
+  // a post's own page for a post that has since come down: just the list
+  if (S.post && !POSTS.some(p => p.slug === S.post)) history.replaceState(null, "", squawkHome + location.search);
   if (!POSTS.length) return;
   await wordingReady;
-  el.innerHTML = POSTS.map((p, i) => `<li><a class="sqcard" href="#${h(p.slug)}" data-post="${h(p.slug)}"><span class="ph ${BG[i % 6]}" aria-hidden="true">🦜${photoTag(p.photo_url, "", p.photo_frame)}</span>
+  el.innerHTML = POSTS.map((p, i) => `<li><a class="sqcard" href="${h(postAddress(p))}" data-post="${h(p.slug)}"><span class="ph ${BG[i % 6]}" aria-hidden="true">🦜${photoTag(p.photo_url, "", p.photo_frame)}</span>
     <span class="bd"><small>${h(fullDate(postDate(p)))}</small><b>${h(p.title)}</b>${p.summary ? `<span>${h(p.summary)}</span>` : ""}<em>${h(t("js.squawk.read", "Read it"))}</em></span></a></li>`).join("");
   $$("[data-articles-empty]").forEach(x => { x.hidden = true; });
-  // a link to one post (#its-name) opens it, on arrival or later
+  // a link to one post (#its-name, or its own page) opens it, on arrival or later
   const fromHash = () => { let s = ""; try { s = decodeURIComponent(location.hash.slice(1)); } catch {} openArticle(POSTS.find(x => x.slug === s)); };
-  fromHash();
+  if (S.post && !location.hash) openArticle(POSTS.find(x => x.slug === S.post)); else fromHash();
   addEventListener("hashchange", fromHash);
 }
-setupReader($("#article"), hash => POSTS.some(p => "#" + p.slug === hash));
+setupReader($("#article"), () => squawkHome + location.search);
 document.addEventListener("click", async e => {
   const card = e.target.closest(".sqcard");
   if (card && !e.metaKey && !e.ctrlKey && !e.shiftKey && e.button === 0) { e.preventDefault(); return openArticle(POSTS.find(p => p.slug === card.dataset.post)); } // a new tab works normally
   const share = e.target.closest("#article [data-share]");
   if (!share) return;
-  const p = $("#article").post, url = location.origin + location.pathname + "#" + p.slug;
+  const p = $("#article").post, url = location.origin + postAddress(p);
   if (navigator.share) { try { await navigator.share({ title: p.title, url }); } catch {} return; } // cancelled: nothing to do
   try { await navigator.clipboard.writeText(url); share.textContent = t("js.squawk.copied", "Link copied ✓"); } catch { share.textContent = url; }
 });

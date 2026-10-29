@@ -67,6 +67,9 @@ const urls = [...(await sitemapRes.text()).matchAll(/<loc>([^<]+)<\/loc>/g)].map
 check(sitemapRes.status === 200 && urls.length > 0, "sitemap lists the pages", `${urls.length} pages`);
 check(urls.every(u => u.startsWith(site.href)), "sitemap uses this address", urls.find(u => !u.startsWith(site.href)) || site.origin);
 
+// A Twin Squawk post's link preview uses its own photo, from the database's photo storage.
+let photos = "";
+try { photos = JSON.parse(attr(home, /window\.SITE=(\{.*?\});<\/script>/)).supabaseUrl + "/storage/v1/object/public/photos/"; } catch {}
 const images = new Set();
 for (const u of urls) {
   const r = await get(u), html = await r.text();
@@ -75,7 +78,7 @@ for (const u of urls) {
   const problems = [];
   if (r.status !== 200) problems.push(`status ${r.status}`);
   if (canon !== u || og !== u) problems.push(`preview address ${canon || "missing"}`);
-  if (!img.startsWith(site.href)) problems.push(`share image ${img || "missing"}`);
+  if (!img.startsWith(site.href) && !(photos && img.startsWith(photos))) problems.push(`share image ${img || "missing"}`);
   if (/\{\{[^}]*\}\}/.test(html)) problems.push("unfilled placeholder");
   if (/<meta name="robots" content="noindex/.test(html) !== preview) problems.push("preview mode differs from the homepage");
   if (/class="preview"/.test(html) !== preview) problems.push("preview banner differs from the homepage");

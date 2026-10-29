@@ -1,0 +1,31 @@
+# Every 10 minutes, rebuilds the site if a Twin Squawk post has gone live, changed or come down since the last build
+# (tools/posts-changed.mjs). That gives each post its own page, with its own link preview, within about 15 minutes of
+# going live. Most runs find nothing to do and stop after a few seconds.
+name: Build new posts
+on:
+  schedule:
+    - cron: "4,14,24,34,44,54 * * * *"
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: read
+  actions: write
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Look for new or changed posts
+        id: posts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node tools/posts-changed.mjs "$(gh api "repos/${{ github.repository }}/pages" --jq .html_url)" >> "$GITHUB_OUTPUT"
+      - name: Rebuild the site
+        if: steps.posts.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run deploy-site.yml --ref main -R "${{ github.repository }}"

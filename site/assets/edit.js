@@ -380,7 +380,9 @@ const SECTIONS = {
     titleOf: r => r.title,
     order: (a, b) => postTime(b) - postTime(a),
     row: r => ({ title: r.title, emoji: "🦜", photo: r.photo_url, frame: r.photo_frame, sub: niceDay(r.publish_at || r.created_at), flags: [!r.published && "Hidden"] }),
-    link: r => `${CFG.siteUrl || CFG.base}twin-squawk/#${r.slug}`,
+    link: r => `${CFG.siteUrl || CFG.base}twin-squawk/${r.slug}/`,
+    // whether its own page, with its link preview, is up yet: the site is rebuilt within about 15 minutes of a post going live
+    built: r => fetch(`${CFG.base}twin-squawk/${encodeURIComponent(r.slug)}/`, { method: "HEAD", cache: "no-store" }).then(x => x.ok, () => false),
     fields: [
       { name: "title", type: "text", label: "Headline", required: true, max: 200, help: "Like “Tyce found his family”." },
       { name: "summary", type: "textarea", rows: 2, max: 400, label: "Short summary", help: "A line or two. Shown under the headline on the list, and at the top of the post." },
@@ -1152,7 +1154,8 @@ async function showForm(key, id, params = new URLSearchParams()) {
   render(`${backUrl ? `<a class="back" href="${h(backUrl)}">‹ Back to ${h(backTo.title)}</a>` : `<a class="back" href="${listUrl}">‹ ${h(listName)}</a>`}
     <h1>${isNew ? `${plan ? "Plan" : "Add"} ${h(S.one)}` : h(S.titleOf(row))}</h1>
     ${!isNew && row.updated_at ? `<p class="small">Last changed ${h(nice(row.updated_at.slice(0, 10)))}</p>` : ""}
-    ${!isNew && S.link ? `<p class="small">Its link: <a href="${h(S.link(row))}" target="_blank" rel="noopener">${h(S.link(row).replace(/^https?:\/\//, ""))}</a>${future(row.publish_at) ? " (it works once it's live)" : ""}</p>` : ""}
+    ${!isNew && S.link ? `<p class="small">Its link: <a href="${h(S.link(row))}" target="_blank" rel="noopener">${h(S.link(row).replace(/^https?:\/\//, ""))}</a>
+      <span data-link-note>${!row.published ? "(it works once “Show on the site” is on)" : future(row.publish_at) ? "(it works once it's live)" : ""}</span></p>` : ""}
     <form class="form eform" novalidate>
       ${S.fields.map(f => fieldHTML(f, vals[f.name], ctx)).join("")}
       ${herds.length ? `<datalist id="herds">${[...new Set(herds.map(x => x.herd))].map(x => `<option value="${h(x)}">`).join("")}</datalist>` : ""}
@@ -1161,7 +1164,10 @@ async function showForm(key, id, params = new URLSearchParams()) {
     </form>
     ${isNew ? "" : S.noDelete ? `<p class="small danger">${h(S.noDelete)}</p>` : `<div class="danger"><button class="linkbtn" type="button" data-act="delete">Delete this ${h(S.one)}</button></div>`}`);
 
-  const form = $(".eform", app);
+  const form = $(".eform", app), linkNote = $("[data-link-note]", app);
+  if (linkNote && S.built && row.published && !future(row.publish_at)) S.built(row).then(ok => {
+    linkNote.textContent = ok ? "✓ Its link preview is ready." : "Its link preview is being made, usually within 15 minutes of it going live. The link works already.";
+  });
   // photos show their framing, in the shape they have on the site
   const shapePics = () => { $$(".pf-pic[data-shape]", form).forEach(p => { p.style.aspectRatio = p.dataset.shape; }); showFrames(form); };
   shapePics();
