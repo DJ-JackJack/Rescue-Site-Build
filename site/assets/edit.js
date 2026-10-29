@@ -20,6 +20,14 @@ const photoUrl = u => { try { return u ? safeUrl(new URL(u, new URL(CFG.base || 
 const today = () => new Date().toLocaleDateString("en-CA"); // YYYY-MM-DD in local time
 const daysAgo = d => (d ? Math.round((new Date(today()) - new Date(d)) / 864e5) : null);
 const nice = d => (d ? new Date(d + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "");
+// a moment (timestamptz), in this device's time: "Fri, Oct 31, 9:00 AM", or just the day
+const niceAt = ts => new Date(ts).toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+const niceDay = ts => new Date(ts).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+const future = ts => !!ts && new Date(ts).getTime() > Date.now();
+// for a day-and-time box, in this device's time: "2026-10-31T09:00"
+const localInput = ts => { const d = new Date(ts), p = n => String(n).padStart(2, "0"); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`; };
+const tomorrow9 = () => { const d = new Date(); d.setDate(d.getDate() + 1); d.setHours(9, 0, 0, 0); return d.toISOString(); };
+const inTime = ts => { const m = Math.round((new Date(ts) - Date.now()) / 6e4); return m < 60 ? `in ${plural(Math.max(m, 1), "minute")}` : m < 36 * 60 ? `in ${plural(Math.round(m / 60), "hour")}` : `in ${plural(Math.round(m / 1440), "day")}`; };
 const slugify = s => String(s).toLowerCase().normalize("NFKD").replace(/[^\w\s-]/g, "").trim().replace(/[\s_]+/g, "-").replace(/-+/g, "-").slice(0, 60) || "item";
 const label = (opts, v) => (opts.find(o => o[0] === v) || [, v || ""])[1];
 const plural = (n, one, many = one + "s") => `${n} ${n === 1 ? one : many}`;
@@ -169,8 +177,8 @@ async function tidyPhotos() {
   await walk("", 0);
   const used = new Set(), note = u => { u = u?.url ?? u; if (typeof u === "string" && u.startsWith(PHOTOS)) used.add(decodeURIComponent(u.slice(PHOTOS.length).split("?")[0])); };
   const [rows, many, deleted] = await Promise.all([
-    Promise.all(["animals", "goals", "collabs", "places", "videos"].map(t => api.list(t, "select=photo_url&photo_url=not.is.null"))),
-    Promise.all(["adventures", "page_photos"].map(t => api.list(t, "select=photos"))),
+    Promise.all(["animals", "goals", "collabs", "places", "videos", "articles"].map(t => api.list(t, "select=photo_url&photo_url=not.is.null"))),
+    Promise.all(["adventures", "page_photos", "articles"].map(t => api.list(t, "select=photos"))),
     api.list("content_history", "select=data&op=eq.delete&restored_at=is.null"),
   ]);
   rows.flat().forEach(r => note(r.photo_url));
@@ -358,8 +366,39 @@ const LOOKS = [["full", "Full width"], ["banner", "Wide banner"], ["left", "Besi
 
 const SHOW = { name: "published", type: "toggle", label: "Show on the site", help: "Turn this off to hide it without losing anything.", dflt: true };
 const SORT = { name: "sort", type: "number", label: "Order", help: "Lower numbers show first.", dflt: 100 };
+// When it goes live: as soon as it's saved, or on its own at a set time (publish_at). The database keeps it from visitors
+// until then. Every section gets this, straight after "Show on the site".
+const LIVE = { name: "publish_at", type: "golive", label: "When should it go live?", when: v => v.published,
+  help: "Pick a day and time, in this phone's time zone, and it goes live on its own then. Until then only editors can see it, here. Phones with notifications on get one when it's live." };
+const postTime = r => new Date(r.publish_at || r.created_at).getTime();
 
 const SECTIONS = {
+  squawk: {
+    table: "articles", title: "Twin Squawk", one: "post", kind: "Twin Squawk post", icon: "🦜",
+    intro: "The news page: rescue updates, shelter news, your day outs and what's coming up, newest first. Put a post up now, or pick a time for it to go live on its own.",
+    query: "select=*&order=created_at.desc",
+    titleOf: r => r.title,
+    order: (a, b) => postTime(b) - postTime(a),
+    row: r => ({ title: r.title, emoji: "🦜", photo: r.photo_url, frame: r.photo_frame, sub: niceDay(r.publish_at || r.created_at), flags: [!r.published && "Hidden"] }),
+    link: r => `${CFG.siteUrl || CFG.base}twin-squawk/#${r.slug}`,
+    fields: [
+      { name: "title", type: "text", label: "Headline", required: true, max: 200, help: "Like “Tyce found his family”." },
+      { name: "summary", type: "textarea", rows: 2, max: 400, label: "Short summary", help: "A line or two. Shown under the headline on the list, and at the top of the post." },
+      { name: "body", type: "textarea", rows: 12, max: 20000, label: "The post", help: "Leave a blank line between paragraphs. To add a heading, start a line with ## and a space, like “## Meeting day”." },
+      { name: "photo_url", type: "photo", label: "Cover photo", folder: "articles", frame: "photo_frame", shapes: [{ a: 16 / 9, label: "On the post" }] },
+      { name: "photo_alt", type: "text", label: "What's in the cover photo", max: 300, when: v => !!v.photo_url,
+        help: "A few words for people who can't see it, like “Tyce on his leash, meeting his new family”.",
+        validate: (v, vals) => (vals.photo_url && !v ? "Add a short description of the photo, for people who can't see it." : "") },
+      { name: "photos", type: "gallery", alt: true, label: "More photos", max: 30, folder: "articles", shapes: () => [{ a: 1, label: "In the gallery" }],
+        help: "Shown in a gallery at the end of the post. Add a short description for each one. Tap ⤢ on a photo to move or zoom it in its frame. Never photos of a home, or anything showing where someone lives." },
+      { name: "videos", type: "rows", label: "Videos", add: "+ Add a video", bad: "Each video needs a link starting with https://",
+        cols: [{ key: "title", label: "Title", max: 200, ph: "Tyce leaving the shelter" }, { key: "url", label: "Link", url: true, need: true }],
+        help: "YouTube videos play right in the post. Others, like TikTok, open where they were posted. Tap Share, then Copy link." },
+      { name: "links", type: "rows", label: "Links", cols: LINK_COLS, add: "+ Add a link", help: "Shown at the end of the post, like the shelter's adoption page or a fundraiser." },
+      SHOW,
+    ],
+    beforeAdd: r => ({ ...r, slug: slugify(r.title).replace(/^-+|-+$/g, "") || "post" }),
+  },
   animals: {
     table: "animals", title: "Animals", one: "animal", icon: "🐾",
     intro: "Everyone on Animals We've Helped (Happy Tails), the Animal Story Spotlight, the rescue cards and the Willow Woods herds.",
@@ -666,6 +705,7 @@ const SECTIONS = {
     },
   },
 };
+for (const S of Object.values(SECTIONS)) S.fields.splice(S.fields.indexOf(SHOW) + 1, 0, LIVE);
 
 /* ---------- screens ---------- */
 let dirty = false;
@@ -691,6 +731,7 @@ async function route() {
     if (sec === "text") return await showText(id);
     if (sec === "deleted") return await showDeleted();
     if (sec === "visitors") return await showVisitors(id || "7");
+    if (sec === "scheduled") return await showScheduled();
     if (!SECTIONS[sec]) return go("#/");
     return id ? await showForm(sec, id, params) : await showList(sec);
   } catch (e) {
@@ -737,7 +778,8 @@ function showNotEditor() {
 }
 
 async function showHome() {
-  const [msgs, animals, goals, progs, help, events, week, videos, places, collabs, fosters, advs, pics] = await Promise.all([
+  const now = encodeURIComponent(new Date().toISOString());
+  const [msgs, animals, goals, progs, help, events, week, videos, places, collabs, fosters, advs, pics, posts, coming] = await Promise.all([
     api.list("messages", "select=id&handled=is.false"),
     api.list("animals", "select=id,name,status,published,checked_on"),
     api.list("goals", "select=id,title,status,published,figures_updated_at,bars:goal_bars(id)"),
@@ -751,7 +793,10 @@ async function showHome() {
     api.list("foster_programs", "select=id,program_name,shelter_name,published,checked_on"),
     api.list("adventures", "select=id"),
     api.list("page_photos", "select=id,page,spot,layout,photos,published"),
+    api.list("articles", "select=id"),
+    Promise.all(Object.values(SECTIONS).map(S => api.list(S.table, `select=id&published=is.true&publish_at=gt.${now}`))),
   ]);
+  const soon = coming.flat().length;
   const todo = [];
   if (msgs.length) todo.push(`<li><b>${plural(msgs.length, "new message")}</b><div class="btns"><a class="btn royal sm" href="#/messages">Read ${msgs.length === 1 ? "it" : "them"}</a></div></li>`);
   for (const a of animals.filter(a => a.status === "looking" && a.published && stale(a.checked_on, 21)).sort((x, y) => (x.checked_on || "").localeCompare(y.checked_on || ""))) {
@@ -785,6 +830,8 @@ async function showHome() {
   }
   const tiles = [
     ["messages", "✉️", "Messages", msgs.length ? `${msgs.length} new` : "None new"],
+    ["squawk", "🦜", "Twin Squawk", plural(posts.length, "post")],
+    ["scheduled", "⏰", "Scheduled", soon ? `${soon} coming up` : "Plan posts ahead"],
     ["animals", "🐾", "Animals", plural(animals.length, "animal")],
     ["goals", "🌾", "Shelter goals", plural(goals.filter(g => g.status === "active").length, "active goal")],
     ["events", "📅", "Events", plural(events.length, "coming up", "coming up")],
@@ -809,12 +856,12 @@ async function showHome() {
     ${todo.length ? `<ul class="todo">${todo.join("")}</ul>` : `<p class="allgood">All caught up ✓</p>`}
     <h2 class="sub">Everything</h2>
     <div class="tiles">${tiles.map(([k, ic, t, s]) => `<a class="tile" href="#/${k}"><span class="ic" aria-hidden="true">${ic}</span><b>${t}</b>${s ? `<small>${h(s)}</small>` : ""}</a>`).join("")}</div>
-    <p class="small foot">Signed in as ${h(session?.email)}. Changes show on the site straight away.</p>`);
+    <p class="small foot">Signed in as ${h(session?.email)}. Changes show on the site straight away, unless you pick a time for them to go live.</p>`);
 }
 
 function rowHTML(S, key, r) {
   const v = S.row(r), pic = photoUrl(v.photo);
-  const flags = v.flags.filter(Boolean).map(f => f.startsWith("!") ? `<span class="flag warn">${h(f.slice(1))}</span>` : `<span class="flag">${h(f)}</span>`).join("");
+  const flags = [r.published && future(r.publish_at) && `⏰ ${niceAt(r.publish_at)}`, ...v.flags].filter(Boolean).map(f => f.startsWith("!") ? `<span class="flag warn">${h(f.slice(1))}</span>` : `<span class="flag">${h(f)}</span>`).join("");
   return `<li data-s="${h((v.title + " " + v.sub).toLowerCase())}" data-tok="${h((S.tokens ? S.tokens(r) : []).join(" "))}">
     <a class="row" href="#/${key}/${h(r.id)}"><span class="thumb" aria-hidden="true">${v.emoji || ""}${pic ? `<img src="${h(pic)}" alt="" loading="lazy"${frameData(PP.frame(v.frame))}>` : ""}</span>
     <span class="rt"><b>${h(v.title)}</b><small>${h(v.sub)}</small>${flags ? `<span class="flags">${flags}</span>` : ""}</span><span class="chev" aria-hidden="true">›</span></a></li>`;
@@ -959,6 +1006,13 @@ function fieldHTML(f, v, ctx) {
     case "rows":
       return wrap(`<span class="flabel">${h(f.label)}</span><div class="rows-ed" data-rows-of="${f.name}">${(v || []).map(r => rowsRow(f, r)).join("")}</div>
         <button type="button" class="btn ghost sm" data-row-add="${f.name}">${h(f.add || "+ Add one")}</button>`);
+    case "golive": { // f.name: the time it goes live; the box keeps the saved time, so one that's already passed stays as it was
+      const at = future(v), went = v && !at ? `<p class="hint">It went live on its own ${h(niceAt(v))}.</p>` : "";
+      return wrap(`<fieldset class="choice"${desc}><legend>${h(f.label)}</legend><div class="opts">
+        <label class="opt"><input type="radio" name="${f.name}_how" value="now"${at ? "" : " checked"}><span>Right away</span></label>
+        <label class="opt"><input type="radio" name="${f.name}_how" value="at"${at ? " checked" : ""}><span>At a set time</span></label></div></fieldset>
+        <div class="inrow" data-at${at ? "" : " hidden"}><input id="${id}" name="${f.name}" type="datetime-local" value="${h(at ? localInput(v) : "")}" min="${h(localInput(Date.now()))}" data-orig="${h(v || "")}" aria-label="The day and time it goes live"></div>${went}`);
+    }
     case "bars":
       return wrap(`<span class="flabel">${h(f.label)}</span><div class="bars">${[...(v || [])].sort((a, b) => a.sort - b.sort).map(barRow).join("")}</div><button type="button" class="btn ghost sm" data-bar-add>+ Add a line</button>`);
   }
@@ -1006,6 +1060,11 @@ function readForm(form, fields) {
         out[f.name] = $$(".note-row", form).map(r => ({ date: $("[name=u_date]", r).value || null, text: $("[name=u_text]", r).value.trim() }))
           .filter(n => n.text || n.date).sort((a, b) => (b.date || "").localeCompare(a.date || ""));
         break;
+      case "golive": { // a time that's already passed (it's live) stays as it was, so saving changes nothing
+        const orig = el.dataset.orig || null, at = $(`input[name="${f.name}_how"]:checked`, form)?.value === "at";
+        out[f.name] = !at ? (orig && !future(orig) ? orig : null) : !el.value || isNaN(new Date(el.value)) ? null : orig && localInput(orig) === el.value ? orig : new Date(el.value).toISOString();
+        break;
+      }
       case "bars":
         out[f.name] = $$(".bar-row", form).map((r, i) => ({ id: r.dataset.id || null, label: $("[name=bar_label]", r).value.trim(), target: num($("[name=bar_target]", r).value), current: num($("[name=bar_current]", r).value), sort: i + 1 }));
         break;
@@ -1033,6 +1092,10 @@ function validate(form, fields, vals) {
         msg = "Each photo needs a short description, for people who can't see it.";
       }
       else if (f.validate && (msg = f.validate(v, vals) || "")) { /* its own check */ }
+      else if (f.type === "golive" && $(`input[name="${f.name}_how"]:checked`, form)?.value === "at") {
+        if (!v) msg = "Pick the day and time it should go live.";
+        else if (v !== (form.elements[f.name].dataset.orig || null) && !future(v)) msg = "That time has already passed. Pick a time coming up, or choose “Right away”.";
+      }
       else if (f.type === "journey") {
         $$(".step-row", box).forEach(r => r.classList.toggle("bad", !$("[name=j_label]", r).value.trim() && !!($("[name=j_detail]", r).value.trim() || $("[name=j_date]", r).value)));
         if (v.some(s => !s.label)) msg = "Each step needs a “What happened”.";
@@ -1064,12 +1127,14 @@ function validate(form, fields, vals) {
 const same = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 
 // params (from the address): a new one's starting values (?page=help&spot=…), and back=/help/ to go back to that page
-// on the site when done, as when it was opened from "Photos on this page".
+// on the site when done, as when it was opened from "Photos on this page". plan=1: a new one set to go live at a set
+// time, and from=scheduled: back to the Scheduled screen when done.
 async function showForm(key, id, params = new URLSearchParams()) {
-  const S = SECTIONS[key], isNew = id === "new";
+  const S = SECTIONS[key], isNew = id === "new", plan = isNew && params.has("plan");
   const backTo = (CFG.pages || []).find(p => p.path === params.get("back"));
   const backUrl = backTo ? CFG.base + backTo.path.replace(/^\//, "") : "";
-  const done = () => (backUrl ? location.assign(backUrl) : go(`#/${key}`));
+  const listUrl = plan || params.get("from") === "scheduled" ? "#/scheduled" : `#/${key}`, listName = listUrl === "#/scheduled" ? "Scheduled" : S.title;
+  const done = () => (backUrl ? location.assign(backUrl) : go(listUrl));
   const [found, partners, herds] = await Promise.all([
     isNew ? [null] : api.list(S.table, `${S.query.replace(/&order=[^&]*/, "")}&id=eq.${encodeURIComponent(id)}`),
     S.fields.some(f => f.type === "partner") ? api.list("partners", "select=id,name,published,feature_ok&order=name.asc") : [],
@@ -1077,20 +1142,22 @@ async function showForm(key, id, params = new URLSearchParams()) {
   ]);
   const row = found[0];
   if (!isNew && !row) {
-    render(`<a class="back" href="#/${key}">‹ ${h(S.title)}</a><h1>Not found</h1><p class="note">That one wasn't found. It may have been deleted.</p>`);
+    render(`<a class="back" href="${listUrl}">‹ ${h(listName)}</a><h1>Not found</h1><p class="note">That one wasn't found. It may have been deleted.</p>`);
     return;
   }
   const vals = row || Object.fromEntries(S.fields.map(f => [f.name, params.has(f.name) && ["text", "select", "choice"].includes(f.type) ? params.get(f.name)
+    : f.type === "golive" && plan ? tomorrow9()
     : typeof f.dflt === "function" ? f.dflt() : f.dflt ?? (f.type === "toggle" ? false : ["tags", "lines", "bars", "journey", "updates", "rows", "gallery"].includes(f.type) ? [] : null)]));
   const ctx = { partners, vals };
-  render(`${backUrl ? `<a class="back" href="${h(backUrl)}">‹ Back to ${h(backTo.title)}</a>` : `<a class="back" href="#/${key}">‹ ${h(S.title)}</a>`}
-    <h1>${isNew ? `Add ${h(S.one)}` : h(S.titleOf(row))}</h1>
+  render(`${backUrl ? `<a class="back" href="${h(backUrl)}">‹ Back to ${h(backTo.title)}</a>` : `<a class="back" href="${listUrl}">‹ ${h(listName)}</a>`}
+    <h1>${isNew ? `${plan ? "Plan" : "Add"} ${h(S.one)}` : h(S.titleOf(row))}</h1>
     ${!isNew && row.updated_at ? `<p class="small">Last changed ${h(nice(row.updated_at.slice(0, 10)))}</p>` : ""}
+    ${!isNew && S.link ? `<p class="small">Its link: <a href="${h(S.link(row))}" target="_blank" rel="noopener">${h(S.link(row).replace(/^https?:\/\//, ""))}</a>${future(row.publish_at) ? " (it works once it's live)" : ""}</p>` : ""}
     <form class="form eform" novalidate>
       ${S.fields.map(f => fieldHTML(f, vals[f.name], ctx)).join("")}
       ${herds.length ? `<datalist id="herds">${[...new Set(herds.map(x => x.herd))].map(x => `<option value="${h(x)}">`).join("")}</datalist>` : ""}
       <p class="formmsg err-msg" role="alert"></p>
-      <div class="savebar"><button class="btn royal" type="submit">${isNew ? "Add" : "Save changes"}</button><a class="btn ghost" href="${backUrl ? h(backUrl) : `#/${key}`}">Cancel</a></div>
+      <div class="savebar"><button class="btn royal" type="submit">${isNew ? "Add" : "Save changes"}</button><a class="btn ghost" href="${backUrl ? h(backUrl) : listUrl}">Cancel</a></div>
     </form>
     ${isNew ? "" : S.noDelete ? `<p class="small danger">${h(S.noDelete)}</p>` : `<div class="danger"><button class="linkbtn" type="button" data-act="delete">Delete this ${h(S.one)}</button></div>`}`);
 
@@ -1101,6 +1168,7 @@ async function showForm(key, id, params = new URLSearchParams()) {
   const refresh = () => {
     const v = readForm(form, S.fields);
     for (const f of S.fields) if (f.when) $(`[data-f="${f.name}"]`, form).hidden = !f.when(v);
+    for (const f of S.fields.filter(x => x.type === "golive")) $(`[data-f="${f.name}"] [data-at]`, form).hidden = $(`input[name="${f.name}_how"]:checked`, form)?.value !== "at";
     // reframing a photo that came with the site, while nothing has been put in its place
     for (const f of S.fields.filter(x => x.current)) {
       const b = $(`[data-use-current="${f.name}"]`, form), cur = f.current(v);
@@ -1113,6 +1181,9 @@ async function showForm(key, id, params = new URLSearchParams()) {
     dirty = true;
     const f = S.fields.find(x => x.name === e.target.name && x.onPick);
     if (f && e.target.checked) f.onPick(e.target.value, form.elements);
+    // "At a set time" starts at 9 tomorrow morning
+    const g = S.fields.find(x => x.type === "golive" && e.target.name === x.name + "_how");
+    if (g && e.target.value === "at" && !form.elements[g.name].value) form.elements[g.name].value = localInput(tomorrow9());
     // a dropdown whose choices depend on this one (the spots on the page picked) starts again
     for (const d of S.fields.filter(x => x.dependsOn === e.target.name)) form.elements[d.name].innerHTML = selectOpts(d, d.options(readForm(form, S.fields)), "");
     refresh();
@@ -1193,7 +1264,7 @@ async function showForm(key, id, params = new URLSearchParams()) {
       if (f.frame) { form.elements[f.frame].value = ""; $(`[data-frame-btn="${name}"]`, form).hidden = true; }
       $(".pf-pic", form).innerHTML = "<span>No photo yet</span>";
       $(".pick", form).firstChild.textContent = "Choose a photo";
-      t.hidden = true; dirty = true;
+      t.hidden = true; dirty = true; refresh();
     }
   });
   $$("[data-photo]", form).forEach(inp => inp.addEventListener("change", async () => {
@@ -1208,7 +1279,7 @@ async function showForm(key, id, params = new URLSearchParams()) {
       $(".pick", form).firstChild.textContent = "Change photo";
       $("[data-photo-remove]", form).hidden = false;
       if (f.frame) { form.elements[f.frame].value = ""; $(`[data-frame-btn="${f.name}"]`, form).hidden = false; } // a new photo starts centered
-      dirty = true;
+      dirty = true; refresh();
       toast("Photo added. Tap Save to keep it.");
     } catch (err) {
       const cur = photoUrl(form.elements[f.name].value);
@@ -1259,7 +1330,7 @@ async function showForm(key, id, params = new URLSearchParams()) {
       await S.afterSave?.(saved, v, row);
       if (!isNew && S.fields.some(f => (f.type === "photo" || f.type === "gallery") && f.name in patch)) tidyPhotosNow(true); // a replaced or removed photo goes
       dirty = false;
-      toast(isNew ? "Added ✓" : "Saved ✓");
+      toast(future(saved?.publish_at) && saved.published ? `Scheduled ✓ It goes live ${niceAt(saved.publish_at)}.` : isNew ? "Added ✓" : "Saved ✓");
       done();
     } catch (err) {
       if (err instanceof SignedOut) return route();
@@ -1273,6 +1344,40 @@ async function showForm(key, id, params = new URLSearchParams()) {
     try { await api.drop(S.table, row.id); dirty = false; toast("Deleted"); done(); }
     catch (err) { if (err instanceof SignedOut) return route(); toast(err.message, true); }
   });
+}
+
+/* ---------- scheduled ----------
+   Everything with a time to go live (publish_at), from every section: what's coming up, and what went live this past
+   week. The database keeps each one from visitors until its time, so it goes live on its own; within 5 minutes, phones
+   with notifications on get one saying so (the announce-scheduled job, which asks notify-message to send it). */
+const wontShow = (key, r) => (!r.published ? "“Show on the site” is off, so it won't go live. Open it to turn that on."
+  : key === "animals" && !r.people_ok ? "“Everyone shown or named has OK'd it” is off, so it won't go live."
+  : key === "partners" && !r.feature_ok ? "“They've said yes to being featured” is off, so it won't go live." : "");
+const kindOf = S => S.kind || S.one[0].toUpperCase() + S.one.slice(1);
+async function showScheduled() {
+  const since = encodeURIComponent(new Date(Date.now() - 7 * 864e5).toISOString()), keys = Object.keys(SECTIONS);
+  const lists = await Promise.all(keys.map(k => api.list(SECTIONS[k].table, `${SECTIONS[k].query.replace(/&order=[^&]*/, "")}&publish_at=gte.${since}`)));
+  const all = keys.flatMap((k, i) => lists[i].map(r => ({ k, r }))), at = x => new Date(x.r.publish_at).getTime(), now = Date.now();
+  const soon = all.filter(x => at(x) > now).sort((a, b) => at(a) - at(b)), went = all.filter(x => at(x) <= now).sort((a, b) => at(b) - at(a));
+  const name = ({ k, r }) => SECTIONS[k].titleOf(r) || "Untitled";
+  render(`<a class="back" href="#/">‹ Start</a>
+    <div class="lhead"><h1>Scheduled</h1><a class="btn royal" href="#/squawk/new?plan=1">+ Plan a post</a></div>
+    <p class="lede">Things set to go live on their own. Each one shows on the site at its time, and phones with notifications on get one saying it's live.</p>
+    <h2 class="sub">Coming up</h2>
+    ${soon.length ? `<ul class="todo sched">${soon.map(x => {
+      const S = SECTIONS[x.k], off = wontShow(x.k, x.r);
+      return `<li${off ? ' class="off"' : ""}><span class="kind">${S.icon} ${h(kindOf(S))}</span><b>${h(name(x))}</b>
+        <small>Goes live ${h(niceAt(x.r.publish_at))}, ${h(inTime(x.r.publish_at))}</small>${off ? `<small class="warnline">${h(off)}</small>` : ""}
+        <div class="btns"><a class="btn royal sm" href="#/${x.k}/${h(x.r.id)}?from=scheduled">Open</a>${off ? "" : `<button class="btn ghost sm" type="button" data-act="live-now" data-t="${h(S.table)}" data-id="${h(x.r.id)}" data-name="${h(name(x))}">Put it on the site now</button>`}</div></li>`;
+    }).join("")}</ul>` : `<p class="allgood">Nothing scheduled. Tap “Plan a post” to write one ahead.</p>`}
+    <h2 class="sub">Plan something else</h2>
+    <p class="small">Fill it in now and pick when it goes live. Plan as many as you like, one after another.</p>
+    <div class="tiles">${keys.filter(k => k !== "squawk").map(k => `<a class="tile" href="#/${k}/new?plan=1"><span class="ic" aria-hidden="true">${SECTIONS[k].icon}</span><b>${h(SECTIONS[k].title)}</b></a>`).join("")}</div>
+    ${went.length ? `<h2 class="sub">Went live this past week</h2>
+    <ul class="rows">${went.map(x => `<li><a class="row" href="#/${x.k}/${h(x.r.id)}?from=scheduled"><span class="thumb" aria-hidden="true">${SECTIONS[x.k].icon}</span>
+      <span class="rt"><b>${h(name(x))}</b><small>${h(kindOf(SECTIONS[x.k]))} · ${h(niceAt(x.r.publish_at))}</small></span><span class="chev" aria-hidden="true">›</span></a></li>`).join("")}</ul>` : ""}
+    <div id="pushbox"></div>`);
+  showPushBox();
 }
 
 /* ---------- messages ---------- */
@@ -1317,8 +1422,9 @@ async function showMessages(view) {
 }
 
 /* ---------- notifications ---------- */
-// Phone notifications for new messages (Web Push). This device signs up with its browser's push service, the
-// sign-up is saved in push_subscriptions, and the notify-message function sends to it when a message comes in.
+// Phone notifications for new messages, and for things that went live at their set time (Web Push). This device signs
+// up with its browser's push service, the sign-up is saved in push_subscriptions, and the notify-message function
+// sends to it when a message comes in or something scheduled goes live.
 // sw.js (next to this page) shows them. iPhones and iPads need the editor added to the Home Screen first.
 const NOTIFY = `${API}/functions/v1/notify-message`;
 const canPush = () => "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
@@ -1363,22 +1469,22 @@ async function showPushBox() {
   const card = (title, text, buttons = "") => { box.innerHTML = `<div class="card pushbox"><h2>${title}</h2><p class="small">${text}</p>${buttons ? `<div class="btns">${buttons}</div>` : ""}</div>`; };
   if (!canPush()) {
     return apple() && !onHomeScreen()
-      ? card("🔔 Get notified about new messages", "On iPhone and iPad, first add the editor to your Home Screen: tap <b>Share</b>, then <b>Add to Home Screen</b>. Open the editor from that icon, come back here and turn notifications on.")
+      ? card("🔔 Get phone notifications", "On iPhone and iPad, first add the editor to your Home Screen: tap <b>Share</b>, then <b>Add to Home Screen</b>. Open the editor from that icon, come back here and turn notifications on.")
       : card("🔔 Notifications", "This browser can't show notifications. Try Chrome, or Safari with the editor added to the Home Screen.");
   }
   if (Notification.permission === "denied") return card("🔔 Notifications are blocked", "This phone or computer has blocked notifications for this site. Allow them in its settings (under this browser, or the Site editor app), then come back here.");
   const sub = await currentSub().catch(() => null);
   if (sub && Notification.permission === "granted") {
-    return card("🔔 Notifications are on", "This device gets a notification when someone sends a message. It shows the topic and their name, never the message itself.",
+    return card("🔔 Notifications are on", "This device gets a notification when someone sends a message (it shows the topic and their name, never the message itself), and when something you scheduled goes live.",
       `<button class="btn ghost sm" type="button" data-act="push-test">Send a test</button><button class="linkbtn" type="button" data-act="push-off">Turn off on this device</button>`);
   }
-  card("🔔 Get notified about new messages", "Get a notification on this device whenever someone sends a message. It shows the topic and their name, never the message itself. Turn it on for each phone or computer you want them on.",
+  card("🔔 Get phone notifications", "Get a notification on this device whenever someone sends a message (it shows the topic and their name, never the message itself), and when something you scheduled goes live. Turn it on for each phone or computer you want them on.",
     `<button class="btn royal sm" type="button" data-act="push-on">Turn on notifications</button>`);
   if (!pushKey) notifyCall({ action: "key" }).then(j => { pushKey = j.key; }).catch(() => {}); // ready before the tap
 }
 // The number of new messages on the app icon, where the phone supports it.
 const badge = n => { try { (n ? navigator.setAppBadge?.(n) : navigator.clearAppBadge?.())?.catch?.(() => {}); } catch {} };
-navigator.serviceWorker?.addEventListener("message", e => { if (e.data?.go === "#/messages") go("#/messages"); });
+navigator.serviceWorker?.addEventListener("message", e => { if (["#/messages", "#/scheduled"].includes(e.data?.go)) go(e.data.go); });
 let subChecked = false; // once per visit, make sure this device's sign-up is still saved
 const recheckSub = () => { if (subChecked || !canPush()) return; subChecked = true; currentSub().then(s => s && Notification.permission === "granted" && keepSub(s)).catch(() => {}); };
 
@@ -1390,7 +1496,7 @@ const WORDS = CFG.textDefaults || [], AREAS = CFG.areas || [];
 const PHRASE_GROUPS = {
   goal: "Shelter goals", status: "Animal labels", count: "Animal counts", animal: "Happy Tails", stat: "The adoption number",
   journey: "An animal's journey (the pop-up)", rescue: "Rescues", horse: "Willow Woods horses", event: "Events",
-  spotlight: "Animal Story Spotlight", collab: "Collaborations", program: "Day-out programs", foster: "Foster programs", adventure: "Our day outs", video: "Day-out videos", place: "Dog-friendly places", help: "Local help list",
+  spotlight: "Animal Story Spotlight", squawk: "Twin Squawk", collab: "Collaborations", program: "Day-out programs", foster: "Foster programs", adventure: "Our day outs", video: "Day-out videos", place: "Dog-friendly places", help: "Local help list",
   form: "Contact forms", failed: "When part of a page can't load",
 };
 const clip = (s, n = 60) => (s.length > n ? s.slice(0, n - 1) + "…" : s);
@@ -1532,7 +1638,7 @@ const KIND = {
   events: ["Event", r => r.title], collabs: ["Collaboration", r => r.title], partners: ["Rescue or shelter", r => r.name], sniffari_programs: ["Day-out program", r => r.program_name || r.shelter_name],
   foster_programs: ["Foster program", r => r.program_name || r.shelter_name], adventures: ["Day out", r => r.title],
   videos: ["Day-out video", r => r.title], places: ["Dog-friendly place", r => r.name], page_photos: ["Photo on a page", r => SECTIONS.photos.titleOf(r)],
-  help_resources: ["Help listing", r => r.name], messages: ["Message", r => (r.name ? `From ${r.name}` : `From ${r.email}`)],
+  help_resources: ["Help listing", r => r.name], articles: ["Twin Squawk post", r => r.title], messages: ["Message", r => (r.name ? `From ${r.name}` : `From ${r.email}`)],
 };
 async function showDeleted() {
   const rows = await api.list("content_history", "select=id,at,tx,tbl,row_key,data,by_email&op=eq.delete&restored_at=is.null&order=at.desc&limit=300");
@@ -1618,13 +1724,16 @@ async function showVisitors(range) {
 /* ---------- one-tap actions ---------- */
 app.addEventListener("click", async e => {
   const b = e.target.closest("[data-act]");
-  if (!b || !["checked", "adopted", "msg-done", "msg-undo", "msg-delete", "restore", "forget", "nocount", "clear-counts", "push-on", "push-off", "push-test", "w-clear", "signout"].includes(b.dataset.act)) return;
+  if (!b || !["checked", "adopted", "live-now", "msg-done", "msg-undo", "msg-delete", "restore", "forget", "nocount", "clear-counts", "push-on", "push-off", "push-test", "w-clear", "signout"].includes(b.dataset.act)) return;
   const id = b.dataset.id;
   try {
     switch (b.dataset.act) {
       case "signout": return signOut();
       case "checked": await api.save(b.dataset.t, id, { checked_on: today() }); toast("Marked as checked today ✓"); break;
       case "adopted": await api.save("animals", id, { status: "adopted", adopted_on: today() }); toast("Marked adopted 🎉"); break;
+      case "live-now":
+        if (!confirm(`Put “${b.dataset.name}” on the site now, instead of at its set time?`)) return;
+        await api.save(b.dataset.t, id, { publish_at: null }); toast("It's on the site now ✓"); break;
       case "msg-done": await api.save("messages", id, { handled: true }); toast("Marked done ✓"); break;
       case "msg-undo": await api.save("messages", id, { handled: false }); toast("Moved back to new"); break;
       case "msg-delete":

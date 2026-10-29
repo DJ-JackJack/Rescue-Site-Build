@@ -4,6 +4,9 @@
 //   each one once, so an extra or forged call can't repeat or invent anything.
 // - The edit page calls it for the public key ({"action":"key"}) and, signed in, to send a test
 //   ({"action":"test","endpoint":...}).
+// - Every 5 minutes, if something scheduled has gone live, the database's announce-scheduled job calls it with
+//   {"action":"live"}. Again it trusts nothing in the call: it asks the database (live_claim) what has gone live and
+//   not been announced yet, and announces each one once.
 // - Its VAPID keys are made here on first use and kept in push_state, which only the server can read.
 // - Each notification is encrypted for the device it goes to. It says the topic and who it's from, never the message.
 // Deployed with verify_jwt off: it checks callers itself, as above.
@@ -43,7 +46,7 @@ async function vapid(): Promise<Vapid> {
   return (vapidKeys = { publicKey: s.vapid_public, privateJwk: s.vapid_private });
 }
 
-async function deliver(subs: Sub[], data: Record<string, unknown>) {
+async function deliver(subs: Sub[], data: Record<string, unknown>, topic = "messages") {
   const keys = await vapid();
   let sent = 0;
   await Promise.all(subs.map(async s => {
@@ -51,7 +54,7 @@ async function deliver(subs: Sub[], data: Record<string, unknown>) {
     try { host = new URL(s.endpoint).hostname; } catch { /* not a URL */ }
     if (!PUSH_HOSTS.test(host)) return console.error("skipped a device with an unknown push service", host);
     try {
-      const { status, text } = await sendPush(s, data, keys, CONTACT);
+      const { status, text } = await sendPush(s, data, keys, CONTACT, topic);
       if (status === 404 || status === 410) await db(`push_subscriptions?endpoint=eq.${encodeURIComponent(s.endpoint)}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
       else if (status >= 400) console.error("push refused", status, host, text.slice(0, 300));
       else sent++;
@@ -73,6 +76,18 @@ async function announceNew() {
   return { sent: await deliver(subs, { ...data, count: unhandled, url: "./#/messages" }), messages: messages.length };
 }
 
+// Things that were scheduled and have now gone live on the site.
+async function announceLive() {
+  const { items = [] } = (await db("rpc/live_claim", { method: "POST", body: "{}" })) || {};
+  if (!items.length) return { sent: 0, items: 0 };
+  const name = (i: { what?: string; title?: string }) => `${i.what || "Post"}: ${short(String(i.title || ""), 80)}`;
+  const data = items.length === 1
+    ? { title: `${BRAND} Now live on the site`, body: name(items[0]) }
+    : { title: `${BRAND} ${items.length} things went live`, body: items.slice(0, 3).map(name).join(" · ") + (items.length > 3 ? ` and ${items.length - 3} more` : "") };
+  const subs: Sub[] = await db("push_subscriptions?select=endpoint,p256dh,auth");
+  return { sent: await deliver(subs, { ...data, url: "./#/scheduled" }, "live"), items: items.length };
+}
+
 async function sendTest(req: Request, endpoint: string) {
   const u = await fetch(`${API}/auth/v1/user`, { headers: { apikey: PUBLISHABLE, Authorization: req.headers.get("authorization") || "" } });
   if (!u.ok) return reply(401, { error: "You've been signed out. Please sign in again." });
@@ -91,6 +106,7 @@ Deno.serve(async req => {
   try {
     if (body.action === "key") return reply(200, { key: (await vapid()).publicKey });
     if (body.action === "test") return await sendTest(req, String(body.endpoint || ""));
+    if (body.action === "live") return reply(200, await announceLive());
     return reply(200, await announceNew());
   } catch (e) {
     console.error(String(e));

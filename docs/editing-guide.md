@@ -28,12 +28,16 @@ Forgot your password? It can be reset in Supabase: Authentication → Users → 
 - **Day-out programs, foster programs and help listings** that haven't been checked in a while.
 - **A photo that needs a new spot**, when the part of the page it was added to has been rewritten.
 
-Below that, **Everything** has a button for each part of the site.
+Below that, **Everything** has a button for each part of the site, with **Twin Squawk** and **Scheduled** near the top.
 
 ## Common jobs
 
 | I want to… | Do this |
 |---|---|
+| Write a Twin Squawk post | **Twin Squawk** → **+ Add post**. Write a headline, a short summary (it shows on the list and at the top of the post) and the post itself. Leave a blank line between paragraphs, and start a line with `## ` for a heading, like `## Meeting day`. Add a cover photo and say what's in it, more photos for a gallery at the end, videos (YouTube ones play right in the post) and links, like the shelter's adoption page. Tap **Add** and it's on the Twin Squawk page, newest first. Each post has its own link to share: it's shown at the top when you open the post here, and **Share this post** on the site copies it. |
+| Schedule something to go live later | On any form, under **When should it go live?**, tap **At a set time** and pick the day and time (it starts at 9 tomorrow morning). Save as usual. Until then only editors see it. At that minute it shows on the site by itself, and within about 5 minutes every phone with notifications on gets one saying it's live. Works for posts, animals, goals, events, day outs, videos, help listings, photos on the pages, everything. |
+| Plan a few things ahead | **Scheduled** → **+ Plan a post**, or tap the kind of thing under **Plan something else**. Fill it in, check the time, and tap **Add**: you're back on Scheduled, ready to plan the next one. The list shows what's coming up, soonest first, and what went live this past week. |
+| Put something scheduled up early, or move its time | **Scheduled** → **Put it on the site now**. Or **Open** it and change the time, or tap **Right away**, then save. |
 | Add a dog I filmed | Animals → **+ Add animal**. Fill in the name, tap **Still looking**, pick the rescue, add a photo and the link to their listing, then tap **Add**. |
 | Move an animal to the Animal Story Spotlight | Open them, and under **Which part of the site?** tap **Animal Story Spotlight**, then **Save changes**. Tap **Animals We've Helped** to move them back. The Spotlight is for animals already in a forever home or a sanctuary, like the Willow Woods horses; Animals We've Helped is for animals you featured to find a home. Horses switch by themselves when you pick their status (Still looking keeps them in Animals We've Helped), and you can still change it by hand. |
 | Mark a dog adopted | Open them, tap **Adopted** (today's date fills in by itself), then **Save changes**. Or use **Adopted!** on the start screen. |
@@ -66,17 +70,18 @@ Below that, **Everything** has a button for each part of the site.
 | Change any wording | **Page wording**, then pick the page, or type a few of the words in the search box. Change the words and tap **Save changes**. Or, while you're signed in, open the page on the site and tap **✏️ Edit this page's wording** at the bottom. |
 | Undo a wording change | Open it in Page wording and tap **Use the original**, or empty the box, then save. |
 | Answer a message | Messages → **Reply by email** opens your email app. Then tap **Mark done**. |
-| Get a notification for new messages | **Messages** → **Turn on notifications**, then **Allow**. Do it on each phone or computer you want them on, and tap **Send a test** to check. On iPhone or iPad, add the editor to your Home Screen first (Share → Add to Home Screen) and turn them on from that icon. |
+| Get a notification for new messages and things going live | **Messages** (or **Scheduled**) → **Turn on notifications**, then **Allow**. Do it on each phone or computer you want them on, and tap **Send a test** to check. On iPhone or iPad, add the editor to your Home Screen first (Share → Add to Home Screen) and turn them on from that icon. |
 | Undo a delete | **Recently deleted** → **Restore**. Anything deleted in the last 90 days comes back just as it was. |
 | See how many people visit | **Visitors**. Page views for the last 7 days, 30 days or 12 months, which pages are popular, where visitors came from, and any addresses people tried that aren't on the site. |
 
 ## Good to know
 
-- **Changes show on the site straight away.** Refresh the page to see them.
+- **Changes show on the site straight away,** unless you picked a time for them to go live. Refresh the page to see them.
+- **Scheduled times** are in your phone's time zone. Something scheduled stays hidden from visitors until its time, even if someone has its link. If **Show on the site** is off, it won't go live at its time; the Scheduled screen warns you.
 - **Hide, don't delete.** Turning off "Show on the site" hides something and keeps everything. If you do delete something by mistake, it stays in **Recently deleted** for 90 days.
 - **Where visitors came from:** the site can usually tell when a link was opened inside TikTok, Instagram, Facebook, Messenger or Snapchat, or from an app on an Android phone. Links sent in texts, WhatsApp, Discord or email on an iPhone, typed in or bookmarked still show as "Direct". To count a link you share, add `?from=` and a name: `?from=tiktok` in your bios, or your own, like `?from=flyer`.
 - **Wording:** every piece of wording on the site is in Page wording: headings, paragraphs, buttons, the menu and footer (under **On every page**), page titles and descriptions for Google and link previews, photo descriptions, and the messages the site writes itself, like "Still looking" or "Thanks! Your message reached Taea" (under **Messages and labels**). Words in {curly brackets} are filled in by the site, so keep them. Changes show on the site straight away; link previews and Google catch up overnight.
-- **Notifications** show the topic and the sender's name, never the message itself. Tapping one opens Messages. To stop them on a device, open Messages there and tap **Turn off on this device**.
+- **Notifications** show the topic and the sender's name, never the message itself. Tapping one opens Messages. When something you scheduled goes live, the notification says what it was, and tapping it opens Scheduled. A live notification doesn't replace a message one, or the other way round. To stop them on a device, open Messages there and tap **Turn off on this device**.
 - **Addresses that weren't found** on the Visitors screen are links people tried that aren't on the site, usually mistyped or cut short. If the same one keeps showing up, look for where that link was posted and fix it there.
 - **Your own visits don't count** while you're signed in here. On the Visitors screen you can also skip a phone or computer when it's signed out.
 - **Photos:** pick any photo from your phone. The edit page shrinks it and strips hidden data (like where it was taken) before uploading. Still check the background: no house, street, plates or mail.

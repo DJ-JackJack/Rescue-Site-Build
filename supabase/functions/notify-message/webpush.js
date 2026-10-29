@@ -52,8 +52,9 @@ export async function encrypt(text, p256dh, authSecret) {
 }
 
 // Sends one notification. Returns the push service's status: 201 is sent; 404 or 410 means the device
-// has turned notifications off (or the sign-up expired), so it can be forgotten.
-export async function sendPush(sub, data, vapid, subject) {
+// has turned notifications off (or the sign-up expired), so it can be forgotten. topic: a newer notification with the
+// same topic replaces one still waiting for the device, so messages and went-live alerts each have their own.
+export async function sendPush(sub, data, vapid, subject, topic = "messages") {
   const r = await fetch(sub.endpoint, {
     method: "POST",
     headers: {
@@ -62,7 +63,7 @@ export async function sendPush(sub, data, vapid, subject) {
       "Content-Type": "application/octet-stream",
       TTL: "86400", // keep trying for a day if the phone is off
       Urgency: "high",
-      Topic: "messages", // a newer notification replaces one still waiting
+      Topic: topic,
     },
     body: await encrypt(JSON.stringify(data), sub.p256dh, sub.auth),
   });

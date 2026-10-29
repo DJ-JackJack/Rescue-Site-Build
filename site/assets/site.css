@@ -265,6 +265,25 @@ dialog.journey::backdrop{background:rgba(25,19,51,.55)}
 .advcard .bd span{color:var(--royal);font-weight:800;font-size:.84rem;margin-top:4px}
 .advcard:hover,.advcard:focus-visible{box-shadow:0 0 0 3px var(--lavender),var(--shadow)}
 dialog.adv{max-width:min(720px,calc(100vw - 24px))}
+/* Twin Squawk: the news page. The newest post is the big one, then the rest in a grid; each opens in a reader. */
+.squawks{list-style:none;margin:0;padding:0;display:grid;gap:18px;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr))}
+.squawks li:first-child{grid-column:1/-1}
+.sqcard{display:flex;flex-direction:column;height:100%;background:#fff;border-radius:var(--r);box-shadow:var(--shadow);overflow:hidden;color:var(--ink);text-decoration:none}
+.sqcard .ph{aspect-ratio:16/9;display:grid;place-items:center;font-size:2.6rem;position:relative;overflow:hidden}
+.sqcard .ph img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.sqcard .bd{display:flex;flex-direction:column;gap:4px;padding:14px 18px 18px;flex:1}
+.sqcard small{color:var(--violet);font-weight:800;font-size:.76rem;letter-spacing:.1em;text-transform:uppercase}
+.sqcard b{font-family:var(--f-disp);font-weight:600;font-size:1.25rem;line-height:1.2}
+.sqcard .bd span{color:var(--ink2);font-size:.95rem}
+.sqcard em{font-style:normal;color:var(--royal);font-weight:800;font-size:.9rem;margin-top:auto;padding-top:8px}
+.sqcard:hover,.sqcard:focus-visible{box-shadow:0 0 0 3px var(--lavender),var(--shadow)}
+@media (min-width:760px){.squawks li:first-child .sqcard{flex-direction:row}.squawks li:first-child .ph{aspect-ratio:auto;flex:0 0 56%;min-height:280px}.squawks li:first-child .bd{padding:26px 28px}.squawks li:first-child b{font-size:1.7rem}}
+.sqcover{margin:0 0 14px;border-radius:16px;overflow:hidden;aspect-ratio:16/9;position:relative;background:var(--wash)}
+.sqcover img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.sqlede{font-weight:700;color:var(--plum);margin:0 0 12px}
+.sqhead{font:600 1.2rem/1.25 var(--f-disp);color:var(--plum);margin:18px 0 6px}
+.squawk #sqmeta{color:var(--plum);margin-top:4px}
+.sqshare{margin-top:18px}
 .adv .jhead .ph{position:relative;overflow:hidden}
 .adv .jhead .ph img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .adv #ameta{color:var(--plum);margin-top:4px}

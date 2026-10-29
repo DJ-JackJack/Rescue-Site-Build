@@ -30,6 +30,9 @@
 .todo b{font-size:1.04rem}
 .todo small{color:var(--ink2);font-size:.9rem}
 .todo .btns{margin-top:8px;gap:8px}
+.sched .kind{color:var(--violet);font-weight:800;font-size:.76rem;letter-spacing:.08em;text-transform:uppercase}
+.sched .off{border-left-color:#E0A100}
+.sched .warnline{color:#4A3200;background:#FFE6A8;border-radius:10px;padding:6px 10px;font-weight:700}
 .allgood{background:#fff;border-radius:16px;padding:16px 18px;font-weight:800;color:var(--royal);box-shadow:var(--shadow)}
 .tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 @media (min-width:640px){.tiles{grid-template-columns:repeat(4,minmax(0,1fr))}}

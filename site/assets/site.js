@@ -695,6 +695,12 @@ const ytId = u => {
     return /^[\w-]{11}$/.test(id || "") ? id : "";
   } catch { return ""; }
 };
+// videos in a reader: YouTube ones as a player that loads once tapped, others as links to where they were posted
+const videosHTML = (vids, fallback) => `<div class="avids">${vids.map(v => {
+  const id = ytId(v.url), title = v.title || fallback, where = platform(v.url);
+  return id ? `<div class="yt${/\/shorts\//.test(v.url) ? " tall" : ""}" data-yt="${h(id)}" data-title="${h(title)}"><button type="button" class="yt-play"><span class="yt-icon" aria-hidden="true">▶</span><b>${h(title)}</b><small>${h(t("js.adventure.yt", "Tap to play. It loads from YouTube."))}</small></button></div>`
+    : `<a class="btn ghost" href="${h(safeUrl(v.url))}" target="_blank" rel="noopener">${h(v.title || (where ? t("js.video.watch", "Watch on {site}", { site: where }) : t("js.video.watch-it", "Watch the video")))} <span class="ext" aria-hidden="true">↗</span></a>`;
+}).join("")}</div>`;
 const advDate = a => (a.went_on ? fullDate(a.went_on) : "");
 let ADVS = [];
 function openAdventure(a) {
@@ -709,11 +715,7 @@ function openAdventure(a) {
   $("#apic").innerHTML = "🦮" + photoTag(raw[0], "", fr[raw[0]]);
   const story = String(a.story || "").trim();
   $("#abody").innerHTML = (story ? `<div class="jstory">${blockHTML(story)}</div>` : "")
-    + (vids.length ? `<h3 class="jsub">${h(t("js.adventure.videos", "Videos"))}</h3><div class="avids">${vids.map(v => {
-      const id = ytId(v.url), title = v.title || a.title, where = platform(v.url);
-      return id ? `<div class="yt${/\/shorts\//.test(v.url) ? " tall" : ""}" data-yt="${h(id)}" data-title="${h(title)}"><button type="button" class="yt-play"><span class="yt-icon" aria-hidden="true">▶</span><b>${h(title)}</b><small>${h(t("js.adventure.yt", "Tap to play. It loads from YouTube."))}</small></button></div>`
-        : `<a class="btn ghost" href="${h(safeUrl(v.url))}" target="_blank" rel="noopener">${h(v.title || (where ? t("js.video.watch", "Watch on {site}", { site: where }) : t("js.video.watch-it", "Watch the video")))} <span class="ext" aria-hidden="true">↗</span></a>`;
-    }).join("")}</div>` : "")
+    + (vids.length ? `<h3 class="jsub">${h(t("js.adventure.videos", "Videos"))}</h3>${videosHTML(vids, a.title)}` : "")
     + (photos.length ? `<h3 class="jsub">${h(t("js.adventure.photos", "Photos"))}</h3><ul class="agal">${photos.map((u, i) => `<li><button type="button" data-photo="${i}" aria-label="${h(t("js.adventure.photo", "Photo {n} of {count}", { n: i + 1, count: photos.length }))}"><img src="${h(u)}" alt=""${frameAttr(fr[raw[i]])} loading="lazy"></button></li>`).join("")}</ul>` : "")
     + (places.length ? `<h3 class="jsub">${h(t("js.adventure.places", "Places we went"))}</h3><ul class="xlinks">${places.map(b => safeUrl(b.url)
       ? `<li><a href="${h(safeUrl(b.url))}" target="_blank" rel="noopener">${h(b.name)} <span class="ext" aria-hidden="true">↗</span></a></li>` : `<li><span>${h(b.name)}</span></li>`).join("")}</ul>` : "");
@@ -740,38 +742,98 @@ async function renderAdventures(el) {
   fromHash();
   addEventListener("hashchange", fromHash);
 }
-{
-  const dlg = $("#adventure");
-  if (dlg) {
-    const light = $("#alight"), img = $("#alight-img");
-    const show = i => { const n = dlg.photos.length; dlg.at = (i + n) % n; img.src = dlg.photos[dlg.at]; img.alt = t("js.adventure.photo", "Photo {n} of {count}", { n: dlg.at + 1, count: n }); light.hidden = false; $(".lb-x", light).focus(); };
-    const shut = () => { light.hidden = true; img.removeAttribute("src"); };
-    document.addEventListener("click", e => { const b = e.target.closest(".advcard"); if (b) openAdventure(ADVS.find(a => a.id === b.dataset.adv)); });
-    dlg.addEventListener("click", e => {
-      if (e.target === dlg) return dlg.close();
-      const play = e.target.closest(".yt-play");
-      if (play) {
-        const box = play.parentElement, id = box.dataset.yt;
-        box.innerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(id)}?autoplay=1&rel=0" title="${h(box.dataset.title)}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>`;
-        return;
-      }
-      const ph = e.target.closest("[data-photo]");
-      if (ph) return show(Number(ph.dataset.photo));
-      if (e.target.closest(".lb-x") || e.target === light || e.target === img) return shut();
-      if (e.target.closest(".lb-prev")) return show(dlg.at - 1);
-      if (e.target.closest(".lb-next")) return show(dlg.at + 1);
-    });
-    dlg.addEventListener("cancel", e => { if (!light.hidden) { e.preventDefault(); shut(); } }); // Escape closes the photo first
-    dlg.addEventListener("keydown", e => {
-      if (light.hidden) return;
-      if (e.key === "ArrowLeft") show(dlg.at - 1);
-      else if (e.key === "ArrowRight") show(dlg.at + 1);
-    });
-    $(".jclose", dlg).addEventListener("click", () => dlg.close());
-    // closing stops any video and takes the day out off the address
-    dlg.addEventListener("close", () => { $("#abody").innerHTML = ""; shut(); if (/^#day-out-/.test(location.hash)) history.replaceState(null, "", location.pathname + location.search); });
-  }
+// A reader (a day out, a Twin Squawk post): YouTube plays once tapped, photos open larger (arrow keys go through them,
+// Escape closes the photo first), and closing stops any video and takes the post off the address (ownHash).
+function setupReader(dlg, ownHash) {
+  if (!dlg) return;
+  const body = $(".jbody", dlg), light = $(".lightbox", dlg), img = $("img", light);
+  const show = i => { const n = dlg.photos.length; dlg.at = (i + n) % n; img.src = dlg.photos[dlg.at]; img.alt = dlg.alts?.[dlg.at] || t("js.adventure.photo", "Photo {n} of {count}", { n: dlg.at + 1, count: n }); light.hidden = false; $(".lb-x", light).focus(); };
+  const shut = () => { light.hidden = true; img.removeAttribute("src"); };
+  dlg.addEventListener("click", e => {
+    if (e.target === dlg) return dlg.close();
+    const play = e.target.closest(".yt-play");
+    if (play) {
+      const box = play.parentElement, id = box.dataset.yt;
+      box.innerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(id)}?autoplay=1&rel=0" title="${h(box.dataset.title)}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>`;
+      return;
+    }
+    const ph = e.target.closest("[data-photo]");
+    if (ph) return show(Number(ph.dataset.photo));
+    if (e.target.closest(".lb-x") || e.target === light || e.target === img) return shut();
+    if (e.target.closest(".lb-prev")) return show(dlg.at - 1);
+    if (e.target.closest(".lb-next")) return show(dlg.at + 1);
+  });
+  dlg.addEventListener("cancel", e => { if (!light.hidden) { e.preventDefault(); shut(); } });
+  dlg.addEventListener("keydown", e => {
+    if (light.hidden) return;
+    if (e.key === "ArrowLeft") show(dlg.at - 1);
+    else if (e.key === "ArrowRight") show(dlg.at + 1);
+  });
+  $(".jclose", dlg).addEventListener("click", () => dlg.close());
+  dlg.addEventListener("close", () => { body.innerHTML = ""; shut(); if (ownHash(location.hash)) history.replaceState(null, "", location.pathname + location.search); });
 }
+setupReader($("#adventure"), hash => /^#day-out-/.test(hash));
+document.addEventListener("click", e => { const b = e.target.closest(".advcard"); if (b) openAdventure(ADVS.find(a => a.id === b.dataset.adv)); });
+
+/* ---------- Twin Squawk: the news page ----------
+   Newest first, by when each one went live (a post waiting for its time isn't sent to visitors at all). Each opens in a
+   reader at its own address (/twin-squawk/#its-name), so it can be shared: its photos open larger, and YouTube videos
+   play there once tapped. */
+let POSTS = [];
+const postDate = p => p.publish_at || p.created_at;
+// a post's words: a blank line starts a new paragraph; a line starting "## " is a heading, with the lines under it as text
+const postHTML = s => s.trim().split(/\n\s*\n/).map(b => {
+  const [first, ...rest] = b.trim().split("\n"), head = /^##\s/.test(first) ? `<h3 class="sqhead">${h(first.replace(/^##\s+/, ""))}</h3>` : "";
+  const text = (head ? rest : [first, ...rest]).join("\n").trim();
+  return head + (text ? `<p>${h(text).replace(/\n/g, "<br>")}</p>` : "");
+}).join("");
+function openArticle(p) {
+  const dlg = $("#article");
+  if (!dlg || !p) return;
+  const pics = (Array.isArray(p.photos) ? p.photos : []).filter(x => x && photoUrl(x.url));
+  const vids = (Array.isArray(p.videos) ? p.videos : []).filter(v => v && safeUrl(v.url));
+  const links = (Array.isArray(p.links) ? p.links : []).filter(l => l && safeUrl(l.url));
+  const cover = photoUrl(p.photo_url), body = String(p.body || "").trim();
+  $("#sqname").textContent = p.title;
+  $("#sqmeta").textContent = fullDate(postDate(p));
+  $("#sqbody").innerHTML = (cover ? `<figure class="sqcover"><img src="${h(cover)}" alt="${h(p.photo_alt || "")}"${frameAttr(p.photo_frame)}></figure>` : "")
+    + (p.summary ? `<p class="sqlede">${h(p.summary)}</p>` : "")
+    + (body ? `<div class="jstory">${postHTML(body)}</div>` : "")
+    + (vids.length ? `<h3 class="jsub">${h(t("js.squawk.videos", "Videos"))}</h3>${videosHTML(vids, p.title)}` : "")
+    + (pics.length ? `<h3 class="jsub">${h(t("js.squawk.photos", "Photos"))}</h3><ul class="agal">${pics.map((x, i) => `<li><button type="button" data-photo="${i}" aria-label="${h(x.alt || t("js.adventure.photo", "Photo {n} of {count}", { n: i + 1, count: pics.length }))}"><img src="${h(photoUrl(x.url))}" alt=""${frameAttr(x)} loading="lazy"></button></li>`).join("")}</ul>` : "")
+    + (links.length ? `<h3 class="jsub">${h(t("js.squawk.links", "Links"))}</h3><ul class="xlinks">${links.map(l => `<li><a href="${h(safeUrl(l.url))}" target="_blank" rel="noopener">${h(l.label || safeUrl(l.url))} <span class="ext" aria-hidden="true">↗</span></a></li>`).join("")}</ul>` : "")
+    + `<div class="btns sqshare"><button type="button" class="btn ghost sm" data-share>${h(t("js.squawk.share", "Share this post"))}</button></div>`;
+  dlg.photos = pics.map(x => photoUrl(x.url));
+  dlg.alts = pics.map(x => String(x.alt || ""));
+  dlg.post = p;
+  $("#sqlight").hidden = true;
+  if (!dlg.open) dlg.showModal ? dlg.showModal() : dlg.setAttribute("open", "");
+  $("#sqbody").scrollTop = 0;
+  history.replaceState(null, "", "#" + p.slug);
+}
+async function renderArticles(el) {
+  try { POSTS = await q("articles", "select=id,slug,title,summary,body,photo_url,photo_frame,photo_alt,photos,videos,links,publish_at,created_at"); } catch { return; }
+  POSTS.sort((a, b) => new Date(postDate(b)) - new Date(postDate(a)));
+  if (!POSTS.length) return;
+  await wordingReady;
+  el.innerHTML = POSTS.map((p, i) => `<li><a class="sqcard" href="#${h(p.slug)}" data-post="${h(p.slug)}"><span class="ph ${BG[i % 6]}" aria-hidden="true">🦜${photoTag(p.photo_url, "", p.photo_frame)}</span>
+    <span class="bd"><small>${h(fullDate(postDate(p)))}</small><b>${h(p.title)}</b>${p.summary ? `<span>${h(p.summary)}</span>` : ""}<em>${h(t("js.squawk.read", "Read it"))}</em></span></a></li>`).join("");
+  $$("[data-articles-empty]").forEach(x => { x.hidden = true; });
+  // a link to one post (#its-name) opens it, on arrival or later
+  const fromHash = () => { let s = ""; try { s = decodeURIComponent(location.hash.slice(1)); } catch {} openArticle(POSTS.find(x => x.slug === s)); };
+  fromHash();
+  addEventListener("hashchange", fromHash);
+}
+setupReader($("#article"), hash => POSTS.some(p => "#" + p.slug === hash));
+document.addEventListener("click", async e => {
+  const card = e.target.closest(".sqcard");
+  if (card && !e.metaKey && !e.ctrlKey && !e.shiftKey && e.button === 0) { e.preventDefault(); return openArticle(POSTS.find(p => p.slug === card.dataset.post)); } // a new tab works normally
+  const share = e.target.closest("#article [data-share]");
+  if (!share) return;
+  const p = $("#article").post, url = location.origin + location.pathname + "#" + p.slug;
+  if (navigator.share) { try { await navigator.share({ title: p.title, url }); } catch {} return; } // cancelled: nothing to do
+  try { await navigator.clipboard.writeText(url); share.textContent = t("js.squawk.copied", "Link copied ✓"); } catch { share.textContent = url; }
+});
 
 /* ---------- visitor counts ---------- */
 // One count per page view, kept in the site's own database (count_view): just the page, the day and where
@@ -962,7 +1024,9 @@ let editor = false;
 try { editor = !!localStorage.getItem("tt-editor-session"); } catch {}
 if (editor && S.scope) {
   const spotsHere = S.scope !== "404" && !!$("[data-b]");
-  document.body.insertAdjacentHTML("beforeend", `<div class="editfabs"><a class="editfab" href="${h(S.base)}edit/#/text/${h(S.scope)}">✏️ Edit this page's wording</a>`
+  document.body.insertAdjacentHTML("beforeend", `<div class="editfabs">`
+    + (S.scope === "twin-squawk" ? `<a class="editfab" href="${h(S.base)}edit/#/squawk">🦜 Write or change posts</a>` : "")
+    + `<a class="editfab" href="${h(S.base)}edit/#/text/${h(S.scope)}">✏️ Edit this page's wording</a>`
     + (spotsHere ? `<button class="editfab" type="button" data-ppmode aria-pressed="false">📷 Photos on this page</button>` : "") + `</div>`);
   const btn = $("[data-ppmode]");
   const link = (q, id) => `${h(S.base)}edit/#/photos/${id ? encodeURIComponent(id) : "new"}?${q ? q + "&" : ""}back=${encodeURIComponent(S.page)}`;
@@ -1019,5 +1083,6 @@ $$("[data-fosters]").forEach(renderFosters);
 $$("[data-videos]").forEach(renderVideos);
 $$("[data-places]").forEach(renderPlaces);
 $$("[data-adventures]").forEach(renderAdventures);
+$$("[data-articles]").forEach(renderArticles);
 countView();
 })();

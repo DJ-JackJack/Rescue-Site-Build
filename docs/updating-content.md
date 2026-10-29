@@ -45,6 +45,16 @@ The same page has three more parts, each hidden until it has a published row:
 - `videos`: videos of the dogs' day outs. `title`, `url` (an `https://` link to the post on TikTok, Instagram, YouTube or Facebook), and optionally `posted_on`, `note` and a cover `photo_url`. They're links, not embeds, so no outside scripts or cookies load on the page. They show by `sort`, then newest first.
 - `places`: her dog-friendly places. `name`, `area` (a city or the public place, never a private address), `why`, and optionally `link_url` and `photo_url`.
 
+## Twin Squawk
+
+`articles`, shown on the Twin Squawk page (`/twin-squawk/`), newest first: `title`, `slug` (its address, `/twin-squawk/#slug`; lowercase letters, numbers and dashes), `summary`, `body` (a blank line starts a paragraph, a line starting with `## ` is a heading), a cover `photo_url` with `photo_frame` and `photo_alt`, `photos` (a gallery of up to 30, `[{"url", "alt", "w", "h", "x", "y", "z"}]`), `videos` (`[{"url", "title"}]`, YouTube ones play in the post after play is tapped) and `links` (`[{"url", "label"}]`). The date shown is `publish_at` if it has one, else `created_at`. Tick `published`.
+
+## Going live at a set time
+
+Every table with `published` (`articles`, `animals`, `goals`, `partners`, `events`, `collabs`, `sniffari_programs`, `foster_programs`, `adventures`, `videos`, `places`, `help_resources`, `page_photos`) also has `publish_at`. Empty means it shows as soon as it's published. A time in the future keeps it from visitors until then: each table has two extra "restrictive" read rules (`<table>_on_time` and `<table>_on_time_signed_in`, `20261029_scheduler_twin_squawk.sql`), so it appears at that exact minute with nothing to run, and editors always see it. Every other rule about who sees what stays as it was.
+
+Every 5 minutes, the pg_cron job `announce-scheduled` checks `live_due()` for anything that went live in the last 2 days and hasn't been announced. If there's something, it calls `notify-message` with `{"action": "live"}`. The function trusts nothing in the call: `live_claim()` (server only) notes each one in `went_live` and returns what to announce, so each one is announced once (and again if it's rescheduled). Animals only count once `people_ok` is ticked, and rescues once `feature_ok` is. The edit page's **Scheduled** screen lists what's coming up and what went live in the past week.
+
 ## Foster programs
 
 `foster_programs`, shown on the Foster page: `shelter_name`, `program_name`, `city`, `signup_url`, `facts`, `links`, `tags` (`free`, `dogs`, `cats`, `kittens`, `puppies`, `medical`, `short`, `sleepover`, `adopt`), `checked_on`, `sort`, `published`. `free` means the program says the animal's care is covered at no cost to the foster; the page counts them ("4 of the 9 programs listed here are free to foster"). Like day-out programs, publicly advertised programs need no shelter OK.
@@ -119,10 +129,11 @@ The `admins` table lists the email addresses allowed to edit. It can't be read o
 
 ## Message notifications
 
-Editors can get a phone notification for each new message (Web Push, no app or extra account):
+Editors can get a phone notification for each new message, and when something scheduled goes live (Web Push, no app or extra account):
 
-- **Signing up a device:** edit page → Messages → **Turn on notifications**. The browser signs up with its push service (Google, Apple, Mozilla or Microsoft) and the sign-up is saved in `push_subscriptions` (editors only). iPhones and iPads only allow this for web apps on the Home Screen. `site/edit-sw.js`, published as `/edit/sw.js`, shows the notifications and opens Messages when one is tapped.
+- **Signing up a device:** edit page → Messages → **Turn on notifications**. The browser signs up with its push service (Google, Apple, Mozilla or Microsoft) and the sign-up is saved in `push_subscriptions` (editors only). iPhones and iPads only allow this for web apps on the Home Screen. `site/edit-sw.js`, published as `/edit/sw.js`, shows the notifications and opens Messages (or Scheduled, for something that went live) when one is tapped. The two kinds use their own push `Topic` and notification tag, so one never replaces the other.
 - **Sending:** after each new message, the trigger `messages_notify` asks the Edge Function `notify-message` (`supabase/functions/notify-message/`) to announce it, through `pg_net`, so the form never waits and a problem there can't lose a message. The function trusts nothing in the call: `push_claim` marks the messages not yet announced (`messages.notified_at`) and returns only their topic and name. Each notification is encrypted for the device it goes to, and says the topic and who it's from, never the message. Devices that turned notifications off are forgotten automatically.
+- **Things going live:** see "Going live at a set time" above. The notification names what went live ("Twin Squawk: …"), or how many things did.
 - **Keys:** the function makes its VAPID keys on first use and keeps them in `push_state`, which only the server can read. Nobody has to handle them.
 - **If notifications stop:** open Messages on that device and tap **Send a test**. If the test doesn't arrive, turn them off and on again there. The function's logs are in the Supabase dashboard under Edge Functions → notify-message → Logs.
 - **Updating the function:** it's deployed with `verify_jwt` off, because it checks callers itself. Redeploy it from `supabase/functions/notify-message/` with the same setting.
