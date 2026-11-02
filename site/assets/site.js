@@ -923,11 +923,13 @@ async function renderPagePhotos() {
   $$("[data-pp-side]").forEach(w => w.replaceWith(...(w.querySelector(":scope > .pp-side-text")?.childNodes || [])));
   $$("figure[data-pp]").forEach(f => f.remove());
   $$("[data-pp-hid]").forEach(el => { el.hidden = false; el.removeAttribute("data-pp-hid"); });
-  $$("[data-pp-swap]:not(img)").forEach(li => { // the photo wall
+  $$("[data-pp-swap]:not(img)").forEach(li => { // the photo wall, and empty photo frames
+    li.removeAttribute("data-pp-swap");
+    if (li.dataset.img === undefined) { $("img[data-pp-add]", li)?.remove(); return; }
     let o = {};
     try { o = JSON.parse(li.dataset.ppOrig); } catch {}
     setWallPhoto(li, o.img || "", null);
-    li.removeAttribute("data-pp-swap"); li.removeAttribute("data-pp-orig");
+    li.removeAttribute("data-pp-orig");
   });
   $$("img[data-pp-swap]").forEach(img => {
     let o = {};
@@ -969,6 +971,13 @@ async function renderPagePhotos() {
   for (const [k, row] of swaps) {
     const img = $(`[data-pi="${CSS.escape(k)}"]`), to = PPH.swap(row, S.base);
     if (!img) continue;
+    if (img.tagName !== "IMG" && img.dataset.img === undefined) { // an empty photo frame (a card's emoji): the photo goes in it
+      if (!to) continue; // nothing there to hide
+      const css = PPH.swapCSS(to);
+      img.insertAdjacentHTML("beforeend", `<img src="${h(to.src)}" alt="${h(to.alt)}"${css ? ` style="${h(css)}"` : ""} data-pp-add>`);
+      img.dataset.ppSwap = row.id;
+      continue;
+    }
     if (img.tagName !== "IMG") { // the photo wall
       img.dataset.ppOrig = JSON.stringify({ img: img.dataset.img || "" });
       setWallPhoto(img, to ? to.url : "", to?.frame);
@@ -1051,9 +1060,9 @@ if (editor && S.scope) {
     });
     $$("[data-pp-hid]").forEach(el => { el.hidden = false; el.classList.add("ppghost"); });
     $$("figure[data-pp]").forEach(f => f.insertAdjacentHTML("afterbegin", `<a class="ppfix" href="${link("", f.dataset.pp)}">✎ Change this photo</a>`));
-    $$("[data-pi]:not(img)").forEach(li => { // the photo wall
-      const row = li.dataset.ppSwap;
-      li.insertAdjacentHTML("beforeend", `<a class="ppfix" href="${row ? link("", row) : spotLink(li.dataset.pi)}">${row && !li.dataset.img ? "👁 Hidden" : "✎ Change photo"}</a>`);
+    $$("[data-pi]:not(img)").forEach(li => { // the photo wall, and empty photo frames
+      const row = li.dataset.ppSwap, frame = li.dataset.img === undefined;
+      li.insertAdjacentHTML("beforeend", `<a class="ppfix" href="${row ? link("", row) : spotLink(li.dataset.pi)}">${frame && !row ? "＋ Put a photo here" : row && !frame && !li.dataset.img ? "👁 Hidden" : "✎ Change photo"}</a>`);
     });
     $$("img[data-pi]").forEach(img => {
       const row = img.dataset.ppSwap || img.closest("[data-pp-hid]")?.dataset.ppHid;
