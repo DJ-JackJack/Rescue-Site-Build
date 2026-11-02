@@ -693,7 +693,7 @@ const SECTIONS = {
         current: v => (isSwap(v) ? picOf(v) : null), // a photo that came with the site can be reframed without replacing it
         help: "Add a short description for each one, for people who can't see it. Tap ⤢ on a photo to move or zoom it in its frame. Never photos of a home, or anything showing where someone lives. To hide a photo that's already on the page, pick it under “Where on the page?” and leave this empty.",
         validate: (list, v) => isSwap(v)
-          ? (list.length > 1 ? "Pick just one photo to put in its place." : "")
+          ? (list.length > 1 ? "Pick just one photo to put in its place." : !list.length && picOf(v) && !picOf(v).src ? "Add a photo to put here." : "")
           : !list.length ? "Add a photo."
           : v.layout !== "row" && list.length > 1 ? "This look shows one photo. To show several, pick “A row of photos”." : "" },
       { name: "caption", type: "text", label: "Caption", max: 300, when: v => !isSwap(v), help: "Optional. Shown under the photo." },

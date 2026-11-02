@@ -8,7 +8,9 @@
 //     (Taea's own wording changes don't count: they're applied after this, to the same keys.)
 //   - data-pi="i.home.1a2b3c4d": a photo already on the page (a fingerprint of its file name), so it can be
 //     changed or hidden. That's every <img> from assets/photos, and each photo on the home page's photo wall, which
-//     site.js draws from data-img (keyed by its file name, or by its label when it has no photo yet).
+//     site.js draws from data-img (keyed by its file name, or by its label when it has no photo yet). An empty
+//     photo frame, like a card that shows an emoji until it has a photo, gets one too (keyed by its card's heading),
+//     so a photo can be put in it.
 // It returns the HTML and, for the edit page, every spot and photo with a description of where it is.
 //
 // bakePhotos(html, rows) runs after the wording and puts the saved photos in, through site/assets/pagephotos.js,
@@ -73,6 +75,7 @@ const shapeOf = (img, box) => {
   const w = Number(attr(img, "width")), h = Number(attr(img, "height"));
   return w > 0 && h > 0 ? w / h : 0;
 };
+const hasImg = n => (n.children || []).some(c => c.tag === "img" || hasImg(c));
 const addAttrs = (el, more) => {
   el.attrs += more;
   el.start = el.start.replace(/\s*\/?>$/, m => more + m);
@@ -104,6 +107,11 @@ export function markSpots(html, scope) {
       if (!c.tag || SKIP_TAGS.has(c.tag)) continue;
       if (filled(c)) {
         const jsFilled = SKIP_ATTR.test((c.attrs || "").replace(/\saria-hidden="true"/g, ""));
+        if (!jsFilled && near && has(c, "ph") && !hasImg(c)) { // an empty photo frame on a card: a photo can be put in it
+          const k = keyOf("i", "frame " + near);
+          addAttrs(c, ` data-pi="${k}"`);
+          pics.push({ k, l: `The empty photo spot on “${near}”`, src: "", g: group, a: shapeOf(c, c), alt: "" });
+        }
         if (!jsFilled) visit(c, near, true);
         continue;
       }
@@ -199,6 +207,13 @@ export function bakePhotos(html, rows, base = "/") {
     const img = byI.get(k);
     if (!img) continue;
     const to = PP.swap(row, base);
+    if (img.tag !== "img" && attr(img, "data-img") === undefined) { // an empty photo frame: the photo goes in it
+      if (!to) continue; // nothing there to hide
+      const css = PP.swapCSS(to);
+      addAttrs(img, ` data-pp-swap="${esc(row.id)}"`);
+      img.children.push({ raw: `<img src="${esc(to.src)}" alt="${esc(to.alt)}"${css ? ` style="${esc(css)}"` : ""} data-pp-add>` });
+      continue;
+    }
     if (img.tag !== "img") { // the photo wall: site.js draws the photo from data-img ("" for none), framed by data-frame
       const orig = { img: decode(attr(img, "data-img") || "") };
       const a = img.attrs.replace(/\s(data-img|data-frame)="[^"]*"/g, "") + ` data-img="${esc(to ? to.url : "")}"${to?.frame ? ` data-frame="${esc(JSON.stringify(to.frame))}"` : ""} data-pp-swap="${esc(row.id)}" data-pp-orig="${esc(JSON.stringify(orig))}"`;
