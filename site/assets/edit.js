@@ -344,6 +344,7 @@ const CITIES = [["virginia-beach", "Virginia Beach"], ["norfolk", "Norfolk"], ["
 const citiesOf = r => (r.cities || []).map(c => label(CITIES, c)).join(", ");
 const TOPICS = { partner: "Partnership", help: "Help keeping a pet", dog: "About a dog", sniffari: "Day-out program", request: "Video request or question", other: "Something else" };
 const RANK = { looking: 0, foster: 1, adopted: 2, sanctuary: 3, placed: 4, unknown: 5 };
+const byName = (a, b) => a.name.localeCompare(b.name, "en", { sensitivity: "base", numeric: true });
 const stale = (d, days) => d === null || d === undefined || daysAgo(d) >= days;
 const platform = u => {
   let host = "";
@@ -408,7 +409,8 @@ const SECTIONS = {
     titleOf: r => r.name,
     filters: [["all", "All"], ["looking", "Still looking"], ["foster", "In foster"], ["adopted", "Adopted"], ["sanctuary", "In sanctuary"], ["unknown", "Unknown"], ["spotlight", "Spotlight"], ["hidden", "Hidden"]],
     tokens: r => [r.status, r.section === "spotlight" ? "spotlight" : "", r.published ? "" : "hidden"],
-    order: (a, b) => (RANK[a.status] ?? 9) - (RANK[b.status] ?? 9) || a.name.localeCompare(b.name),
+    // ways to order the list: [value, what the switch says, order, the heading each group goes under]
+    sorts: [["az", "A–Z", byName], ["status", "By status", (a, b) => (RANK[a.status] ?? 9) - (RANK[b.status] ?? 9) || byName(a, b), r => label(STATUS, r.status)]],
     row: r => ({ title: r.name, sub: [label(STATUS, r.status), r.partner?.name, r.section === "spotlight" && "Story Spotlight"].filter(Boolean).join(" · "), photo: r.photo_url, frame: r.photo_frame, emoji: EMOJI[r.species],
       flags: [!r.published && "Hidden", r.status === "looking" && r.published && stale(r.checked_on, 21) && "!Needs a check"] }),
     fields: [
@@ -869,25 +871,46 @@ function rowHTML(S, key, r) {
     <span class="rt"><b>${h(v.title)}</b><small>${h(v.sub)}</small>${flags ? `<span class="flags">${flags}</span>` : ""}</span><span class="chev" aria-hidden="true">›</span></a></li>`;
 }
 
+// S.sorts: the list can be put in more than one order, and the choice is kept on this device. One with groups (like
+// by status) has a heading over each group.
 async function showList(key) {
   const S = SECTIONS[key];
   let rows = await api.list(S.table, S.query);
   if (S.order) rows = rows.sort(S.order);
-  let filter = "all";
+  let filter = "all", sort = S.sorts?.[0][0];
   try { filter = sessionStorage.getItem("f:" + key) || "all"; } catch {}
+  try { sort = localStorage.getItem("tt-sort:" + key) || sort; } catch {}
+  if (S.sorts && !S.sorts.some(x => x[0] === sort)) sort = S.sorts[0][0];
+  const listHTML = () => {
+    const [, , order, groupOf] = S.sorts?.find(x => x[0] === sort) || [];
+    const list = order ? [...rows].sort(order) : rows;
+    let group = null;
+    return list.map(r => {
+      const g = groupOf ? groupOf(r) : null, head = g !== null && g !== group ? `<li class="lgroup"><h2 class="sub">${h(g)} <small>${list.filter(x => groupOf(x) === g).length}</small></h2></li>` : "";
+      group = g;
+      return head + rowHTML(S, key, r);
+    }).join("");
+  };
   render(`<a class="back" href="#/">‹ Start</a>
     <div class="lhead"><h1>${h(S.title)}</h1><a class="btn royal" href="#/${key}/new">+ Add ${h(S.one)}</a></div>
     ${S.intro ? `<p class="lede">${h(S.intro)}</p>` : ""}
     ${S.filters ? `<div class="fchips" role="group" aria-label="Show">${S.filters.map(([v, l]) => `<button type="button" data-filter="${h(v)}" aria-pressed="${v === filter}">${h(l)}</button>`).join("")}</div>` : ""}
     ${rows.length > 6 ? `<label class="sr" for="find">Search</label><input class="search" id="find" type="search" placeholder="Search ${h(S.title.toLowerCase())}" autocomplete="off">` : ""}
-    ${rows.length ? `<ul class="rows">${rows.map(r => rowHTML(S, key, r)).join("")}</ul>` : `<p class="allgood">Nothing here yet. Tap “Add ${h(S.one)}” to start.</p>`}
+    ${S.sorts && rows.length > 1 ? `<div class="sortby" role="group" aria-label="Order"><span>Order:</span>${S.sorts.map(([v, l]) => `<button type="button" data-sort="${h(v)}" aria-pressed="${v === sort}">${h(l)}</button>`).join("")}</div>` : ""}
+    ${rows.length ? `<ul class="rows">${listHTML()}</ul>` : `<p class="allgood">Nothing here yet. Tap “Add ${h(S.one)}” to start.</p>`}
     <p class="small none" hidden>No matches.</p>`);
   const apply = () => {
     const term = ($("#find")?.value || "").trim().toLowerCase();
     let shown = 0;
-    $$(".rows li", app).forEach(li => {
+    $$(".rows li[data-s]", app).forEach(li => {
       const ok = (!term || li.dataset.s.includes(term)) && (filter === "all" || li.dataset.tok.split(" ").includes(filter));
       li.hidden = !ok; if (ok) shown++;
+    });
+    // a group's heading shows while something under it does
+    $$(".rows .lgroup", app).forEach(g => {
+      let any = false;
+      for (let n = g.nextElementSibling; n && !n.classList.contains("lgroup"); n = n.nextElementSibling) if (!n.hidden) { any = true; break; }
+      g.hidden = !any;
     });
     $(".none", app).hidden = !!shown || !rows.length;
   };
@@ -897,6 +920,14 @@ async function showList(key) {
     try { sessionStorage.setItem("f:" + key, filter); } catch {}
     $$("[data-filter]", app).forEach(x => x.setAttribute("aria-pressed", x === b));
     apply();
+  }));
+  $$("[data-sort]", app).forEach(b => b.addEventListener("click", () => {
+    sort = b.dataset.sort;
+    try { localStorage.setItem("tt-sort:" + key, sort); } catch {}
+    $$("[data-sort]", app).forEach(x => x.setAttribute("aria-pressed", x === b));
+    $(".rows", app).innerHTML = listHTML();
+    apply();
+    showFrames(app);
   }));
   apply();
   showFrames(app);
