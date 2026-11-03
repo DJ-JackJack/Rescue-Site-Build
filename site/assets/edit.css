@@ -59,6 +59,13 @@
 .flags{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
 .flag{font:800 .66rem var(--f-body);text-transform:uppercase;letter-spacing:.05em;background:var(--wash);color:var(--plum);border-radius:999px;padding:3px 8px}
 .flag.warn{background:#FFE6A8;color:#4A3200}
+.sortby{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-top:10px;font-weight:800;font-size:.86rem;color:var(--ink2)}
+.sortby button{font:800 .86rem var(--f-body);border:2px solid var(--midviolet);background:#fff;color:var(--plum);border-radius:999px;padding:6px 12px;min-height:40px;cursor:pointer}
+.sortby [aria-pressed="true"]{background:var(--plum);border-color:var(--plum);color:#fff}
+.rows .lgroup{list-style:none;margin-top:10px}
+.rows .lgroup:first-child{margin-top:0}
+.rows .lgroup h2{margin:0 2px}
+.rows .lgroup small{font:800 .8rem var(--f-body);color:var(--ink2);margin-left:4px}
 .chev{font-size:1.7rem;color:var(--midviolet);line-height:1}
 
 /* forms */
