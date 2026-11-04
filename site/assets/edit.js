@@ -500,8 +500,8 @@ const SECTIONS = {
     ],
   },
   collabs: {
-    table: "collabs", title: "Collaborations", one: "collaboration", icon: "🎨",
-    intro: "What you've done, are doing and have planned with each rescue, like portraits or shelter treats. Shown on their card on the Rescues page, sorted into coming up, happening now and done by the dates.",
+    table: "collabs", title: "Working together", one: "collaboration", icon: "🎨",
+    intro: "What you've done, are doing and have planned with each rescue, like portraits or shelter treats. Shown under “Working together” on their card on the Rescues page, sorted into coming up, happening now and done by the dates.",
     query: "select=*,partner:partners(name)&order=starts_on.desc",
     titleOf: r => r.title,
     filters: [["all", "All"], ...WHEN],
@@ -522,7 +522,7 @@ const SECTIONS = {
     prepare(vals, row, patch) { if (vals.ongoing && vals.ends_on) patch.ends_on = null; },
   },
   partners: {
-    table: "partners", title: "Rescues & shelters", one: "rescue or shelter", icon: "🏡",
+    table: "partners", title: "Rescues and shelters", one: "rescue or shelter", icon: "🏡",
     intro: "An organization shows on the site once both switches are on: they've said yes, and “Show on the site”.",
     query: "select=*&order=sort.asc,name.asc",
     titleOf: r => r.name,
@@ -543,7 +543,7 @@ const SECTIONS = {
     beforeAdd: r => ({ ...r, slug: slugify(r.name) }),
   },
   sniffari: {
-    table: "sniffari_programs", title: "Day-out programs", one: "day-out program", icon: "🦮",
+    table: "sniffari_programs", title: "Sniffari programs", short: "Programs", one: "day-out program", icon: "📋",
     intro: "Shelter day-out programs listed on Rescues on Sniffari.",
     query: "select=*&order=sort.asc",
     titleOf: r => r.program_name || r.shelter_name,
@@ -564,7 +564,7 @@ const SECTIONS = {
     ],
   },
   fosters: {
-    table: "foster_programs", title: "Foster programs", one: "foster program", icon: "🏠",
+    table: "foster_programs", title: "Foster programs", one: "foster program", icon: "🛏️",
     intro: "The shelters' and rescues' foster programs, listed on the Foster page. The page counts how many are free to foster.",
     query: "select=*&order=sort.asc,shelter_name.asc",
     titleOf: r => r.program_name || r.shelter_name,
@@ -609,7 +609,7 @@ const SECTIONS = {
     ],
   },
   videos: {
-    table: "videos", title: "Day-out videos", one: "day-out video", icon: "🎬",
+    table: "videos", title: "Day-out videos", short: "Videos", one: "day-out video", icon: "🎬",
     intro: "Videos of the dogs' day outs, shown on Rescues on Sniffari. That part of the page stays hidden until there's a video to show.",
     query: "select=*&order=sort.asc,posted_on.desc.nullslast,created_at.desc",
     titleOf: r => r.title,
@@ -639,7 +639,7 @@ const SECTIONS = {
     ],
   },
   help: {
-    table: "help_resources", title: "Local help list", one: "help listing", icon: "🤝",
+    table: "help_resources", title: "Help listings", one: "help listing", icon: "🤝",
     intro: "The help pages list these city by city, with buttons at the top to jump to each city, and each listing shows under its kind of help in its city's section. Help for pets shows on “Help keeping your pet”, wild animal help there and on the Wildlife page, and help for people (crisis lines, abuse at home, mental health, grieving a pet) on Caring for Yourself.",
     query: "select=*&order=category.asc,sort.asc,name.asc",
     titleOf: r => r.name,
@@ -670,7 +670,7 @@ const SECTIONS = {
     ],
   },
   photos: {
-    table: "page_photos", title: "Photos on the pages", one: "photo", icon: "🖼️",
+    table: "page_photos", title: "Photos", one: "photo", icon: "🖼️",
     intro: "Photos you've added to the pages, and photos on the pages you've changed or hidden. The easiest way to add one: open the page on the site while you're signed in, tap “📷 Photos on this page”, then tap “＋ Add a photo here” where you want it.",
     query: "select=*&order=page.asc,sort.asc,created_at.asc",
     titleOf: r => `${pageTitle(r.page) || r.page}: ${r.layout === "swap" ? (r.photos?.length ? "a changed photo" : "a hidden photo") : "a photo"}`,
@@ -736,6 +736,7 @@ async function route() {
     if (sec === "deleted") return await showDeleted();
     if (sec === "visitors") return await showVisitors(id || "7");
     if (sec === "scheduled") return await showScheduled();
+    if (sec === "settings") return await showSettings();
     if (!SECTIONS[sec]) return go("#/");
     return id ? await showForm(sec, id, params) : await showList(sec);
   } catch (e) {
@@ -832,36 +833,37 @@ async function showHome() {
     todo.push(`<li><b>${h(r.name)}: still running?</b><small>${r.checked_on ? `Last checked ${h(nice(r.checked_on))}.` : "Never checked."}</small>
       <div class="btns"><button class="btn royal sm" type="button" data-act="checked" data-t="help_resources" data-id="${h(r.id)}">Still running</button><a class="btn ghost sm" href="#/help/${h(r.id)}">Open</a></div></li>`);
   }
-  const tiles = [
-    ["messages", "✉️", "Messages", msgs.length ? `${msgs.length} new` : "None new"],
-    ["squawk", "🦜", "Twin Squawk", plural(posts.length, "post")],
-    ["scheduled", "⏰", "Scheduled", soon ? `${soon} coming up` : "Plan posts ahead"],
-    ["animals", "🐾", "Animals", plural(animals.length, "animal")],
-    ["goals", "🌾", "Shelter goals", plural(goals.filter(g => g.status === "active").length, "active goal")],
-    ["events", "📅", "Events", plural(events.length, "coming up", "coming up")],
-    ["partners", "🏡", "Rescues & shelters", ""],
-    ["collabs", "🎨", "Collaborations", plural(collabs.length, "collaboration")],
-    ["sniffari", "🦮", "Day-out programs", plural(progs.length, "program")],
-    ["fosters", "🏠", "Foster programs", plural(fosters.length, "program")],
-    ["adventures", "🦮", "Our day outs", plural(advs.length, "day out")],
-    ["videos", "🎬", "Day-out videos", plural(videos.length, "video")],
-    ["places", "📍", "Dog-friendly places", plural(places.length, "place")],
-    ["photos", "🖼️", "Photos on the pages", plural(pics.length, "photo")],
-    ["help", "🤝", "Local help list", plural(help.length, "listing")],
-    ["text", "✏️", "Page wording", ""],
-    ["visitors", "📈", "Visitors", week ? plural(week.days.reduce((a, d) => a + d[1], 0), "view") + " this week" : ""],
-    ["deleted", "🗑️", "Recently deleted", ""],
-  ];
+  // what each tile says under its name
+  const counts = {
+    messages: msgs.length ? `${msgs.length} new` : "None new", squawk: plural(posts.length, "post"), scheduled: soon ? `${soon} coming up` : "Plan posts ahead",
+    animals: plural(animals.length, "animal"), goals: plural(goals.filter(g => g.status === "active").length, "active goal"), events: plural(events.length, "coming up", "coming up"),
+    collabs: plural(collabs.length, "collaboration"), sniffari: plural(progs.length, "program"), fosters: plural(fosters.length, "program"), adventures: plural(advs.length, "day out"),
+    videos: plural(videos.length, "video"), places: plural(places.length, "place"), photos: plural(pics.length, "photo"), help: plural(help.length, "listing"),
+    visitors: week ? plural(week.days.reduce((a, d) => a + d[1], 0), "view") + " this week" : "",
+  };
   badge(msgs.length);
   recheckSub();
   tidyPhotosNow();
   render(`<h1>Hi! What needs updating?</h1>
     <h2 class="sub">Needs attention</h2>
     ${todo.length ? `<ul class="todo">${todo.join("")}</ul>` : `<p class="allgood">All caught up ✓</p>`}
-    <h2 class="sub">Everything</h2>
-    <div class="tiles">${tiles.map(([k, ic, t, s]) => `<a class="tile" href="#/${k}"><span class="ic" aria-hidden="true">${ic}</span><b>${t}</b>${s ? `<small>${h(s)}</small>` : ""}</a>`).join("")}</div>
+    ${GROUPS.map(([name, where, keys]) => `<section class="tgroup"><h2 class="sub">${h(name)}</h2><p class="small where">${h(where)}</p>
+      <div class="tiles">${keys.map(k => { const [ic, t] = tileOf(k); return `<a class="tile" href="#/${k}"><span class="ic" aria-hidden="true">${ic}</span><b>${h(t)}</b>${counts[k] ? `<small>${h(counts[k])}</small>` : ""}</a>`; }).join("")}</div></section>`).join("")}
     <p class="small foot">Signed in as ${h(session?.email)}. Changes show on the site straight away, unless you pick a time for them to go live.</p>`);
 }
+
+// The start screen's tiles, grouped by the part of the site they change: [heading, the pages it covers, tiles].
+const GROUPS = [
+  ["Post", "The Twin Squawk page", ["squawk", "scheduled"]],
+  ["Animals", "Happy Tails, the Story Spotlight and the Willow Woods horses", ["animals"]],
+  ["Shelters and rescues", "The Rescues page, Shelter Goals and the Foster page", ["partners", "goals", "events", "collabs", "fosters"]],
+  ["Rescues on Sniffari", "The Rescues on Sniffari page", ["sniffari", "adventures", "videos", "places"]],
+  ["Every page", "The words and photos on any page", ["text", "photos"]],
+  ["Help pages", "Help keeping your pet, Caring for Yourself and Wildlife", ["help"]],
+  ["Inbox and settings", "Behind the scenes", ["messages", "visitors", "deleted", "settings"]],
+];
+const SCREENS = { messages: ["✉️", "Messages"], scheduled: ["⏰", "Scheduled"], text: ["✏️", "Wording"], visitors: ["📈", "Visitors"], deleted: ["🗑️", "Recently deleted"], settings: ["⚙️", "Settings"] };
+const tileOf = k => SCREENS[k] || [SECTIONS[k].icon, SECTIONS[k].short || SECTIONS[k].title];
 
 function rowHTML(S, key, r) {
   const v = S.row(r), pic = photoUrl(v.photo);
@@ -1413,7 +1415,26 @@ async function showScheduled() {
     ${went.length ? `<h2 class="sub">Went live this past week</h2>
     <ul class="rows">${went.map(x => `<li><a class="row" href="#/${x.k}/${h(x.r.id)}?from=scheduled"><span class="thumb" aria-hidden="true">${SECTIONS[x.k].icon}</span>
       <span class="rt"><b>${h(name(x))}</b><small>${h(kindOf(SECTIONS[x.k]))} · ${h(niceAt(x.r.publish_at))}</small></span><span class="chev" aria-hidden="true">›</span></a></li>`).join("")}</ul>` : ""}
-    <div id="pushbox"></div>`);
+    <p class="small pushline" id="pushline"></p>`);
+  showPushLine();
+}
+
+/* ---------- settings ---------- */
+// Everything about this phone or computer and the account, in one place.
+const GUIDE = "https://github.com/DJ-JackJack/Rescue-Site-Build/blob/main/docs/editing-guide.md";
+async function showSettings() {
+  let off = false;
+  try { off = localStorage.getItem(NOCOUNT) === "1"; } catch {}
+  render(`<a class="back" href="#/">‹ Start</a><h1>Settings</h1>
+    <h2 class="sub">Phone notifications</h2>
+    <div id="pushbox"></div>
+    <h2 class="sub">Visitor counts</h2>
+    <div class="card vdev"><p class="small">Visits from a phone or computer that's signed in here never count. ${off ? "This one is also skipped when signed out." : "When signed out, this one counts like any visitor."}</p>
+      <div class="btns"><button class="btn ghost sm" type="button" data-act="nocount">${off ? "Count it again when signed out" : "Also skip it when signed out"}</button></div></div>
+    <h2 class="sub">Help</h2>
+    <p><a href="${GUIDE}" target="_blank" rel="noopener">How to use the editor <span class="ext" aria-hidden="true">↗</span></a></p>
+    <h2 class="sub">Account</h2>
+    <div class="card"><p class="small">Signed in as <b>${h(session?.email)}</b>.</p><div class="btns"><button class="btn ghost sm" type="button" data-act="signout">Sign out</button></div></div>`);
   showPushBox();
 }
 
@@ -1438,7 +1459,7 @@ async function showMessages(view) {
   const tabs = [["new", `New (${rows.filter(m => !m.handled).length})`], ["done", "Done"], ["all", "All"]];
   render(`<a class="back" href="#/">‹ Start</a><h1>Messages</h1>
     <p class="lede">Everything sent through the forms on the site.</p>
-    <div id="pushbox"></div>
+    <p class="small pushline" id="pushline"></p>
     <div class="fchips" role="group" aria-label="Show">${tabs.map(([v, l]) => `<a href="#/messages/${v}" aria-current="${v === view}">${h(l)}</a>`).join("")}</div>
     ${list.length ? `<ul class="msgs">${list.map(m => {
       const mail = encodeURIComponent(m.email).replace(/%40/g, "@");
@@ -1455,7 +1476,7 @@ async function showMessages(view) {
           <button class="linkbtn" type="button" data-act="msg-delete" data-id="${h(m.id)}">Delete</button></div></li>`;
     }).join("")}</ul>` : `<p class="allgood">${view === "new" ? "No new messages ✓" : "Nothing here."}</p>`}`);
   badge(rows.filter(m => !m.handled).length);
-  showPushBox();
+  showPushLine();
 }
 
 /* ---------- notifications ---------- */
@@ -1519,6 +1540,14 @@ async function showPushBox() {
     `<button class="btn royal sm" type="button" data-act="push-on">Turn on notifications</button>`);
   if (!pushKey) notifyCall({ action: "key" }).then(j => { pushKey = j.key; }).catch(() => {}); // ready before the tap
 }
+// On Messages and Scheduled, a line saying whether this device gets notifications; they're set up in Settings.
+async function showPushLine() {
+  const el = $("#pushline", app);
+  if (!el) return;
+  const on = canPush() && Notification.permission === "granted" && !!(await currentSub().catch(() => null));
+  el.innerHTML = on ? `🔔 Notifications are on for this device. <a href="#/settings">Settings</a>`
+    : `🔔 Get a notification on this device for new messages and things going live: <a href="#/settings">turn them on in Settings</a>.`;
+}
 // The number of new messages on the app icon, where the phone supports it.
 const badge = n => { try { (n ? navigator.setAppBadge?.(n) : navigator.clearAppBadge?.())?.catch?.(() => {}); } catch {} };
 navigator.serviceWorker?.addEventListener("message", e => { if (["#/messages", "#/scheduled"].includes(e.data?.go)) go(e.data.go); });
@@ -1533,7 +1562,7 @@ const WORDS = CFG.textDefaults || [], AREAS = CFG.areas || [];
 const PHRASE_GROUPS = {
   goal: "Shelter goals", status: "Animal labels", count: "Animal counts", animal: "Happy Tails", stat: "The adoption number",
   journey: "An animal's journey (the pop-up)", rescue: "Rescues", horse: "Willow Woods horses", event: "Events",
-  spotlight: "Animal Story Spotlight", squawk: "Twin Squawk", collab: "Collaborations", program: "Day-out programs", foster: "Foster programs", adventure: "Our day outs", video: "Day-out videos", place: "Dog-friendly places", help: "Local help list",
+  spotlight: "Animal Story Spotlight", squawk: "Twin Squawk", collab: "Working together", program: "Sniffari programs", foster: "Foster programs", adventure: "Our day outs", video: "Day-out videos", place: "Dog-friendly places", help: "Help listings",
   form: "Contact forms", failed: "When part of a page can't load",
 };
 const clip = (s, n = 60) => (s.length > n ? s.slice(0, n - 1) + "…" : s);
@@ -1565,7 +1594,7 @@ async function showText(scope) {
   const saveBar = `<div class="savebar wsave" hidden><button class="btn royal" type="button" data-act="w-save">Save changes</button></div>`;
   if (!area) {
     const orphans = Object.keys(saved).filter(k => !known.has(k));
-    render(`<div id="wscreen"><a class="back" href="#/">‹ Start</a><h1>Page wording</h1>
+    render(`<div id="wscreen"><a class="back" href="#/">‹ Start</a><h1>Wording</h1>
       <p class="lede">Change any wording on the site. Pick a page, or search for the words you want to change.</p>
       <label class="sr" for="wfind">Search all the wording</label><input class="search" id="wfind" type="search" placeholder="Search all the wording" autocomplete="off">
       <div id="wresults" class="wlist"></div>
@@ -1573,7 +1602,7 @@ async function showText(scope) {
         const all = WORDS.filter(w => w.scope === a.scope), c = all.filter(w => saved[w.key]).length;
         return `<li><a class="row" href="#/text/${h(a.scope)}"><span class="rt"><b>${h(a.title)}</b><small>${plural(all.length, "piece")} of wording${c ? ` · ${c} changed` : ""}</small></span><span class="chev" aria-hidden="true">›</span></a></li>`;
       }).join("")}</ul>
-      <p class="small">Animals, shelter goals, rescues, events, day-out programs and the help list are changed in their own sections on the start screen.</p>
+      <p class="small">Animals, shelter goals, rescues, events, Sniffari programs and help listings are changed in their own tiles on the start screen.</p>
       ${orphans.length ? `<div class="card worphans"><h2>Saved wording that's no longer on the site</h2>
         <p class="small">The words these replaced have since been changed on the site itself, so they don't show anywhere. Clear them, or copy the words to where they belong now.</p>
         <ul>${orphans.map(k => `<li><span>“${h(clip(saved[k].body, 140))}”</span> <button class="linkbtn" type="button" data-act="w-clear" data-key="${h(k)}">Clear</button></li>`).join("")}</ul></div>` : ""}
@@ -1608,7 +1637,7 @@ async function showText(scope) {
         return head + wordItem(w, saved);
       }).join("");
     };
-    render(`<div id="wscreen"><a class="back" href="#/text">‹ Page wording</a>
+    render(`<div id="wscreen"><a class="back" href="#/text">‹ Wording</a>
       <div class="lhead"><h1>${h(area.title)}</h1>${area.path ? `<a class="btn ghost sm" href="${h(CFG.base + area.path.replace(/^\//, ""))}" target="_blank" rel="noopener">See the page <span class="ext" aria-hidden="true">↗</span></a>` : ""}</div>
       <p class="lede">${h(lede)} Change what you like, then tap <b>Save changes</b>. To go back to the original words, empty the box.</p>
       ${changedCount ? `<div class="fchips" role="group" aria-label="Show"><button type="button" data-wf="all" aria-pressed="${filter === "all"}">Everything</button><button type="button" data-wf="changed" aria-pressed="${filter === "changed"}">Changed (${changedCount})</button></div>` : ""}
@@ -1729,8 +1758,6 @@ async function showVisitors(range) {
   }
   const max = Math.max(1, ...bars.map(b => b[1]));
   const pageName = p => (CFG.pages || []).find(x => x.path === p)?.title || (p === "/404" ? "Page not found" : p);
-  let off = false;
-  try { off = localStorage.getItem(NOCOUNT) === "1"; } catch {}
   render(`<a class="back" href="#/">‹ Start</a><h1>Visitors</h1>
     <p class="lede">How often each page is viewed and where visitors come from. No cookies, and nothing about who visited is kept.</p>
     <div class="fchips" role="group" aria-label="Show">${RANGES.map(([v, l]) => `<a href="#/visitors/${v}" aria-current="${v === range}">${h(l)}</a>`).join("")}</div>
@@ -1747,12 +1774,8 @@ async function showVisitors(range) {
     <h2 class="sub">Where visits came from</h2>
     ${s.sources.length ? barList(bySource(s.sources), k => k) : `<p class="allgood">No visits yet.</p>`}
     <p class="hint vtip">The site can usually tell when a link was opened inside TikTok, Instagram, Facebook, Messenger or Snapchat. Links sent in texts, WhatsApp, Discord or email on an iPhone still show as Direct. To count a link you share, add <b>?from=</b> and a name to it, like <b>${h((CFG.siteUrl || "") + "?from=tiktok")}</b> (or ?from=instagram, ?from=flyer).</p>
-    <div class="card vdev">
-      <h2>This phone or computer</h2>
-      <p class="small">Visits from a device that's signed in here never count. ${off ? "This one is also skipped when signed out." : "When signed out, this one counts like any visitor."}</p>
-      <div class="btns"><button class="btn ghost sm" type="button" data-act="nocount">${off ? "Count it again when signed out" : "Also skip it when signed out"}</button>
-        <button class="linkbtn" type="button" data-act="clear-counts">Start the counts fresh</button></div>
-    </div>`);
+    <p class="small vdev">Your own visits don't count while you're signed in. To skip this phone or computer when signed out too, see <a href="#/settings">Settings</a>.
+      <button class="linkbtn" type="button" data-act="clear-counts">Start the counts fresh</button></p>`);
   // the page's security policy allows no inline styles, so sizes are set here
   $$(".vchart span", app).forEach(el => { el.style.height = Math.max(Number(el.dataset.h), 1) + "%"; });
   $$(".vlist i", app).forEach(el => { el.style.width = el.dataset.w + "%"; });
