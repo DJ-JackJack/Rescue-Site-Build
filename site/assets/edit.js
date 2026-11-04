@@ -671,7 +671,10 @@ const SECTIONS = {
   },
   photos: {
     table: "page_photos", title: "Photos", one: "photo", icon: "🖼️",
-    intro: "Photos you've added to the pages, and photos on the pages you've changed or hidden. The easiest way to add one: open the page on the site while you're signed in, tap ✎ Edit, then “📷 Photos on this page”, then “＋ Add a photo here” where you want it.",
+    intro: "Pick a page to open it on the site with its photo buttons showing: “＋ Add a photo here” at every spot, and a button on each photo to change or hide it.",
+    // the screen opens with the pages to pick from and the spots still waiting for a photo; what's saved is listed under them
+    above: rows => photosAbove(rows),
+    listHeading: "Photos you've added or changed",
     query: "select=*&order=page.asc,sort.asc,created_at.asc",
     titleOf: r => `${pageTitle(r.page) || r.page}: ${r.layout === "swap" ? (r.photos?.length ? "a changed photo" : "a hidden photo") : "a photo"}`,
     row: r => ({ title: pageTitle(r.page) || r.page, emoji: "🖼️", photo: r.photos?.[0]?.url, frame: PP.frame(r.photos?.[0]),
@@ -865,6 +868,20 @@ const GROUPS = [
 const SCREENS = { messages: ["✉️", "Messages"], scheduled: ["⏰", "Scheduled"], text: ["✏️", "Wording"], visitors: ["📈", "Visitors"], deleted: ["🗑️", "Recently deleted"], settings: ["⚙️", "Settings"] };
 const tileOf = k => SCREENS[k] || [SECTIONS[k].icon, SECTIONS[k].short || SECTIONS[k].title];
 
+// Photos: the pages, each opening on the site with its photo buttons showing (?edit=photos), then the spots still
+// waiting for a photo (an empty frame on a card, a photo-wall spot with none yet), each straight to its form.
+function photosAbove(rows) {
+  const taken = new Set(rows.filter(r => r.published && r.photos?.length).map(r => r.spot));
+  const waiting = PAGES.flatMap(([page, title]) => spotsOf(page).filter(x => x.src === "" && !taken.has(x.k)).map(x => ({ ...x, page, title })));
+  const at = page => (AREAS.find(a => a.scope === page)?.path || "/").replace(/^\//, "");
+  return `<h2 class="sub">Pick a page</h2>
+    <div class="pagepick">${PAGES.map(([page, title]) => { const n = rows.filter(r => r.page === page).length;
+      return `<a href="${h(CFG.base + at(page))}?edit=photos">${h(title)}${n ? ` <small>${n}</small>` : ""}</a>`; }).join("")}</div>
+    <p class="small"><a href="#/photos/new">Or add one here without opening the page</a></p>
+    ${waiting.length ? `<h2 class="sub">Waiting for a photo</h2><ul class="todo">${waiting.map(x => `<li><b>${h(x.l)}</b><small>On ${h(x.title)}</small>
+      <div class="btns"><a class="btn royal sm" href="#/photos/new?page=${encodeURIComponent(x.page)}&spot=${encodeURIComponent(x.k)}">＋ Put a photo here</a></div></li>`).join("")}</ul>` : ""}`;
+}
+
 function rowHTML(S, key, r) {
   const v = S.row(r), pic = photoUrl(v.photo);
   const flags = [r.published && future(r.publish_at) && `⏰ ${niceAt(r.publish_at)}`, ...v.flags].filter(Boolean).map(f => f.startsWith("!") ? `<span class="flag warn">${h(f.slice(1))}</span>` : `<span class="flag">${h(f)}</span>`).join("");
@@ -894,12 +911,14 @@ async function showList(key) {
     }).join("");
   };
   render(`<a class="back" href="#/">‹ Start</a>
-    <div class="lhead"><h1>${h(S.title)}</h1><a class="btn royal" href="#/${key}/new">+ Add ${h(S.one)}</a></div>
+    <div class="lhead"><h1>${h(S.title)}</h1>${S.above ? "" : `<a class="btn royal" href="#/${key}/new">+ Add ${h(S.one)}</a>`}</div>
     ${S.intro ? `<p class="lede">${h(S.intro)}</p>` : ""}
+    ${S.above ? S.above(rows) : ""}
+    ${S.listHeading ? `<h2 class="sub">${h(S.listHeading)}</h2>` : ""}
     ${S.filters ? `<div class="fchips" role="group" aria-label="Show">${S.filters.map(([v, l]) => `<button type="button" data-filter="${h(v)}" aria-pressed="${v === filter}">${h(l)}</button>`).join("")}</div>` : ""}
     ${rows.length > 6 ? `<label class="sr" for="find">Search</label><input class="search" id="find" type="search" placeholder="Search ${h(S.title.toLowerCase())}" autocomplete="off">` : ""}
     ${S.sorts && rows.length > 1 ? `<div class="sortby" role="group" aria-label="Order"><span>Order:</span>${S.sorts.map(([v, l]) => `<button type="button" data-sort="${h(v)}" aria-pressed="${v === sort}">${h(l)}</button>`).join("")}</div>` : ""}
-    ${rows.length ? `<ul class="rows">${listHTML()}</ul>` : `<p class="allgood">Nothing here yet. Tap “Add ${h(S.one)}” to start.</p>`}
+    ${rows.length ? `<ul class="rows">${listHTML()}</ul>` : `<p class="allgood">${S.above ? "Nothing yet." : `Nothing here yet. Tap “Add ${h(S.one)}” to start.`}</p>`}
     <p class="small none" hidden>No matches.</p>`);
   const apply = () => {
     const term = ($("#find")?.value || "").trim().toLowerCase();
@@ -1598,6 +1617,7 @@ async function showText(scope) {
       <p class="lede">Change any wording on the site. Pick a page, or search for the words you want to change.</p>
       <label class="sr" for="wfind">Search all the wording</label><input class="search" id="wfind" type="search" placeholder="Search all the wording" autocomplete="off">
       <div id="wresults" class="wlist"></div>
+      <h2 class="sub">Or pick a page</h2>
       <ul class="rows warea">${AREAS.map(a => {
         const all = WORDS.filter(w => w.scope === a.scope), c = all.filter(w => saved[w.key]).length;
         return `<li><a class="row" href="#/text/${h(a.scope)}"><span class="rt"><b>${h(a.title)}</b><small>${plural(all.length, "piece")} of wording${c ? ` · ${c} changed` : ""}</small></span><span class="chev" aria-hidden="true">›</span></a></li>`;

@@ -35,6 +35,11 @@
 .sched .warnline{color:#4A3200;background:#FFE6A8;border-radius:10px;padding:6px 10px;font-weight:700}
 .allgood{background:#fff;border-radius:16px;padding:16px 18px;font-weight:800;color:var(--royal);box-shadow:var(--shadow)}
 .tgroup{margin-top:22px;padding:0}
+.pagepick{display:flex;flex-wrap:wrap;gap:8px}
+.pagepick a{display:inline-flex;align-items:center;gap:6px;min-height:42px;padding:8px 14px;border:2px solid var(--midviolet);border-radius:999px;background:#fff;color:var(--plum);font:800 .9rem var(--f-body);text-decoration:none}
+.pagepick a:hover{border-color:var(--royal)}
+.pagepick small{background:var(--wash);border-radius:999px;padding:1px 7px;font-size:.75rem}
+.pagepick+.small{margin-top:12px}
 .tgroup .sub{margin:0}
 .tgroup .where{margin:2px 0 10px}
 .pushline{margin:8px 0 0}
