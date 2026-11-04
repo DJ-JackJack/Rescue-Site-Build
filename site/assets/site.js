@@ -1139,9 +1139,12 @@ if (editor && S.scope) {
   $("[data-ppmode]", menu)?.addEventListener("click", () => { shut(); photosReady.then(photosOn); });
   $("[data-pens]", menu)?.addEventListener("click", () => { shut(); pensOn(); });
 
-  // back from the edit page: the same mode, and the thing that was being edited in view
-  if (was("tt-pp-mode") && spotsHere) photosReady.then(photosOn);
-  else if (was("tt-pen-mode") && lists.length) pensOn();
+  // opened from the editor's Photos (?edit=photos), or back from the edit page: that mode, and the thing that was
+  // being edited in view
+  const ask = new URLSearchParams(location.search).get("edit");
+  if (ask) { const u = new URL(location.href); u.searchParams.delete("edit"); history.replaceState(history.state, "", u.pathname + u.search + u.hash); }
+  if ((ask === "photos" || (!ask && was("tt-pp-mode"))) && spotsHere) photosReady.then(photosOn);
+  else if ((ask === "things" || (!ask && was("tt-pen-mode"))) && lists.length) pensOn();
   let at = null;
   try { at = sessionStorage.getItem("tt-pen-at"); sessionStorage.removeItem("tt-pen-at"); } catch {}
   if (at) {
