@@ -365,11 +365,12 @@ const SHAPE_CHOICES = [["original", "As taken"], ["square", "Square"], ["wide", 
 const LOOKS = [["full", "Full width"], ["banner", "Wide banner"], ["left", "Beside the text, photo on the left"], ["right", "Beside the text, photo on the right"],
   ["small", "Small, in the middle"], ["row", "A row of photos"]];
 
-const SHOW = { name: "published", type: "toggle", label: "Show on the site", help: "Turn this off to hide it without losing anything.", dflt: true };
-const SORT = { name: "sort", type: "number", label: "Order", help: "Lower numbers show first.", dflt: 100 };
+// Fields marked more fold away under "More options"; those marked onSite go in the "On the site" box that ends every form.
+const SHOW = { name: "published", type: "toggle", label: "Show on the site", help: "Turn this off to hide it without losing anything.", dflt: true, onSite: true };
+const SORT = { name: "sort", type: "number", label: "Order", help: "Lower numbers show first. The ↑ ↓ arrows on the list set this for you.", dflt: 100, more: true };
 // When it goes live: as soon as it's saved, or on its own at a set time (publish_at). The database keeps it from visitors
 // until then. Every section gets this, straight after "Show on the site".
-const LIVE = { name: "publish_at", type: "golive", label: "When should it go live?", when: v => v.published,
+const LIVE = { name: "publish_at", type: "golive", label: "When should it go live?", when: v => v.published, onSite: true,
   help: "Pick a day and time, in this phone's time zone, and it goes live on its own then. Until then only editors can see it, here. Phones with notifications on get one when it's live." };
 const postTime = r => new Date(r.publish_at || r.created_at).getTime();
 
@@ -438,7 +439,7 @@ const SECTIONS = {
       { name: "adopted_on", type: "date", label: "Adoption date", when: v => v.status === "adopted" },
       { name: "herd", type: "text", label: "Herd", max: 60, list: "herds", help: "Groups the horses on the Willow Woods page, like “Herd One”.", when: v => v.species === "horse" },
       { ...SORT, label: "Order in the herd", help: "1 shows first.", when: v => v.species === "horse" },
-      { name: "transport", type: "toggle", label: "Transport run", help: "Like the puppy relay. Doesn't count in the adoption numbers." },
+      { name: "transport", type: "toggle", label: "Transport run", help: "Like the puppy relay. Doesn't count in the adoption numbers.", more: true },
       { name: "people_ok", type: "toggle", label: "Everyone shown or named has OK'd it", dflt: true, help: "If this is off, the animal stays hidden." },
       SHOW,
     ],
@@ -447,6 +448,7 @@ const SECTIONS = {
     table: "goals", title: "Shelter goals", one: "goal", icon: "🌾",
     intro: "Each goal belongs to a shelter, with their own numbers. Donations always go to their page.",
     query: "select=*,partner:partners(name),bars:goal_bars(*)&order=sort.asc",
+    reorder: {},
     titleOf: r => r.title,
     row: r => ({ title: r.title, photo: r.photo_url, frame: r.photo_frame, emoji: "🌾",
       sub: [r.partner?.name, r.status === "met" ? `Met ${nice(r.met_on)}` : r.figures_updated_at ? `Numbers from ${nice(r.figures_updated_at)}` : "No numbers yet"].filter(Boolean).join(" · "),
@@ -525,6 +527,7 @@ const SECTIONS = {
     table: "partners", title: "Rescues and shelters", one: "rescue or shelter", icon: "🏡",
     intro: "An organization shows on the site once both switches are on: they've said yes, and “Show on the site”.",
     query: "select=*&order=sort.asc,name.asc",
+    reorder: {},
     titleOf: r => r.name,
     noDelete: "Rescues can't be deleted here, because their goals would go with them. Turn off “Show on the site” to hide one.",
     row: r => ({ title: r.name, emoji: "🏡", sub: label(KINDS, r.kind), flags: [!(r.published && r.feature_ok) && "Hidden"] }),
@@ -546,6 +549,7 @@ const SECTIONS = {
     table: "sniffari_programs", title: "Sniffari programs", short: "Programs", one: "day-out program", icon: "📋",
     intro: "Shelter day-out programs listed on Rescues on Sniffari.",
     query: "select=*&order=sort.asc",
+    reorder: {},
     titleOf: r => r.program_name || r.shelter_name,
     row: r => ({ title: r.program_name || r.shelter_name, emoji: "🦮", sub: [r.shelter_name, r.city].filter(Boolean).join(" · "),
       flags: [!r.published && "Hidden", r.published && stale(r.checked_on, 90) && "!Check the details"] }),
@@ -567,6 +571,7 @@ const SECTIONS = {
     table: "foster_programs", title: "Foster programs", one: "foster program", icon: "🛏️",
     intro: "The shelters' and rescues' foster programs, listed on the Foster page. The page counts how many are free to foster.",
     query: "select=*&order=sort.asc,shelter_name.asc",
+    reorder: {},
     titleOf: r => r.program_name || r.shelter_name,
     filters: [["all", "All"], ...FOSTER_TAGS.slice(0, 3), ["hidden", "Hidden"]],
     tokens: r => [...(r.tags || []), r.published ? "" : "hidden"],
@@ -588,6 +593,7 @@ const SECTIONS = {
     table: "adventures", title: "Our day outs", one: "day out", icon: "🦮",
     intro: "The day outs you go on, shown on Rescues on Sniffari: your write-up, videos, a photo gallery and the places you went. That part of the page stays hidden until there's one to show.",
     query: "select=*,partner:partners(name)&order=sort.asc,went_on.desc.nullslast",
+    reorder: {},
     titleOf: r => r.title,
     row: r => ({ title: r.title, emoji: "🦮", photo: r.photos?.[0], frame: r.frames?.[r.photos?.[0]], sub: [r.went_on && nice(r.went_on), r.dogs].filter(Boolean).join(" · "), flags: [!r.published && "Hidden"] }),
     fields: [
@@ -605,13 +611,14 @@ const SECTIONS = {
       { name: "businesses", type: "rows", label: "Places you went", add: "+ Add a place", bad: "Each place needs a name, and links need to start with https://",
         cols: [{ key: "name", label: "Name", max: 120, ph: "The Dog Bakery", need: true }, { key: "url", label: "Their website", url: true }],
         help: "Businesses and public places only, with a link to their website." },
-      SHOW, { ...SORT, help: "Lower numbers show first. Day outs with the same number show newest first." },
+      SHOW, { ...SORT, help: "Lower numbers show first; the ↑ ↓ arrows on the list set this for you. Day outs with the same number show newest first." },
     ],
   },
   videos: {
     table: "videos", title: "Day-out videos", short: "Videos", one: "day-out video", icon: "🎬",
     intro: "Videos of the dogs' day outs, shown on Rescues on Sniffari. That part of the page stays hidden until there's a video to show.",
     query: "select=*&order=sort.asc,posted_on.desc.nullslast,created_at.desc",
+    reorder: {},
     titleOf: r => r.title,
     row: r => ({ title: r.title, emoji: "🎬", photo: r.photo_url, frame: r.photo_frame, sub: [r.posted_on && nice(r.posted_on), platform(r.url)].filter(Boolean).join(" · "), flags: [!r.published && "Hidden"] }),
     fields: [
@@ -620,13 +627,14 @@ const SECTIONS = {
       { name: "posted_on", type: "date", label: "Date posted" },
       { name: "note", type: "textarea", rows: 2, max: 300, label: "Short note", help: "Shown under the title." },
       { name: "photo_url", type: "photo", label: "Cover photo", folder: "videos", frame: "photo_frame", shapes: [{ a: 16 / 10, label: "On the video" }] },
-      SHOW, { ...SORT, help: "Lower numbers show first. Videos with the same number show newest first." },
+      SHOW, { ...SORT, help: "Lower numbers show first; the ↑ ↓ arrows on the list set this for you. Videos with the same number show newest first." },
     ],
   },
   places: {
     table: "places", title: "Dog-friendly places", one: "dog-friendly place", icon: "📍",
     intro: "Your picks for places to take a dog, and why, shown on Rescues on Sniffari. That part of the page stays hidden until there's a place to show.",
     query: "select=*&order=sort.asc,name.asc",
+    reorder: {},
     titleOf: r => r.name,
     row: r => ({ title: r.name, emoji: "📍", photo: r.photo_url, frame: r.photo_frame, sub: r.area || "", flags: [!r.published && "Hidden"] }),
     fields: [
@@ -642,6 +650,10 @@ const SECTIONS = {
     table: "help_resources", title: "Help listings", one: "help listing", icon: "🤝",
     intro: "The help pages list these city by city, with buttons at the top to jump to each city, and each listing shows under its kind of help in its city's section. Help for pets shows on “Help keeping your pet”, wild animal help there and on the Wildlife page, and help for people (crisis lines, abuse at home, mental health, grieving a pet) on Caring for Yourself.",
     query: "select=*&order=category.asc,sort.asc,name.asc",
+    // by kind of help, under a heading each, as the help pages list them; arrows move one within its kind
+    reorder: { group: r => r.category, byFilter: true },
+    sorts: [["kind", "By kind", (a, b) => HELPCATS.findIndex(c => c[0] === a.category) - HELPCATS.findIndex(c => c[0] === b.category) || (a.sort ?? 100) - (b.sort ?? 100) || byName(a, b), r => label(HELPCATS, r.category)],
+      ["az", "A–Z", byName]],
     titleOf: r => r.name,
     filters: [["all", "All"], ...HELPCATS],
     tokens: r => [r.category, r.published ? "" : "hidden"],
@@ -657,8 +669,8 @@ const SECTIONS = {
       { name: "best_for", type: "textarea", rows: 2, max: 300, label: "Best used for", help: "Shown as “Best for: …”, like “Big vet bills you can pay off before the promo ends”.", when: v => v.category === "financing" },
       { name: "caution", type: "textarea", rows: 2, max: 400, label: "Caution", help: "Shown in a box with the listing, like “This is a credit card, not financial assistance.”" },
       { name: "link_url", type: "url", label: "Website" },
-      { name: "more_url", type: "url", label: "Second link", help: "Optional, like their free resource library." },
-      { name: "more_label", type: "text", label: "What the second link says", max: 80, help: "Like “Free pet care library”.", when: v => !!v.more_url },
+      { name: "more_url", type: "url", label: "Second link", help: "Optional, like their free resource library.", more: true },
+      { name: "more_label", type: "text", label: "What the second link says", max: 80, help: "Like “Free pet care library”.", when: v => !!v.more_url, more: true },
       { name: "phone", type: "text", label: "Phone", max: 40, inputmode: "tel", help: "Extra words are fine, like “(757) 427-0071, option 1”. The call button uses the first number." },
       { name: "email", type: "text", label: "Email", max: 120, inputmode: "email", check: [/^[^@\s]+@[^@\s]+\.[^@\s]+$/, "That doesn't look like an email address."] },
       { name: "cities", type: "tags", label: "Which city it's listed under", options: CITIES,
@@ -882,32 +894,38 @@ function photosAbove(rows) {
       <div class="btns"><a class="btn royal sm" href="#/photos/new?page=${encodeURIComponent(x.page)}&spot=${encodeURIComponent(x.k)}">＋ Put a photo here</a></div></li>`).join("")}</ul>` : ""}`;
 }
 
-function rowHTML(S, key, r) {
+// move: { up, down } for a row that can be moved with arrows (each false at the top or bottom of its group)
+function rowHTML(S, key, r, move) {
   const v = S.row(r), pic = photoUrl(v.photo);
   const flags = [r.published && future(r.publish_at) && `⏰ ${niceAt(r.publish_at)}`, ...v.flags].filter(Boolean).map(f => f.startsWith("!") ? `<span class="flag warn">${h(f.slice(1))}</span>` : `<span class="flag">${h(f)}</span>`).join("");
-  return `<li data-s="${h((v.title + " " + v.sub).toLowerCase())}" data-tok="${h((S.tokens ? S.tokens(r) : []).join(" "))}">
+  return `<li data-s="${h((v.title + " " + v.sub).toLowerCase())}" data-tok="${h((S.tokens ? S.tokens(r) : []).join(" "))}"${move ? ' class="movable"' : ""}>
     <a class="row" href="#/${key}/${h(r.id)}"><span class="thumb" aria-hidden="true">${v.emoji || ""}${pic ? `<img src="${h(pic)}" alt="" loading="lazy"${frameData(PP.frame(v.frame))}>` : ""}</span>
-    <span class="rt"><b>${h(v.title)}</b><small>${h(v.sub)}</small>${flags ? `<span class="flags">${flags}</span>` : ""}</span><span class="chev" aria-hidden="true">›</span></a></li>`;
+    <span class="rt"><b>${h(v.title)}</b><small>${h(v.sub)}</small>${flags ? `<span class="flags">${flags}</span>` : ""}</span><span class="chev" aria-hidden="true">›</span></a>${move ? `<span class="movers">
+      <button type="button" class="xbtn" data-move="-1" data-id="${h(r.id)}" aria-label="Move ${h(v.title)} up"${move.up ? "" : " disabled"}>↑</button><button type="button" class="xbtn" data-move="1" data-id="${h(r.id)}" aria-label="Move ${h(v.title)} down"${move.down ? "" : " disabled"}>↓</button></span>` : ""}</li>`;
 }
 
 // S.sorts: the list can be put in more than one order, and the choice is kept on this device. One with groups (like
-// by status) has a heading over each group.
+// by status) has a heading over each group. S.reorder: in its first order (as the site shows them), ↑ ↓ arrows move a
+// row up or down within its group (S.reorder.group), which numbers the group's Order 10, 20, 30…
 async function showList(key) {
   const S = SECTIONS[key];
   let rows = await api.list(S.table, S.query);
   if (S.order) rows = rows.sort(S.order);
-  let filter = "all", sort = S.sorts?.[0][0];
+  const sorts = S.sorts || (S.reorder ? [["site", "As on the site", (a, b) => (a.sort ?? 100) - (b.sort ?? 100)], ["az", "A–Z", (a, b) => String(S.titleOf(a)).localeCompare(String(S.titleOf(b)), "en", { sensitivity: "base", numeric: true })]] : null);
+  const groupKey = r => S.reorder?.group?.(r) ?? "";
+  let filter = "all", sort = sorts?.[0][0], shown = rows;
   try { filter = sessionStorage.getItem("f:" + key) || "all"; } catch {}
   try { sort = localStorage.getItem("tt-sort:" + key) || sort; } catch {}
-  if (S.sorts && !S.sorts.some(x => x[0] === sort)) sort = S.sorts[0][0];
+  if (sorts && !sorts.some(x => x[0] === sort)) sort = sorts[0][0];
   const listHTML = () => {
-    const [, , order, groupOf] = S.sorts?.find(x => x[0] === sort) || [];
-    const list = order ? [...rows].sort(order) : rows;
+    const [, , order, groupOf] = sorts?.find(x => x[0] === sort) || [];
+    const list = shown = order ? [...rows].sort(order) : rows, arrows = S.reorder && sort === sorts[0][0];
     let group = null;
     return list.map(r => {
       const g = groupOf ? groupOf(r) : null, head = g !== null && g !== group ? `<li class="lgroup"><h2 class="sub">${h(g)} <small>${list.filter(x => groupOf(x) === g).length}</small></h2></li>` : "";
       group = g;
-      return head + rowHTML(S, key, r);
+      const same = arrows ? list.filter(x => groupKey(x) === groupKey(r)) : [], i = same.indexOf(r);
+      return head + rowHTML(S, key, r, arrows && same.length > 1 ? { up: i > 0, down: i < same.length - 1 } : null);
     }).join("");
   };
   render(`<a class="back" href="#/">‹ Start</a>
@@ -916,8 +934,8 @@ async function showList(key) {
     ${S.above ? S.above(rows) : ""}
     ${S.listHeading ? `<h2 class="sub">${h(S.listHeading)}</h2>` : ""}
     ${S.filters ? `<div class="fchips" role="group" aria-label="Show">${S.filters.map(([v, l]) => `<button type="button" data-filter="${h(v)}" aria-pressed="${v === filter}">${h(l)}</button>`).join("")}</div>` : ""}
-    ${rows.length > 6 ? `<label class="sr" for="find">Search</label><input class="search" id="find" type="search" placeholder="Search ${h(S.title.toLowerCase())}" autocomplete="off">` : ""}
-    ${S.sorts && rows.length > 1 ? `<div class="sortby" role="group" aria-label="Order"><span>Order:</span>${S.sorts.map(([v, l]) => `<button type="button" data-sort="${h(v)}" aria-pressed="${v === sort}">${h(l)}</button>`).join("")}</div>` : ""}
+    ${rows.length > 4 ? `<label class="sr" for="find">Search</label><input class="search" id="find" type="search" placeholder="Search ${h(S.title.toLowerCase())}" autocomplete="off">` : ""}
+    ${sorts && rows.length > 1 ? `<div class="sortby" role="group" aria-label="Order"><span>Order:</span>${sorts.map(([v, l]) => `<button type="button" data-sort="${h(v)}" aria-pressed="${v === sort}">${h(l)}</button>`).join("")}</div>` : ""}
     ${rows.length ? `<ul class="rows">${listHTML()}</ul>` : `<p class="allgood">${S.above ? "Nothing yet." : `Nothing here yet. Tap “Add ${h(S.one)}” to start.`}</p>`}
     <p class="small none" hidden>No matches.</p>`);
   const apply = () => {
@@ -934,6 +952,8 @@ async function showList(key) {
       g.hidden = !any;
     });
     $(".none", app).hidden = !!shown || !rows.length;
+    // the arrows move among neighbours, so they're put away while a search or a filter hides some of them
+    $(".rows", app)?.classList.toggle("nomove", !!term || (filter !== "all" && !S.reorder?.byFilter));
   };
   $("#find")?.addEventListener("input", apply);
   $$("[data-filter]", app).forEach(b => b.addEventListener("click", () => {
@@ -942,6 +962,24 @@ async function showList(key) {
     $$("[data-filter]", app).forEach(x => x.setAttribute("aria-pressed", x === b));
     apply();
   }));
+  $(".rows", app)?.addEventListener("click", async e => {
+    const b = e.target.closest("[data-move]");
+    if (!b || b.disabled) return;
+    const r = rows.find(x => String(x.id) === b.dataset.id), same = shown.filter(x => groupKey(x) === groupKey(r));
+    const i = same.indexOf(r), j = i + Number(b.dataset.move);
+    if (j < 0 || j >= same.length) return;
+    [same[i], same[j]] = [same[j], same[i]];
+    const changes = same.map((x, n) => [x, (n + 1) * 10]).filter(([x, v]) => x.sort !== v);
+    $$("[data-move]", app).forEach(x => { x.disabled = true; });
+    try {
+      await Promise.all(changes.map(([x, v]) => api.save(S.table, x.id, { sort: v }).then(() => { x.sort = v; })));
+      toast("Moved ✓");
+    } catch (err) { if (err instanceof SignedOut) return route(); toast(err.message, true); }
+    $(".rows", app).innerHTML = listHTML();
+    apply();
+    showFrames(app);
+    $(`[data-move="${b.dataset.move}"][data-id="${CSS.escape(b.dataset.id)}"]:not(:disabled)`, app)?.focus();
+  });
   $$("[data-sort]", app).forEach(b => b.addEventListener("click", () => {
     sort = b.dataset.sort;
     try { localStorage.setItem("tt-sort:" + key, sort); } catch {}
@@ -1209,7 +1247,9 @@ async function showForm(key, id, params = new URLSearchParams()) {
     ${!isNew && S.link ? `<p class="small">Its link: <a href="${h(S.link(row))}" target="_blank" rel="noopener">${h(S.link(row).replace(/^https?:\/\//, ""))}</a>
       <span data-link-note>${!row.published ? "(it works once “Show on the site” is on)" : future(row.publish_at) ? "(it works once it's live)" : ""}</span></p>` : ""}
     <form class="form eform" novalidate>
-      ${S.fields.map(f => fieldHTML(f, vals[f.name], ctx)).join("")}
+      ${S.fields.filter(f => !f.more && !f.onSite).map(f => fieldHTML(f, vals[f.name], ctx)).join("")}
+      ${S.fields.some(f => f.more) ? `<details class="moreopts"><summary>More options</summary>${S.fields.filter(f => f.more).map(f => fieldHTML(f, vals[f.name], ctx)).join("")}</details>` : ""}
+      ${S.fields.some(f => f.onSite) ? `<div class="onsite" role="group" aria-labelledby="onsite-h"><p class="onsite-h" id="onsite-h">On the site</p>${S.fields.filter(f => f.onSite).map(f => fieldHTML(f, vals[f.name], ctx)).join("")}</div>` : ""}
       ${herds.length ? `<datalist id="herds">${[...new Set(herds.map(x => x.herd))].map(x => `<option value="${h(x)}">`).join("")}</datalist>` : ""}
       <p class="formmsg err-msg" role="alert"></p>
       <div class="savebar"><button class="btn royal" type="submit">${isNew ? "Add" : "Save changes"}</button><a class="btn ghost" href="${backUrl ? h(backUrl) : listUrl}">Cancel</a></div>
@@ -1372,7 +1412,7 @@ async function showForm(key, id, params = new URLSearchParams()) {
     e.preventDefault();
     const v = readForm(form, S.fields), out = $(".formmsg", form), btn = $(".savebar .btn", form);
     const bad = validate(form, S.fields, v);
-    if (bad) { out.textContent = "Please fix the highlighted fields."; bad.scrollIntoView({ block: "center" }); $("input,textarea,select", bad)?.focus({ preventScroll: true }); return; }
+    if (bad) { bad.closest("details")?.setAttribute("open", ""); out.textContent = "Please fix the highlighted fields."; bad.scrollIntoView({ block: "center" }); $("input,textarea,select", bad)?.focus({ preventScroll: true }); return; }
     const patch = {};
     for (const f of S.fields) if (f.type !== "bars" && (isNew || !same(v[f.name], row[f.name]))) patch[f.name] = v[f.name];
     for (const k of S.fields.flatMap(f => [f.frame, f.frames]).filter(Boolean)) if (isNew || !same(v[k] || null, row[k] || null)) patch[k] = v[k] ?? null; // framings

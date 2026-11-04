@@ -75,10 +75,25 @@
 .rows .lgroup:first-child{margin-top:0}
 .rows .lgroup h2{margin:0 2px}
 .rows .lgroup small{font:800 .8rem var(--f-body);color:var(--ink2);margin-left:4px}
+.rows li.movable{display:flex;align-items:center;gap:8px}
+.rows li.movable>.row{flex:1;min-width:0}
+.movers{display:flex;flex-direction:column;gap:4px}
+.movers .xbtn{width:40px;height:32px;font-size:1rem}
+.movers .xbtn:disabled{opacity:.3;cursor:default}
+.rows.nomove .movers{display:none}
 .chev{font-size:1.7rem;color:var(--midviolet);line-height:1}
 
 /* forms */
 .eform{gap:16px;margin-top:10px}
+.moreopts{border:1.5px solid var(--midviolet);border-radius:14px;background:#fff;padding:0 14px}
+.moreopts>summary{cursor:pointer;list-style:none;font-weight:800;color:var(--plum);min-height:48px;display:flex;align-items:center;gap:8px}
+.moreopts>summary::-webkit-details-marker{display:none}
+.moreopts>summary::before{content:"+";font-size:1.2rem;width:16px}
+.moreopts[open]>summary::before{content:"−"}
+.moreopts[open]{padding-bottom:14px}
+.moreopts>.field+.field{margin-top:16px}
+.onsite{border-radius:16px;background:var(--wash);padding:12px 14px 14px;display:flex;flex-direction:column;gap:14px}
+.onsite-h{margin:0;font:800 .78rem var(--f-body);letter-spacing:.08em;text-transform:uppercase;color:var(--plum)}
 .field{display:flex;flex-direction:column;gap:6px}
 .field>label,.flabel,.choice legend,.checks-f legend{font-weight:800;font-size:.95rem}
 .hint{font-weight:600;font-size:.84rem;color:var(--ink2);margin:0}
