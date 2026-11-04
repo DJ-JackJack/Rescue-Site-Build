@@ -22,6 +22,8 @@ const photoUrl = u => { try { return u ? safeUrl(new URL(u, new URL(S.base || "/
 // page (where it's centered and how far it's zoomed in; site/assets/pagephotos.js).
 const frameAttr = f => { const css = window.PagePhotos?.frameCSS(f) || ""; return css ? ` style="${h(css)}"` : ""; };
 const photoTag = (u, cls = "", f = null) => { const p = photoUrl(u); return p ? `<img${cls ? ` class="${cls}"` : ""} src="${h(p)}" alt=""${frameAttr(f)} loading="lazy" onerror="this.remove()">` : ""; };
+// what a card or row is in the editor ("animals:<id>"), for the Edit pencils signed-in editors can turn on
+const ed = (list, id, name) => (id ? ` data-edit="${h(list)}:${h(id)}" data-edit-name="${h(name || "")}"` : "");
 const DAY = 864e5;
 const today = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; };
 const asDate = s => (s ? new Date(s + (s.length === 10 ? "T00:00:00" : "")) : null);
@@ -125,7 +127,7 @@ function goalHTML(g, { heading = "h3", showAllLink = false } = {}) {
     ? `<a class="btn light" href="${h(donate)}" target="_blank" rel="noopener">${h(t("js.goal.give", "Give on {shelter}'s page", { shelter: partner }))} <span class="ext" aria-hidden="true">↗</span></a>`
     : `<p class="note" style="margin-top:0">${h(t("js.goal.no-link", "Donation link coming soon."))}</p>`;
   const pic = photoTag(g.photo_url, "", g.photo_frame);
-  return `<div class="goal feature">
+  return `<div class="goal feature"${ed("goals", g.id, g.title)}>
     ${pic ? `<span class="gpic" aria-hidden="true">${pic}</span>` : ""}
     <p class="who">${showAllLink ? h(t("js.goal.label", "Shelter goal")) + " · " : ""}${h(partner)}</p>
     <${heading}>${h(g.title)}</${heading}>
@@ -204,7 +206,7 @@ function petHTML(a, i) {
   const d = daysToHome(a);
   const sub = a.note || (d !== null ? t("js.animal.home-in", "Home in {n} days", { n: d }) : "");
   const pic = (EMOJI[a.species] || "🐾") + photoTag(a.photo_url, "", a.photo_frame);
-  return `<li><button class="pet" type="button" aria-haspopup="dialog" data-id="${h(a.id)}"><span class="ph ${BG[i % 6]}" aria-hidden="true">${pic}</span><span class="bd"><b>${h(a.name)}</b><span class="chip ${cls}">${h(label)}</span>${sub ? `<small>${h(sub)}</small>` : ""}</span></button></li>`;
+  return `<li${ed("animals", a.id, a.name)}><button class="pet" type="button" aria-haspopup="dialog" data-id="${h(a.id)}"><span class="ph ${BG[i % 6]}" aria-hidden="true">${pic}</span><span class="bd"><b>${h(a.name)}</b><span class="chip ${cls}">${h(label)}</span>${sub ? `<small>${h(sub)}</small>` : ""}</span></button></li>`;
 }
 function countsHTML(animals) {
   const c = s => animals.filter(a => a.status === s).length;
@@ -298,11 +300,11 @@ async function renderRescues(el) {
       const dogs = animals.filter(a => a.partner?.slug === p.slug && a.status in order)
         .sort((x, y) => order[x.status] - order[y.status]).slice(0, 8);
       const adopt = safeUrl(p.adopt_url), donate = safeUrl(p.donate_url);
-      return `<div class="rescue"><div class="top"><div class="logo" aria-hidden="true">${h(p.name.slice(0, 1))}</div><div><h3>${h(p.name)}</h3></div></div>
+      return `<div class="rescue"${ed("partners", p.id, p.name)}><div class="top"><div class="logo" aria-hidden="true">${h(p.name.slice(0, 1))}</div><div><h3>${h(p.name)}</h3></div></div>
         <div class="bd">${p.mission ? `<p>${h(p.mission)}</p>` : ""}
         ${dogs.length ? `<div class="minis">${dogs.map((a, i) => {
           const live = safeUrl(a.listing_url), d = daysToHome(a);
-          return `<div class="mini"><div class="ph ${BG[i % 6]}" aria-hidden="true">${EMOJI[a.species] || "🐾"}${photoTag(a.photo_url, "", a.photo_frame)}</div><b>${h(a.name)}</b><span class="chip ${STATUS[a.status]}"${a.status === "looking" ? ' style="background:var(--wash)"' : ""}>${h(statusLabel(a.status))}</span>
+          return `<div class="mini"${ed("animals", a.id, a.name)}><div class="ph ${BG[i % 6]}" aria-hidden="true">${EMOJI[a.species] || "🐾"}${photoTag(a.photo_url, "", a.photo_frame)}</div><b>${h(a.name)}</b><span class="chip ${STATUS[a.status]}"${a.status === "looking" ? ' style="background:var(--wash)"' : ""}>${h(statusLabel(a.status))}</span>
             ${a.status === "looking" && a.checked_on ? `<small>${h(t("js.rescue.checked", "Checked {date}", { date: new Date(a.checked_on + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }) }))}</small>` : d !== null ? `<small>${h(t("js.animal.home-in", "Home in {n} days", { n: d }))}</small>` : ""}
             ${a.status === "looking" && live ? `<a href="${h(live)}" target="_blank" rel="noopener">${h(t("js.rescue.listing", "Live listing"))} ↗</a>` : ""}</div>`;
         }).join("")}</div>` : ""}
@@ -349,7 +351,7 @@ async function renderSpotlight(el) {
 const getEvents = () => once("events", () => q("events", "select=id,title,starts_on,time_text,place,link_url,partner:partners(slug)&order=starts_on.asc"));
 const eventsHTML = list => `<ul class="events">${list.map(e => {
   const d = asDate(e.starts_on), link = safeUrl(e.link_url);
-  return `<li><span class="when"><b>${d.toLocaleDateString("en-US", { month: "short" })}</b>${d.getDate()}</span><span class="what"><b>${link ? `<a href="${h(link)}" rel="noopener">${h(e.title)}</a>` : h(e.title)}</b><span>${h([d.toLocaleDateString("en-US", { weekday: "long" }), e.time_text, e.place].filter(Boolean).join(" · "))}</span></span></li>`;
+  return `<li${ed("events", e.id, e.title)}><span class="when"><b>${d.toLocaleDateString("en-US", { month: "short" })}</b>${d.getDate()}</span><span class="what"><b>${link ? `<a href="${h(link)}" rel="noopener">${h(e.title)}</a>` : h(e.title)}</b><span>${h([d.toLocaleDateString("en-US", { weekday: "long" }), e.time_text, e.place].filter(Boolean).join(" · "))}</span></span></li>`;
 }).join("")}</ul>`;
 async function renderEvents(el) {
   try {
@@ -375,7 +377,7 @@ function collabsHTML(list) {
     if (!here.length) return "";
     return `<div class="cgroup"><p class="clabel">${h(label)}</p><ul class="collabs">${here.map((c, i) => {
       const link = safeUrl(c.link_url), pic = photoTag(c.photo_url, "", c.photo_frame);
-      return `<li>${pic ? `<span class="ph ${BG[i % 6]}" aria-hidden="true">${pic}</span>` : ""}<div><b>${link ? `<a href="${h(link)}" target="_blank" rel="noopener">${h(c.title)} <span class="ext" aria-hidden="true">↗</span></a>` : h(c.title)}</b>
+      return `<li${ed("collabs", c.id, c.title)}>${pic ? `<span class="ph ${BG[i % 6]}" aria-hidden="true">${pic}</span>` : ""}<div><b>${link ? `<a href="${h(link)}" target="_blank" rel="noopener">${h(c.title)} <span class="ext" aria-hidden="true">↗</span></a>` : h(c.title)}</b>
         <small>${h([c.kind, collabDates(c)].filter(Boolean).join(" · "))}</small>${c.description ? `<p>${h(c.description)}</p>` : ""}</div></li>`;
     }).join("")}</ul></div>`;
   }).join("");
@@ -416,7 +418,7 @@ function programList(el, programs, o) {
     const list = programs.filter(p => f === "all" || (p.tags || []).includes(f));
     el.innerHTML = list.length ? list.map(p => {
       const url = safeUrl(p.signup_url);
-      return `<article class="sn"><h3>${h(p.shelter_name)}</h3>${p.program_name || p.city ? `<span class="prog">${h([p.program_name, p.city].filter(Boolean).join(" · "))}</span>` : ""}
+      return `<article class="sn"${ed(o.edit, p.id, p.program_name || p.shelter_name)}><h3>${h(p.shelter_name)}</h3>${p.program_name || p.city ? `<span class="prog">${h([p.program_name, p.city].filter(Boolean).join(" · "))}</span>` : ""}
         ${p.address ? `<p class="small">${h(p.address)}</p>` : ""}
         ${(p.facts || []).length ? `<div class="facts">${p.facts.map(f => `<span>${h(f)}</span>`).join("")}</div>` : ""}
         ${p.checked_on ? `<p class="small">${h(t("js.program.checked", "Details checked {date}", { date: new Date(p.checked_on + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) }))}</p>` : ""}
@@ -436,13 +438,13 @@ async function renderSniffari(el) {
   let programs;
   try { programs = await getSniffari(); } catch { await wordingReady; failed(el, t("js.failed.programs", "Day-out programs couldn't load right now. Please try again in a little while.")); return; }
   await wordingReady;
-  programList(el, programs, { signup: t("js.program.signup", "Sign up on their page"), none: t("js.program.none", "The first programs are being confirmed with the shelters. Run one? Use the form below.") });
+  programList(el, programs, { edit: "sniffari", signup: t("js.program.signup", "Sign up on their page"), none: t("js.program.none", "The first programs are being confirmed with the shelters. Run one? Use the form below.") });
   // programs that offer sleepovers also get their own short list, which stays hidden until there's one
   const sleep = $("[data-sleepovers]"), stays = programs.filter(p => (p.tags || []).includes("sleepover"));
   if (sleep && stays.length) {
     sleep.innerHTML = `<ul class="res">${stays.map(p => {
       const url = safeUrl(p.signup_url);
-      return `<li>${url ? `<a href="${h(url)}" target="_blank" rel="noopener">${h(p.shelter_name)} <span class="ext" aria-hidden="true">↗</span></a>` : `<b>${h(p.shelter_name)}</b>`}
+      return `<li${ed("sniffari", p.id, p.program_name || p.shelter_name)}>${url ? `<a href="${h(url)}" target="_blank" rel="noopener">${h(p.shelter_name)} <span class="ext" aria-hidden="true">↗</span></a>` : `<b>${h(p.shelter_name)}</b>`}
         ${p.program_name || p.city ? `<small>${h([p.program_name, p.city].filter(Boolean).join(" · "))}</small>` : ""}</li>`;
     }).join("")}</ul>`;
     sleep.closest("[data-show-when-filled]")?.removeAttribute("hidden");
@@ -455,7 +457,7 @@ async function renderFosters(el) {
   try { programs = await q("foster_programs", "select=id,shelter_name,program_name,city,facts,tags,signup_url,links,checked_on,sort&order=sort.asc,shelter_name.asc"); }
   catch { await wordingReady; failed(el, t("js.failed.fosters", "Foster programs couldn't load right now. Please try again in a little while.")); return; }
   await wordingReady;
-  programList(el, programs, { signup: t("js.foster.apply", "Apply on their page"), none: t("js.foster.none", "Foster programs around Hampton Roads are being added here.") });
+  programList(el, programs, { edit: "fosters", signup: t("js.foster.apply", "Apply on their page"), none: t("js.foster.none", "Foster programs around Hampton Roads are being added here.") });
   const free = programs.filter(p => (p.tags || []).includes("free")).length;
   $$("[data-foster-free]").forEach(x => {
     if (!programs.length) return;
@@ -621,7 +623,7 @@ function helpItem(r, place) {
   // where it is, unless that's just the city it's listed under
   const area = r.area && r.area.trim().toLowerCase() !== place.toLowerCase() ? r.area : "";
   const reach = [area ? h(area) : "", r.phone ? (tel ? `<a href="tel:${h(tel)}">${h(r.phone)}</a>` : h(r.phone)) : "", email ? `<a href="mailto:${h(email)}">${h(email)}</a>` : ""].filter(Boolean);
-  return `<li>${r.kind ? `<em class="kind">${h(r.kind)}</em>` : ""}${link ? `<a href="${h(link)}" target="_blank" rel="noopener">${h(r.name)} <span class="ext" aria-hidden="true">↗</span></a>` : `<b>${h(r.name)}</b>`}
+  return `<li${ed("help", r.id, r.name)}>${r.kind ? `<em class="kind">${h(r.kind)}</em>` : ""}${link ? `<a href="${h(link)}" target="_blank" rel="noopener">${h(r.name)} <span class="ext" aria-hidden="true">↗</span></a>` : `<b>${h(r.name)}</b>`}
     ${r.description ? `<span>${h(r.description)}</span>` : ""}
     ${r.best_for ? `<span><b>${h(t("js.help.best-for", "Best for:"))}</b> ${h(r.best_for)}</span>` : ""}
     ${r.caution ? `<span class="caution" role="note">${h(r.caution)}</span>` : ""}
@@ -632,7 +634,7 @@ async function renderHelp() {
   const out = $("[data-cities]"), defs = $("[data-needs]"), shows = $$("[data-help-for]");
   if (!(out && defs) && !shows.length) return;
   let rows = [];
-  try { rows = await q("help_resources", "select=category,name,kind,description,best_for,caution,link_url,more_url,more_label,phone,email,area,cities&order=sort.asc,name.asc"); } catch { return; }
+  try { rows = await q("help_resources", "select=id,category,name,kind,description,best_for,caution,link_url,more_url,more_label,phone,email,area,cities&order=sort.asc,name.asc"); } catch { return; }
   await wordingReady;
   // parts of the page about one kind of help, and links to them, show once some is listed
   shows.forEach(el => { if (rows.some(r => r.category === el.dataset.helpFor)) el.removeAttribute("hidden"); });
@@ -665,24 +667,24 @@ const platform = u => {
 };
 async function renderVideos(el) {
   let rows = [];
-  try { rows = (await q("videos", "select=title,url,posted_on,note,photo_url,photo_frame&order=sort.asc,posted_on.desc.nullslast,created_at.desc")).filter(v => safeUrl(v.url)); } catch { return; }
+  try { rows = (await q("videos", "select=id,title,url,posted_on,note,photo_url,photo_frame&order=sort.asc,posted_on.desc.nullslast,created_at.desc")).filter(v => safeUrl(v.url)); } catch { return; }
   if (!rows.length) return;
   await wordingReady;
   el.innerHTML = rows.map((v, i) => {
     const where = platform(v.url), watch = where ? t("js.video.watch", "Watch on {site}", { site: where }) : t("js.video.watch-it", "Watch the video");
-    return `<li><a class="vid" href="${h(safeUrl(v.url))}" target="_blank" rel="noopener"><span class="ph ${BG[i % 6]}" aria-hidden="true">🎬${photoTag(v.photo_url, "", v.photo_frame)}<span class="play">▶</span></span>
+    return `<li${ed("videos", v.id, v.title)}><a class="vid" href="${h(safeUrl(v.url))}" target="_blank" rel="noopener"><span class="ph ${BG[i % 6]}" aria-hidden="true">🎬${photoTag(v.photo_url, "", v.photo_frame)}<span class="play">▶</span></span>
       <span class="bd"><b>${h(v.title)}</b>${v.note ? `<span>${h(v.note)}</span>` : ""}<small>${h([v.posted_on ? fullDate(v.posted_on) : "", watch].filter(Boolean).join(" · "))} <span aria-hidden="true">↗</span></small></span></a></li>`;
   }).join("");
   el.closest("[data-show-when-filled]")?.removeAttribute("hidden");
 }
 async function renderPlaces(el) {
   let rows = [];
-  try { rows = await q("places", "select=name,area,why,link_url,photo_url,photo_frame&order=sort.asc,name.asc"); } catch { return; }
+  try { rows = await q("places", "select=id,name,area,why,link_url,photo_url,photo_frame&order=sort.asc,name.asc"); } catch { return; }
   if (!rows.length) return;
   await wordingReady;
   el.innerHTML = rows.map((p, i) => {
     const link = safeUrl(p.link_url);
-    return `<li class="place"><span class="ph ${BG[(i + 2) % 6]}" aria-hidden="true">📍${photoTag(p.photo_url, "", p.photo_frame)}</span><div class="bd"><h3>${h(p.name)}</h3>
+    return `<li class="place"${ed("places", p.id, p.name)}><span class="ph ${BG[(i + 2) % 6]}" aria-hidden="true">📍${photoTag(p.photo_url, "", p.photo_frame)}</span><div class="bd"><h3>${h(p.name)}</h3>
       ${p.area ? `<small>${h(p.area)}</small>` : ""}${p.why ? `<p>${h(p.why)}</p>` : ""}
       ${link ? `<a href="${h(link)}" target="_blank" rel="noopener">${h(t("js.place.website", "Their website"))} <span class="ext" aria-hidden="true">↗</span></a>` : ""}</div></li>`;
   }).join("");
@@ -737,7 +739,7 @@ async function renderAdventures(el) {
     const raw = (Array.isArray(a.photos) ? a.photos : []).filter(u => photoUrl(u)), photos = raw, vids = (Array.isArray(a.videos) ? a.videos : []).filter(v => v && safeUrl(v.url));
     const bits = [photos.length && (photos.length === 1 ? t("js.adventure.one-photo", "1 photo") : t("js.adventure.n-photos", "{n} photos", { n: photos.length })),
       vids.length && (vids.length === 1 ? t("js.adventure.one-video", "1 video") : t("js.adventure.n-videos", "{n} videos", { n: vids.length }))].filter(Boolean);
-    return `<li><button class="advcard" type="button" aria-haspopup="dialog" data-adv="${h(a.id)}"><span class="ph ${BG[i % 6]}" aria-hidden="true">🦮${photoTag(raw[0], "", (a.frames || {})[raw[0]])}</span>
+    return `<li${ed("adventures", a.id, a.title)}><button class="advcard" type="button" aria-haspopup="dialog" data-adv="${h(a.id)}"><span class="ph ${BG[i % 6]}" aria-hidden="true">🦮${photoTag(raw[0], "", (a.frames || {})[raw[0]])}</span>
       <span class="bd"><b>${h(a.title)}</b><small>${h([advDate(a), a.dogs].filter(Boolean).join(" · "))}</small>${bits.length ? `<span>${h(bits.join(" · "))}</span>` : ""}</span></button></li>`;
   }).join("");
   el.closest("[data-show-when-filled]")?.removeAttribute("hidden");
@@ -827,7 +829,7 @@ async function renderArticles(el) {
   if (S.post && !POSTS.some(p => p.slug === S.post)) history.replaceState(null, "", squawkHome + location.search);
   if (!POSTS.length) return;
   await wordingReady;
-  el.innerHTML = POSTS.map((p, i) => `<li><a class="sqcard" href="${h(postAddress(p))}" data-post="${h(p.slug)}"><span class="ph ${BG[i % 6]}" aria-hidden="true">🦜${photoTag(p.photo_url, "", p.photo_frame)}</span>
+  el.innerHTML = POSTS.map((p, i) => `<li${ed("squawk", p.id, p.title)}><a class="sqcard" href="${h(postAddress(p))}" data-post="${h(p.slug)}"><span class="ph ${BG[i % 6]}" aria-hidden="true">🦜${photoTag(p.photo_url, "", p.photo_frame)}</span>
     <span class="bd"><small>${h(fullDate(postDate(p)))}</small><b>${h(p.title)}</b>${p.summary ? `<span>${h(p.summary)}</span>` : ""}<em>${h(t("js.squawk.read", "Read it"))}</em></span></a></li>`).join("");
   $$("[data-articles-empty]").forEach(x => { x.hidden = true; });
   // a link to one post (#its-name, or its own page) opens it, on arrival or later
@@ -1037,21 +1039,42 @@ document.addEventListener("click", e => {
   openPhotos(imgs.map(i => ({ src: i.currentSrc || i.src, alt: i.alt })), imgs.indexOf($("img", b)));
 });
 
-/* ---------- for signed-in editors: shortcuts to this page's wording and photos ----------
-   "Photos on this page" shows a "+ Add a photo here" link at every spot a photo can go, and a link on each photo to
-   change it. They open the edit page, which comes back here after saving. */
+/* ---------- for signed-in editors: one Edit button ----------
+   It opens a short menu for this page: a pencil on each thing on it (which opens that one on the edit page, and comes
+   back here to it after saving), photos ("+ Add a photo here" at every spot a photo can go, and a link on each photo
+   to change it), the page's wording, and the editor's lists that feed this page. While pencils or photo links are
+   showing, the button says Done; they stay on when coming back from the edit page. */
+const EDIT_LISTS = { squawk: "Twin Squawk posts", animals: "Animals", goals: "Shelter goals", partners: "Rescues and shelters", events: "Events",
+  collabs: "Working together", fosters: "Foster programs", sniffari: "Sniffari programs", adventures: "Our day outs", videos: "Day-out videos",
+  places: "Dog-friendly places", help: "Help listings" };
+// the lists each page shows, so the menu offers them even while the page has none yet
+const PAGE_LISTS = { home: ["animals", "goals"], animals: ["animals"], spotlight: ["animals"], "willow-woods": ["animals", "goals", "events", "collabs"],
+  rescues: ["partners", "animals", "events", "collabs"], "shelter-goals": ["goals"], sniffari: ["sniffari", "adventures", "videos", "places"],
+  foster: ["fosters"], help: ["help"], "care-for-yourself": ["help"], wildlife: ["help"], "twin-squawk": ["squawk"] };
 let editor = false;
 try { editor = !!localStorage.getItem("tt-editor-session"); } catch {}
 if (editor && S.scope) {
-  const spotsHere = S.scope !== "404" && !!$("[data-b]");
-  document.body.insertAdjacentHTML("beforeend", `<div class="editfabs">`
-    + (S.scope === "twin-squawk" ? `<a class="editfab" href="${h(S.base)}edit/#/squawk">🦜 Write or change posts</a>` : "")
-    + `<a class="editfab" href="${h(S.base)}edit/#/text/${h(S.scope)}">✏️ Edit this page's wording</a>`
-    + (spotsHere ? `<button class="editfab" type="button" data-ppmode aria-pressed="false">📷 Photos on this page</button>` : "") + `</div>`);
-  const btn = $("[data-ppmode]");
-  const link = (q, id) => `${h(S.base)}edit/#/photos/${id ? encodeURIComponent(id) : "new"}?${q ? q + "&" : ""}back=${encodeURIComponent(S.page)}`;
+  const spotsHere = S.scope !== "404" && !!$("[data-b]"), lists = PAGE_LISTS[S.scope] || [], E = `${h(S.base)}edit/`;
+  document.body.insertAdjacentHTML("beforeend", `<div class="editfabs"><div class="editmenu" id="editmenu" hidden>
+    <p class="em-h">This page</p>
+    ${lists.length ? `<button type="button" data-pens>✎ Edit things on this page</button>` : ""}
+    ${spotsHere ? `<button type="button" data-ppmode>📷 Photos on this page</button>` : ""}
+    <a href="${E}#/text/${h(S.scope)}">✏️ Wording on this page</a>
+    ${lists.length ? `<p class="em-h">Add or find</p>${lists.map(k => `<a href="${E}#/${k}">${h(EDIT_LISTS[k])}</a>`).join("")}` : ""}
+    <a class="em-all" href="${E}">Open the editor</a></div>
+    <button class="editfab" type="button" data-editfab aria-expanded="false" aria-controls="editmenu">✎ Edit</button></div>`);
+  const fab = $("[data-editfab]"), menu = $("#editmenu");
+  const remember = (k, on) => { try { on ? sessionStorage.setItem(k, "1") : sessionStorage.removeItem(k); } catch {} };
+  const was = k => { try { return sessionStorage.getItem(k) === "1"; } catch { return false; } };
+  const mode = () => (document.body.classList.contains("ppmode") ? "photos" : document.body.classList.contains("penmode") ? "pens" : "");
+  const label = () => { const m = mode(); fab.textContent = m === "photos" ? "✓ Done with photos" : m === "pens" ? "✓ Done editing" : "✎ Edit"; fab.setAttribute("aria-pressed", String(!!m)); };
+  const shut = () => { menu.hidden = true; fab.setAttribute("aria-expanded", "false"); };
+
+  // photos
+  const link = (q, id) => `${E}#/photos/${id ? encodeURIComponent(id) : "new"}?${q ? q + "&" : ""}back=${encodeURIComponent(S.page)}`;
   const spotLink = k => link(`page=${encodeURIComponent(S.scope)}&spot=${encodeURIComponent(k)}`);
-  const on = () => {
+  const photosOn = () => {
+    pensOff();
     document.body.classList.add("ppmode");
     $$("[data-b]").forEach(el => {
       const k = el.dataset.b, pos = el.dataset.bs || "";
@@ -1068,21 +1091,67 @@ if (editor && S.scope) {
       const row = img.dataset.ppSwap || img.closest("[data-pp-hid]")?.dataset.ppHid;
       img.insertAdjacentHTML("beforebegin", `<a class="ppfix" href="${row ? link("", row) : spotLink(img.dataset.pi)}">${row && img.closest("[data-pp-hid]") ? "👁 Hidden: change or show it" : "✎ Change or hide this photo"}</a>`);
     });
-    btn.textContent = "✓ Done with photos"; btn.setAttribute("aria-pressed", "true");
-    try { sessionStorage.setItem("tt-pp-mode", "1"); } catch {}
+    remember("tt-pp-mode", true); label();
   };
-  const off = () => {
+  const photosOff = () => {
+    if (mode() !== "photos") return;
     document.body.classList.remove("ppmode");
     $$(".ppadd, .ppfix").forEach(a => a.remove());
     $$(".ppghost").forEach(el => { el.hidden = true; el.classList.remove("ppghost"); });
-    btn.textContent = "📷 Photos on this page"; btn.setAttribute("aria-pressed", "false");
-    try { sessionStorage.removeItem("tt-pp-mode"); } catch {}
+    remember("tt-pp-mode", false); label();
   };
-  if (btn) {
-    btn.addEventListener("click", () => photosReady.then(() => (document.body.classList.contains("ppmode") ? off() : on())));
-    let again = false;
-    try { again = sessionStorage.getItem("tt-pp-mode") === "1"; } catch {}
-    if (again) photosReady.then(on); // back from the edit page after saving a photo
+
+  // a pencil on each thing on the page; things drawn later (they come from the database) get one as they arrive
+  const addPens = () => $$("[data-edit]").forEach(el => {
+    if ($(":scope > .editpen", el)) return;
+    const [list, id] = el.dataset.edit.split(":");
+    el.insertAdjacentHTML("beforeend", `<a class="editpen" href="${E}#/${h(list)}/${encodeURIComponent(id)}?back=${encodeURIComponent(S.page)}" data-pen="${h(el.dataset.edit)}" aria-label="${h(`Edit ${el.dataset.editName || "this"}`)}">✎ Edit</a>`);
+  });
+  const watch = new MutationObserver(() => { if (mode() === "pens") addPens(); });
+  function pensOn() {
+    photosOff();
+    document.body.classList.add("penmode");
+    addPens();
+    watch.observe(document.body, { childList: true, subtree: true });
+    remember("tt-pen-mode", true); label();
+  }
+  function pensOff() {
+    if (mode() !== "pens") return;
+    watch.disconnect();
+    document.body.classList.remove("penmode");
+    $$(".editpen").forEach(a => a.remove());
+    remember("tt-pen-mode", false); label();
+  }
+  document.addEventListener("click", e => {
+    const pen = e.target.closest(".editpen");
+    if (pen) { try { sessionStorage.setItem("tt-pen-at", pen.dataset.pen); } catch {} return; } // to come back to it
+    if (!menu.hidden && !e.target.closest(".editfabs")) shut();
+  });
+
+  fab.addEventListener("click", () => {
+    if (mode() === "photos") return photosOff();
+    if (mode() === "pens") return pensOff();
+    menu.hidden = !menu.hidden;
+    fab.setAttribute("aria-expanded", String(!menu.hidden));
+    if (!menu.hidden) $("button, a", menu)?.focus();
+  });
+  document.addEventListener("keydown", e => { if (e.key === "Escape" && !menu.hidden) { shut(); fab.focus(); } });
+  $("[data-ppmode]", menu)?.addEventListener("click", () => { shut(); photosReady.then(photosOn); });
+  $("[data-pens]", menu)?.addEventListener("click", () => { shut(); pensOn(); });
+
+  // back from the edit page: the same mode, and the thing that was being edited in view
+  if (was("tt-pp-mode") && spotsHere) photosReady.then(photosOn);
+  else if (was("tt-pen-mode") && lists.length) pensOn();
+  let at = null;
+  try { at = sessionStorage.getItem("tt-pen-at"); sessionStorage.removeItem("tt-pen-at"); } catch {}
+  if (at) {
+    let tries = 0;
+    const find = () => {
+      const el = $$("[data-edit]").find(x => x.dataset.edit === at);
+      if (el) { el.scrollIntoView({ block: "center" }); el.classList.add("penflash"); }
+      else if (++tries < 25) setTimeout(find, 200);
+    };
+    find();
   }
 }
 

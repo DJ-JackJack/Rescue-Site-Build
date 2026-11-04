@@ -98,7 +98,7 @@ The help pages list published rows city by city (`renderHelp` in `site/assets/si
 
 ## Photos on the pages
 
-`page_photos`: photos added to any page from the edit page (Photos on the pages, or **📷 Photos on this page** on the site while signed in), and photos that came with the site that have been changed or hidden.
+`page_photos`: photos added to any page from the edit page (Photos, or **✎ Edit → 📷 Photos on this page** on the site while signed in), and photos that came with the site that have been changed or hidden.
 
 - `page`: the page, like `help` or `home`.
 - `spot`: where it goes. The build marks every spot (`site/photospots.mjs`): `before:b.help.1a2b3c4d` is just above one part of the page, `after:…` just below the last part of a section or box. The key is a fingerprint of that part's own words, like a wording key, so a photo stays put when other parts move or the wording is changed from the edit page. If the words are rewritten in the code, the spot is gone: the photo stops showing and the edit page asks for a new spot. A photo that came with the site has a key like `i.stories.fa087f83`: every photo from `assets/photos` in a page (also inside a decorative frame, like the relay card on the home page), each photo on the home page photo wall, which site.js draws from `data-img` (keyed by file name, or by its label when it has none, like Wildlife), and each empty photo frame, like a card that shows an emoji until it has a photo (keyed by the card's heading, like Ebay's card on the home page; a photo saved for it goes inside the frame).
@@ -111,7 +111,7 @@ The build puts saved photos into the pages, the same way as saved wording, and s
 
 ## Page wording
 
-Every piece of wording on the site can be changed from the edit page (Page wording). Saved wording is in `site_text`, one row per `key`; an empty `body` means the original words.
+Every piece of wording on the site can be changed from the edit page (Wording). Saved wording is in `site_text`, one row per `key`; an empty `body` means the original words.
 
 - **Keys come from the build** (`site/wording.mjs`). Each text on a page gets one: `w.<page>.<fingerprint>` for text, `a.<page>.<fingerprint>` for photo descriptions and form hints, `p.<page>.title` / `.description` for the page title and description. The shared header, menu, footer and contact form use the page name `all`. The fingerprint comes from the words themselves, so a saved change follows the words even if the page around them moves. If the original words are changed in the page file, the old saved change stops applying, and the edit page lists it under "Saved wording that's no longer on the site".
 - **Longer blocks** marked `data-text="key" data-label="..."` in a page file (like `home.intro`, `about.body`) are edited as one piece, with blank lines for paragraphs and `## ` for headings.
@@ -133,11 +133,11 @@ The `admins` table lists the email addresses allowed to edit. It can't be read o
 
 Editors can get a phone notification for each new message, and when something scheduled goes live (Web Push, no app or extra account):
 
-- **Signing up a device:** edit page → Messages → **Turn on notifications**. The browser signs up with its push service (Google, Apple, Mozilla or Microsoft) and the sign-up is saved in `push_subscriptions` (editors only). iPhones and iPads only allow this for web apps on the Home Screen. `site/edit-sw.js`, published as `/edit/sw.js`, shows the notifications and opens Messages (or Scheduled, for something that went live) when one is tapped. The two kinds use their own push `Topic` and notification tag, so one never replaces the other.
+- **Signing up a device:** edit page → Settings → **Turn on notifications**. The browser signs up with its push service (Google, Apple, Mozilla or Microsoft) and the sign-up is saved in `push_subscriptions` (editors only). iPhones and iPads only allow this for web apps on the Home Screen. `site/edit-sw.js`, published as `/edit/sw.js`, shows the notifications and opens Messages (or Scheduled, for something that went live) when one is tapped. The two kinds use their own push `Topic` and notification tag, so one never replaces the other.
 - **Sending:** after each new message, the trigger `messages_notify` asks the Edge Function `notify-message` (`supabase/functions/notify-message/`) to announce it, through `pg_net`, so the form never waits and a problem there can't lose a message. The function trusts nothing in the call: `push_claim` marks the messages not yet announced (`messages.notified_at`) and returns only their topic and name. Each notification is encrypted for the device it goes to, and says the topic and who it's from, never the message. Devices that turned notifications off are forgotten automatically.
 - **Things going live:** see "Going live at a set time" above. The notification names what went live ("Twin Squawk: …"), or how many things did.
 - **Keys:** the function makes its VAPID keys on first use and keeps them in `push_state`, which only the server can read. Nobody has to handle them.
-- **If notifications stop:** open Messages on that device and tap **Send a test**. If the test doesn't arrive, turn them off and on again there. The function's logs are in the Supabase dashboard under Edge Functions → notify-message → Logs.
+- **If notifications stop:** open Settings on that device and tap **Send a test**. If the test doesn't arrive, turn them off and on again there. The function's logs are in the Supabase dashboard under Edge Functions → notify-message → Logs.
 - **Updating the function:** it's deployed with `verify_jwt` off, because it checks callers itself. Redeploy it from `supabase/functions/notify-message/` with the same setting.
 
 ## Visitor counts
