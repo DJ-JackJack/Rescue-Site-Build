@@ -671,7 +671,7 @@ const SECTIONS = {
   },
   photos: {
     table: "page_photos", title: "Photos", one: "photo", icon: "🖼️",
-    intro: "Photos you've added to the pages, and photos on the pages you've changed or hidden. The easiest way to add one: open the page on the site while you're signed in, tap “📷 Photos on this page”, then tap “＋ Add a photo here” where you want it.",
+    intro: "Photos you've added to the pages, and photos on the pages you've changed or hidden. The easiest way to add one: open the page on the site while you're signed in, tap ✎ Edit, then “📷 Photos on this page”, then “＋ Add a photo here” where you want it.",
     query: "select=*&order=page.asc,sort.asc,created_at.asc",
     titleOf: r => `${pageTitle(r.page) || r.page}: ${r.layout === "swap" ? (r.photos?.length ? "a changed photo" : "a hidden photo") : "a photo"}`,
     row: r => ({ title: pageTitle(r.page) || r.page, emoji: "🖼️", photo: r.photos?.[0]?.url, frame: PP.frame(r.photos?.[0]),
@@ -681,7 +681,7 @@ const SECTIONS = {
       { name: "page", type: "select", label: "Which page?", options: () => PAGES, required: true, placeholder: "Pick a page…" },
       { name: "spot", type: "select", label: "Where on the page?", options: v => spotsOf(v.page), dependsOn: "page", required: true, placeholder: "Pick a spot…",
         missing: "A spot that isn't on the page any more: pick a new one",
-        help: "It's easiest from the page itself: open it while you're signed in and tap “📷 Photos on this page”.",
+        help: "It's easiest from the page itself: open it while you're signed in, tap ✎ Edit, then “📷 Photos on this page”.",
         validate: (v, vals) => (v && !spotsOf(vals.page).some(s => s.k === v) ? "That spot isn't on the page any more. Pick a new one." : "") },
       { name: "layout", type: "choice", label: "How should it look?", options: LOOKS, dflt: "full", pictures: true, when: v => !isSwap(v),
         help: "On phones, every photo shows full width, above or below the words." },

@@ -98,7 +98,7 @@ The help pages list published rows city by city (`renderHelp` in `site/assets/si
 
 ## Photos on the pages
 
-`page_photos`: photos added to any page from the edit page (Photos, or **📷 Photos on this page** on the site while signed in), and photos that came with the site that have been changed or hidden.
+`page_photos`: photos added to any page from the edit page (Photos, or **✎ Edit → 📷 Photos on this page** on the site while signed in), and photos that came with the site that have been changed or hidden.
 
 - `page`: the page, like `help` or `home`.
 - `spot`: where it goes. The build marks every spot (`site/photospots.mjs`): `before:b.help.1a2b3c4d` is just above one part of the page, `after:…` just below the last part of a section or box. The key is a fingerprint of that part's own words, like a wording key, so a photo stays put when other parts move or the wording is changed from the edit page. If the words are rewritten in the code, the spot is gone: the photo stops showing and the edit page asks for a new spot. A photo that came with the site has a key like `i.stories.fa087f83`: every photo from `assets/photos` in a page (also inside a decorative frame, like the relay card on the home page), each photo on the home page photo wall, which site.js draws from `data-img` (keyed by file name, or by its label when it has none, like Wildlife), and each empty photo frame, like a card that shows an emoji until it has a photo (keyed by the card's heading, like Ebay's card on the home page; a photo saved for it goes inside the frame).
