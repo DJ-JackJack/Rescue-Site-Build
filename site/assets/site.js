@@ -90,7 +90,7 @@ const wordingLoaded = q("site_text", "select=key,body").then(rows => {
 // The live sections wait for it (at most a moment), so their phrases are the latest too.
 const wordingReady = Promise.race([wordingLoaded, new Promise(ok => setTimeout(ok, 1500))]);
 const getGoals = () => once("goals", () => q("goals", "select=id,title,why,price_note,donate_url,photo_url,photo_frame,status,featured,figures_updated_at,met_on,sort,partner:partners(name,slug),bars:goal_bars(label,target,current,sort)&order=sort.asc"));
-const getAnimals = () => once("animals", () => q("animals", "select=id,name,species,status,herd,sort,featured_on,adopted_on,transport,note,story,updates,section,listing_url,checked_on,photo_url,photo_frame,journey,created_at,partner:partners(name,slug)&order=featured_on.desc.nullslast,created_at.desc"));
+const getAnimals = () => once("animals", () => q("animals", "select=id,name,species,status,herd,sort,featured_on,adopted_on,passed_on,transport,note,story,updates,section,listing_url,checked_on,photo_url,photo_frame,journey,created_at,partner:partners(name,slug)&order=featured_on.desc.nullslast,created_at.desc"));
 const getPartners = () => once("partners", () => q("partners", "select=id,slug,name,kind,mission,website_url,adopt_url,donate_url,links,sort&order=sort.asc"));
 const getSniffari = () => once("sniffari", () => q("sniffari_programs", "select=id,shelter_name,program_name,city,address,signup_url,links,facts,tags,checked_on,sort&order=sort.asc"));
 const getCollabs = () => once("collabs", () => q("collabs", "select=id,title,kind,starts_on,ends_on,ongoing,description,link_url,photo_url,photo_frame,sort,partner:partners(slug)&order=sort.asc,starts_on.desc"));
@@ -160,19 +160,21 @@ async function renderGoals(el) {
 
 /* ---------- animals: counts, stat, walls, journey ---------- */
 const EMOJI = { dog: "🐶", cat: "🐱", horse: "🐴", bird: "🐦", other: "🐾" };
-const STATUS = { adopted: "c-adopted", placed: "c-placed", foster: "c-foster", sanctuary: "c-sanct", looking: "c-wait", unknown: "c-unknown" };
+const STATUS = { adopted: "c-adopted", placed: "c-placed", foster: "c-foster", sanctuary: "c-sanct", looking: "c-wait", unknown: "c-unknown", passed: "c-memory" };
 const statusLabel = s => ({
   adopted: t("js.status.adopted", "Adopted"), foster: t("js.status.foster", "In foster"), sanctuary: t("js.status.sanctuary", "In sanctuary"),
-  looking: t("js.status.looking", "Still looking"), unknown: t("js.status.unknown", "Status unknown"),
+  looking: t("js.status.looking", "Still looking"), unknown: t("js.status.unknown", "Status unknown"), passed: t("js.status.passed", "In memory"),
 }[s] || t("js.status.placed", "Placed"));
 const WHO = S.ownerFirst || "she";
 const BG = ["g1", "g2", "g3", "g4", "g5", "g6"];
-const daysToHome = a => (a.status === "adopted" && a.featured_on && a.adopted_on) ? daysBetween(asDate(a.featured_on), asDate(a.adopted_on)) : null;
+// an adoption still counts if they later passed away: they did get home
+const daysToHome = a => ((a.status === "adopted" || a.status === "passed") && a.featured_on && a.adopted_on) ? daysBetween(asDate(a.featured_on), asDate(a.adopted_on)) : null;
 // Happy Tales (the animals page: the wall, the counts and the adoption stat) or the Animal Story Spotlight on Stories
 const helped = a => (a.section || "helped") === "helped";
 
 function stats(animals) {
-  // Every dog featured at least 90 days ago counts. "Home" means adopted. Transport runs don't count.
+  // Every dog featured at least 90 days ago counts, whatever happened to them: a dog who passed away stays in, so the
+  // number is never made to look better. "Home" means adopted (even if they later passed away). Transport runs don't count.
   const dogs = animals.filter(a => helped(a) && a.species === "dog" && !a.transport && a.featured_on);
   const cutoff = today() - 90 * DAY;
   const counted = dogs.filter(a => asDate(a.featured_on) <= cutoff);
@@ -211,7 +213,8 @@ function petHTML(a, i) {
 function countsHTML(animals) {
   const c = s => animals.filter(a => a.status === s).length;
   return [["adopted", t("js.count.adopted", "adopted")], ["foster", t("js.count.foster", "in foster")], ["sanctuary", t("js.count.sanctuary", "in sanctuary")],
-    ["placed", t("js.count.placed", "placed or released")], ["looking", t("js.count.looking", "still looking")], ["unknown", t("js.count.unknown", "status unknown")]]
+    ["placed", t("js.count.placed", "placed or released")], ["looking", t("js.count.looking", "still looking")], ["unknown", t("js.count.unknown", "status unknown")],
+    ["passed", t("js.count.passed", "in memory")]]
     .filter(([s]) => ["adopted", "foster", "looking"].includes(s) || c(s))
     .map(([s, l]) => `<div class="count"><b>${c(s)}</b><span>${h(l)}</span></div>`).join("");
 }
@@ -224,9 +227,10 @@ async function renderAnimals() {
   await wordingReady;
   counts.forEach(c => c.innerHTML = countsHTML(ANIMALS));
   walls.forEach(w => {
-    const limit = Number(w.dataset.wall) || Infinity;
+    // data-skip: outcomes a wall leaves out, like the home page's newest animals, which don't show anyone in memory
+    const limit = Number(w.dataset.wall) || Infinity, skip = (w.dataset.skip || "").split(/\s+/).filter(Boolean);
     const draw = filter => {
-      const list = ANIMALS.filter(a => filter === "all" || a.status === filter).slice(0, limit);
+      const list = ANIMALS.filter(a => (filter === "all" || a.status === filter) && !skip.includes(a.status)).slice(0, limit);
       w.innerHTML = list.length ? list.map(petHTML).join("") : `<li class="empty">${h(t("js.animal.none", "More animals are being added."))}</li>`;
       const live = $(w.dataset.live || "#none");
       if (live) live.textContent = list.length === 1 ? t("js.animal.showing-one", "Showing 1 animal") : t("js.animal.showing", "Showing {n} animals", { n: list.length });
@@ -249,11 +253,12 @@ document.addEventListener("click", async e => {
   const chip = $("#jchip"); chip.className = "chip " + cls; chip.textContent = label;
   const pic = $("#jpic"); pic.className = "ph " + BG[0]; pic.innerHTML = (EMOJI[a.species] || "🐾") + photoTag(a.photo_url, "", a.photo_frame);
   let steps = Array.isArray(a.journey) ? a.journey.filter(s => s && s.label) : [];
+  const memory = a.status === "passed";
   if (!steps.length) {
     if (a.featured_on) steps.push({ label: t("js.journey.featured", "Featured"), detail: t("js.journey.video", "Video posted {month}", { month: monthYear(a.featured_on) }) });
     const d = daysToHome(a);
     if (d !== null) steps.push({ label: t("js.journey.adopted", "Adopted"), detail: t("js.journey.home-after", "Home {n} days after the video", { n: d }) });
-    else {
+    else if (!memory) {
       const name = a.partner?.name;
       const via = !name ? "" : a.status === "looking" || a.status === "foster" ? t("js.journey.with", "With {name}", { name })
         : a.status === "sanctuary" ? t("js.journey.at", "At {name}", { name })
@@ -262,6 +267,8 @@ document.addEventListener("click", async e => {
       steps.push({ label, detail: [a.note, via, lost].filter(Boolean).join(" · ") });
     }
   }
+  // someone who has passed away: their journey ends there, quietly, with the month if it's known
+  if (memory && !steps.some(s => s.label === label)) steps.push({ label, date: a.passed_on || undefined, detail: a.note || "" });
   // her story, the steps of their journey, then dated updates and notes, newest first
   const story = String(a.story || "").trim(), notes = (Array.isArray(a.updates) ? a.updates : []).filter(n => n && n.text)
     .sort((x, y) => (y.date || "").localeCompare(x.date || ""));
