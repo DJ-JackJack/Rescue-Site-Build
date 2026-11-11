@@ -15,7 +15,7 @@ Goals, animals, rescues, events, Sniffari programs, the local help list and some
 
 Add a row to `animals`:
 
-- `name`, `species` (dog, cat, horse, bird, other) and `status` (adopted, foster, sanctuary, looking, placed, unknown). "unknown" is for an animal she has lost touch with: the site says their status is unknown. They still count in the adoption stat, as not known to be home.
+- `name`, `species` (dog, cat, horse, bird, other) and `status` (adopted, foster, sanctuary, looking, placed, unknown, passed). "unknown" is for an animal she has lost touch with: the site says their status is unknown. "passed" is for an animal who has passed away: the site says "In memory", their journey ends with the month from `passed_on` (optional), and they stay on Happy Tales and in the numbers, but not in the home page's newest animals or on the rescue cards. They still count in the adoption stat, as not known to be home.
 - Horses: `herd` (for example "Herd One") groups them on the Willow Woods page, and `sort` sets their order.
 - `featured_on`: the date of the video. `adopted_on`: the adoption date. These two dates drive the adoption numbers.
 - `transport`: tick it for transport runs like the puppy relay, so they don't count in the adoption stat.

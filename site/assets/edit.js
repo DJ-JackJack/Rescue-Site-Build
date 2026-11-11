@@ -322,7 +322,7 @@ function openFramer({ url, shapes, frame }) {
 
 /* ---------- what can be edited ---------- */
 const STATUS = [["looking", "Still looking"], ["foster", "In foster"], ["adopted", "Adopted"], ["sanctuary", "In sanctuary"], ["placed", "Placed or released"],
-  ["unknown", "Unknown (lost contact)"]];
+  ["unknown", "Unknown (lost contact)"], ["passed", "In memory (passed away)"]];
 const SPECIES = [["dog", "Dog"], ["cat", "Cat"], ["horse", "Horse"], ["bird", "Bird"], ["other", "Other"]];
 const SHOWN_ON = [["helped", "Happy Tales"], ["spotlight", "Animal Story Spotlight (on Stories)"]];
 const EMOJI = { dog: "🐶", cat: "🐱", horse: "🐴", bird: "🐦", other: "🐾" };
@@ -343,7 +343,7 @@ const CITIES = [["virginia-beach", "Virginia Beach"], ["norfolk", "Norfolk"], ["
   ["hampton", "Hampton"], ["newport-news", "Newport News"], ["hampton-roads", "All of Hampton Roads"], ["further", "Further Abroad"]];
 const citiesOf = r => (r.cities || []).map(c => label(CITIES, c)).join(", ");
 const TOPICS = { partner: "Partnership", help: "Help keeping a pet", dog: "About a dog", sniffari: "Day-out program", request: "Video request or question", other: "Something else" };
-const RANK = { looking: 0, foster: 1, adopted: 2, sanctuary: 3, placed: 4, unknown: 5 };
+const RANK = { looking: 0, foster: 1, adopted: 2, sanctuary: 3, placed: 4, unknown: 5, passed: 6 };
 const byName = (a, b) => a.name.localeCompare(b.name, "en", { sensitivity: "base", numeric: true });
 const stale = (d, days) => d === null || d === undefined || daysAgo(d) >= days;
 const platform = u => {
@@ -408,7 +408,7 @@ const SECTIONS = {
     intro: "Everyone on Happy Tales, the Animal Story Spotlight (on the Stories page), the rescue cards and the Willow Woods herds.",
     query: "select=*,partner:partners(name)&order=name.asc",
     titleOf: r => r.name,
-    filters: [["all", "All"], ["looking", "Still looking"], ["foster", "In foster"], ["adopted", "Adopted"], ["sanctuary", "In sanctuary"], ["unknown", "Unknown"], ["spotlight", "Spotlight"], ["hidden", "Hidden"]],
+    filters: [["all", "All"], ["looking", "Still looking"], ["foster", "In foster"], ["adopted", "Adopted"], ["sanctuary", "In sanctuary"], ["unknown", "Unknown"], ["passed", "In memory"], ["spotlight", "Spotlight"], ["hidden", "Hidden"]],
     tokens: r => [r.status, r.section === "spotlight" ? "spotlight" : "", r.published ? "" : "hidden"],
     // ways to order the list: [value, what the switch says, order, the heading each group goes under]
     sorts: [["az", "A–Z", byName], ["status", "By status", (a, b) => (RANK[a.status] ?? 9) - (RANK[b.status] ?? 9) || byName(a, b), r => label(STATUS, r.status)]],
@@ -437,6 +437,8 @@ const SECTIONS = {
         help: "A dog who's still looking hides from the site 4 weeks after this date, so the site never shows a dog who's already gone.", when: v => v.status === "looking" },
       { name: "featured_on", type: "date", label: "Date of your video about them", help: "Used for the “home within 3 months” numbers." },
       { name: "adopted_on", type: "date", label: "Adoption date", when: v => v.status === "adopted" },
+      { name: "passed_on", type: "date", label: "When they passed", when: v => v.status === "passed",
+        help: "Optional. Their journey shows the month. In their story or an update, share only what you're comfortable with, and what the shelter is OK with. A cause isn't needed." },
       { name: "herd", type: "text", label: "Herd", max: 60, list: "herds", help: "Groups the horses on the Willow Woods page, like “Herd One”.", when: v => v.species === "horse" },
       { ...SORT, label: "Order in the herd", help: "1 shows first.", when: v => v.species === "horse" },
       { name: "transport", type: "toggle", label: "Transport run", help: "Like the puppy relay. Doesn't count in the adoption numbers.", more: true },

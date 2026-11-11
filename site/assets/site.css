@@ -493,6 +493,7 @@ footer .formmsg.is-err{color:#FFB4AB}
 .btn[aria-disabled="true"]{opacity:.8;cursor:default}
 .c-foster{background:#CDB2FD;color:#191333}
 .c-unknown{background:#E9E4F2;color:#352262}
+.c-memory{background:#D3CDDD;color:#191333}
 .herd .wall{grid-template-columns:repeat(auto-fill,minmax(110px,1fr))}
 .herd .pet{background:var(--blush);border-color:var(--orchid);color:var(--ink)}
 .herd .pet small{color:var(--plum)}
