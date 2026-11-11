@@ -324,7 +324,7 @@ function openFramer({ url, shapes, frame }) {
 const STATUS = [["looking", "Still looking"], ["foster", "In foster"], ["adopted", "Adopted"], ["sanctuary", "In sanctuary"], ["placed", "Placed or released"],
   ["unknown", "Unknown (lost contact)"]];
 const SPECIES = [["dog", "Dog"], ["cat", "Cat"], ["horse", "Horse"], ["bird", "Bird"], ["other", "Other"]];
-const SHOWN_ON = [["helped", "Animals We've Helped"], ["spotlight", "Animal Story Spotlight"]];
+const SHOWN_ON = [["helped", "Happy Tales"], ["spotlight", "Animal Story Spotlight (on Stories)"]];
 const EMOJI = { dog: "🐶", cat: "🐱", horse: "🐴", bird: "🐦", other: "🐾" };
 const KINDS = [["rescue", "Rescue"], ["shelter", "Shelter"], ["sanctuary", "Sanctuary"]];
 const TAGS = [["free", "Free"], ["half", "Half-day option"], ["kids", "Kids welcome"], ["first", "Good for first-timers"], ["sleepover", "Sleepovers"]];
@@ -405,7 +405,7 @@ const SECTIONS = {
   },
   animals: {
     table: "animals", title: "Animals", one: "animal", icon: "🐾",
-    intro: "Everyone on Animals We've Helped (Happy Tails), the Animal Story Spotlight, the rescue cards and the Willow Woods herds.",
+    intro: "Everyone on Happy Tales, the Animal Story Spotlight (on the Stories page), the rescue cards and the Willow Woods herds.",
     query: "select=*,partner:partners(name)&order=name.asc",
     titleOf: r => r.name,
     filters: [["all", "All"], ["looking", "Still looking"], ["foster", "In foster"], ["adopted", "Adopted"], ["sanctuary", "In sanctuary"], ["unknown", "Unknown"], ["spotlight", "Spotlight"], ["hidden", "Hidden"]],
@@ -425,12 +425,12 @@ const SECTIONS = {
           if (el.species.value === "horse") el.section.value = v === "looking" ? "helped" : "spotlight";
         } },
       { name: "section", type: "choice", label: "Which part of the site?", options: SHOWN_ON, dflt: "helped",
-        help: "Animals We've Helped is for animals you featured to find a home. Animal Story Spotlight is for animals already in a forever home or a sanctuary, like the Willow Woods horses. Pick the other one and save to move them." },
+        help: "Happy Tales is for animals you featured to find a home. The Animal Story Spotlight, on the Stories page, is for animals already in a forever home or a sanctuary, like the Willow Woods horses. Pick the other one and save to move them." },
       { name: "partner_id", type: "partner", label: "Rescue or shelter" },
       { name: "photo_url", type: "photo", label: "Photo", folder: "animals", frame: "photo_frame", shapes: [{ a: 1, label: "On the card" }] },
       { name: "note", type: "textarea", rows: 2, max: 200, label: "Short note", help: "Shown under their name. Keep it to a line." },
-      { name: "story", type: "textarea", rows: 8, max: 6000, label: "Their story", help: "Shown when people tap them on Happy Tails. Leave a blank line between paragraphs." },
-      { name: "journey", type: "journey", label: "Their journey", help: "The steps people see when they tap this animal on Happy Tails, in order, like each visit until they leave the shelter. Leave it empty and the site uses the video and adoption dates." },
+      { name: "story", type: "textarea", rows: 8, max: 6000, label: "Their story", help: "Shown when people tap them on Happy Tales. Leave a blank line between paragraphs." },
+      { name: "journey", type: "journey", label: "Their journey", help: "The steps people see when they tap this animal on Happy Tales, in order, like each visit until they leave the shelter. Leave it empty and the site uses the video and adoption dates." },
       { name: "updates", type: "updates", label: "Updates and notes", help: "Dated news, like how they're doing in their new home. The newest shows first." },
       { name: "listing_url", type: "url", label: "Link to their adoption listing", when: v => ["looking", "foster"].includes(v.status) },
       { name: "checked_on", type: "date", label: "Last checked that they're still available", today: "Checked today", dflt: today,
@@ -870,7 +870,7 @@ async function showHome() {
 // The start screen's tiles, grouped by the part of the site they change: [heading, the pages it covers, tiles].
 const GROUPS = [
   ["Post", "The Twin Squawk page", ["squawk", "scheduled"]],
-  ["Animals", "Happy Tails, the Story Spotlight and the Willow Woods horses", ["animals"]],
+  ["Animals", "Happy Tales, the Story Spotlight and the Willow Woods horses", ["animals"]],
   ["Shelters and rescues", "The Rescues page, Shelter Goals and the Foster page", ["partners", "goals", "events", "collabs", "fosters"]],
   ["Rescues on Sniffari", "The Rescues on Sniffari page", ["sniffari", "adventures", "videos", "places"]],
   ["Every page", "The words and photos on any page", ["text", "photos"]],
@@ -1619,9 +1619,9 @@ const recheckSub = () => { if (subChecked || !canPush()) return; subChecked = tr
 // (js.*). Saved wording lives in site_text by key; an empty body means "use the original words".
 const WORDS = CFG.textDefaults || [], AREAS = CFG.areas || [];
 const PHRASE_GROUPS = {
-  goal: "Shelter goals", status: "Animal labels", count: "Animal counts", animal: "Happy Tails", stat: "The adoption number",
+  goal: "Shelter goals", status: "Animal labels", count: "Animal counts", animal: "Happy Tales", stat: "The adoption number",
   journey: "An animal's journey (the pop-up)", rescue: "Rescues", horse: "Willow Woods horses", event: "Events",
-  spotlight: "Animal Story Spotlight", squawk: "Twin Squawk", collab: "Working together", program: "Sniffari programs", foster: "Foster programs", adventure: "Our day outs", video: "Day-out videos", place: "Dog-friendly places", help: "Help listings",
+  spotlight: "Animal Story Spotlight", squawk: "Twin Squawk", collab: "Working together", program: "Sniffari programs", foster: "Foster programs", adventure: "Our day outs", montage: "The day-out photo montage", video: "Day-out videos", place: "Dog-friendly places", help: "Help listings",
   form: "Contact forms", failed: "When part of a page can't load",
 };
 const clip = (s, n = 60) => (s.length > n ? s.slice(0, n - 1) + "…" : s);

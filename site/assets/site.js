@@ -168,7 +168,7 @@ const statusLabel = s => ({
 const WHO = S.ownerFirst || "she";
 const BG = ["g1", "g2", "g3", "g4", "g5", "g6"];
 const daysToHome = a => (a.status === "adopted" && a.featured_on && a.adopted_on) ? daysBetween(asDate(a.featured_on), asDate(a.adopted_on)) : null;
-// Animals We've Helped (Happy Tails, the counts and the adoption stat) or the Animal Story Spotlight page
+// Happy Tales (the animals page: the wall, the counts and the adoption stat) or the Animal Story Spotlight on Stories
 const helped = a => (a.section || "helped") === "helped";
 
 function stats(animals) {
@@ -331,8 +331,10 @@ async function renderHorses(el) {
   } catch { failed(el, t("js.failed.horses", "The horses couldn't load right now. Please try again in a little while.")); }
 }
 
-/* Animal Story Spotlight: animals in their forever homes and sanctuaries, by where they live */
+/* Animal Story Spotlight (on the Stories page): animals in their forever homes and sanctuaries, by where they live.
+   data-heading sets the level of each home's heading (h3 under the section's own heading). */
 async function renderSpotlight(el) {
+  const hx = /^h[2-4]$/.test(el.dataset.heading || "") ? el.dataset.heading : "h2";
   let list;
   try { list = (await getAnimals()).filter(a => !helped(a)); }
   catch { await wordingReady; failed(el, t("js.failed.spotlight", "The spotlight couldn't load right now. Please try again in a little while.")); return; }
@@ -342,7 +344,7 @@ async function renderSpotlight(el) {
   el.innerHTML = homes.map(slug => {
     const here = list.filter(a => (a.partner?.slug || "") === slug), name = here[0].partner?.name;
     const page = OWN_PAGE[slug] ? `<a class="more" href="${h(S.base + OWN_PAGE[slug])}">${h(t("js.spotlight.visit", "More about {name}", { name }))}</a>` : "";
-    return `<div class="spot-home"><h2 class="h2">${h(name ? t("js.spotlight.at", "At {name}", { name }) : t("js.spotlight.more", "More stories"))}</h2>${page}
+    return `<div class="spot-home"><${hx} class="${hx === "h2" ? "h2" : "spot-h"}">${h(name ? t("js.spotlight.at", "At {name}", { name }) : t("js.spotlight.more", "More stories"))}</${hx}>${page}
       ${herdsHTML(here, here.every(a => a.species === "horse") ? t("js.horse.more", "More horses") : t("js.spotlight.meet", "Meet them"))}</div>`;
   }).join("");
 }
@@ -743,10 +745,25 @@ async function renderAdventures(el) {
       <span class="bd"><b>${h(a.title)}</b><small>${h([advDate(a), a.dogs].filter(Boolean).join(" · "))}</small>${bits.length ? `<span>${h(bits.join(" · "))}</span>` : ""}</span></button></li>`;
   }).join("");
   el.closest("[data-show-when-filled]")?.removeAttribute("hidden");
+  renderMontage();
   // a link to one day out (#day-out-…) opens it, on arrival or later
   const fromHash = () => { const m = location.hash.match(/^#day-out-([\w-]+)$/); if (m) openAdventure(ADVS.find(a => a.id === m[1])); };
   fromHash();
   addEventListener("hashchange", fromHash);
+}
+// The photo montage at the top of Rescues on Sniffari: photos from the day outs, taking turns between them so it's a
+// mix, each opening its day out. It stays hidden until there are a few photos to show.
+const MONTAGE_MIN = 3, MONTAGE_MAX = 9;
+function renderMontage() {
+  const box = $("[data-montage]");
+  if (!box) return;
+  const lists = ADVS.map(a => (Array.isArray(a.photos) ? a.photos : []).filter(u => photoUrl(u)).map(u => ({ a, u })));
+  const tiles = [];
+  for (let i = 0; tiles.length < MONTAGE_MAX && lists.some(l => l[i]); i++) for (const l of lists) if (l[i] && tiles.length < MONTAGE_MAX) tiles.push(l[i]);
+  if (tiles.length < MONTAGE_MIN) { box.hidden = true; box.innerHTML = ""; return; }
+  box.setAttribute("aria-label", t("js.montage.label", "Photos from our day outs"));
+  box.innerHTML = tiles.map(({ a, u }) => `<li><button class="mtile" type="button" aria-haspopup="dialog" data-adv="${h(a.id)}" aria-label="${h(t("js.montage.open", "A photo from {title}. Open this day out", { title: a.title }))}">${photoTag(u, "", (a.frames || {})[u])}</button></li>`).join("");
+  box.hidden = false;
 }
 // A reader (a day out, a Twin Squawk post): YouTube plays once tapped, photos open larger (arrow keys go through them,
 // Escape closes the photo first), and closing stops any video and takes the post off the address (away(): the address
@@ -780,7 +797,7 @@ function setupReader(dlg, away) {
   dlg.addEventListener("close", () => { body.innerHTML = ""; shut(); const back = away(); if (back) history.replaceState(null, "", back); });
 }
 setupReader($("#adventure"), () => (/^#day-out-/.test(location.hash) ? location.pathname + location.search : ""));
-document.addEventListener("click", e => { const b = e.target.closest(".advcard"); if (b) openAdventure(ADVS.find(a => a.id === b.dataset.adv)); });
+document.addEventListener("click", e => { const b = e.target.closest(".advcard, .mtile"); if (b) openAdventure(ADVS.find(a => a.id === b.dataset.adv)); });
 
 /* ---------- Twin Squawk: the news page ----------
    Newest first, by when each one went live (a post waiting for its time isn't sent to visitors at all). Each opens in a
@@ -1048,7 +1065,7 @@ const EDIT_LISTS = { squawk: "Twin Squawk posts", animals: "Animals", goals: "Sh
   collabs: "Working together", fosters: "Foster programs", sniffari: "Sniffari programs", adventures: "Our day outs", videos: "Day-out videos",
   places: "Dog-friendly places", help: "Help listings" };
 // the lists each page shows, so the menu offers them even while the page has none yet
-const PAGE_LISTS = { home: ["animals", "goals"], animals: ["animals"], spotlight: ["animals"], "willow-woods": ["animals", "goals", "events", "collabs"],
+const PAGE_LISTS = { home: ["animals", "goals"], animals: ["animals"], stories: ["animals"], "willow-woods": ["animals", "goals", "events", "collabs"],
   rescues: ["partners", "animals", "events", "collabs"], "shelter-goals": ["goals"], sniffari: ["sniffari", "adventures", "videos", "places"],
   foster: ["fosters"], help: ["help"], "care-for-yourself": ["help"], wildlife: ["help"], "twin-squawk": ["squawk"] };
 let editor = false;

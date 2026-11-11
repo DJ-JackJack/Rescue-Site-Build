@@ -43,6 +43,13 @@ header{position:sticky;top:0;z-index:30;background:rgba(251,248,255,.9);backdrop
 .brand small{display:block;font-family:var(--f-body);font-weight:700;font-size:.74rem;letter-spacing:.14em;text-transform:uppercase;color:var(--ink2);-webkit-text-fill-color:var(--ink2);margin-top:-2px}
 .hpartner{font:800 .9rem var(--f-body);text-decoration:none;color:var(--plum);border:2px solid var(--plum);border-radius:999px;padding:8px 14px;white-space:nowrap;min-height:44px;display:inline-flex;align-items:center}
 @media (max-width:520px){.hpartner{display:none}}
+/* "I need help": in the header on every page (it stays at the top as you scroll), except on the help page itself */
+.needhelp{font:800 .9rem var(--f-body);text-decoration:none;color:#fff;background:var(--plum);border:2px solid var(--plum);border-radius:999px;padding:8px 14px;white-space:nowrap;min-height:44px;display:inline-flex;align-items:center;gap:6px}
+.needhelp:hover,.needhelp:focus-visible{background:var(--royal);border-color:var(--royal)}
+.needhelp span{color:var(--orchid)}
+.needhelp[aria-current]{display:none}
+@media (max-width:400px){.needhelp{padding:8px 10px;font-size:.85rem}.needhelp span{display:none}.hbar{gap:6px}.hbar .menubtn{padding:11px 13px}}
+@media (max-width:360px){.hbar .brand{font-size:1.05rem}.hbar .brand small{font-size:.6rem}.needhelp{padding:8px 9px;font-size:.8rem}}
 .menubtn{border:0;background:var(--royal);color:#fff;font:800 .95rem var(--f-body);padding:11px 18px;border-radius:999px;cursor:pointer;min-height:44px}
 .menu{display:none;position:absolute;left:0;right:0;top:100%;background:var(--paper);border-bottom:1px solid var(--lavender);box-shadow:var(--shadow)}
 .menu.open{display:block;max-height:calc(100vh - 64px);max-height:calc(100dvh - 64px);overflow-y:auto;overscroll-behavior:contain}
@@ -255,6 +262,14 @@ dialog.journey::backdrop{background:rgba(25,19,51,.55)}
 .steps b time{font:700 .8rem var(--f-body);color:var(--plum);margin-left:6px}
 .jclose{position:absolute;top:10px;right:10px;border:0;background:#fff;color:var(--royal);font:800 1rem var(--f-body);border-radius:999px;width:44px;height:44px;cursor:pointer}
 /* Our day outs: cards, and the pop-up with videos, a photo gallery and the places they went */
+/* the photo montage at the top of Rescues on Sniffari */
+.montage{list-style:none;margin:0 0 28px;padding:0;display:grid;gap:8px;grid-template-columns:repeat(3,1fr)}
+@media (min-width:720px){.montage{grid-template-columns:repeat(6,1fr);gap:10px}.montage li:first-child{grid-column:span 2;grid-row:span 2}}
+.mtile{display:block;width:100%;aspect-ratio:1;padding:0;border:0;border-radius:12px;overflow:hidden;cursor:pointer;background:var(--wash);position:relative;box-shadow:var(--shadow)}
+.mtile img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transition:transform .3s}
+.mtile:hover img{transform:scale(1.04)}
+@media (prefers-reduced-motion:reduce){.mtile img{transition:none}}
+.spot-h{font:700 1.35rem var(--f-disp);color:var(--plum);margin:28px 0 6px}
 .advs{list-style:none;margin:18px 0 0;padding:0;display:grid;gap:16px;grid-template-columns:repeat(auto-fill,minmax(min(100%,240px),1fr))}
 .advcard{display:flex;flex-direction:column;width:100%;height:100%;padding:0;border:0;text-align:left;cursor:pointer;background:#fff;border-radius:var(--r);box-shadow:var(--shadow);overflow:hidden;font:inherit;color:var(--ink)}
 .advcard .ph{aspect-ratio:4/3;display:grid;place-items:center;font-size:2.6rem;position:relative;overflow:hidden}

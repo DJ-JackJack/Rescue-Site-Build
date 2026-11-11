@@ -290,6 +290,21 @@ for (const file of fs.readdirSync(pagesDir).filter(f => f.endsWith(".html")).sor
 
 fs.writeFileSync(path.join(OUT, ".nojekyll"), "");
 fs.cpSync(path.join(SRC, "root"), OUT, { recursive: true }); // favicon.ico for the domain root
+// Pages that moved: their old address forwards to the new one, keeping anything after "?". These aren't in the
+// sitemap, so search engines drop the old address.
+const MOVED = { "spotlight/": "stories/#spotlight" };
+for (const [from, to] of Object.entries(MOVED)) {
+  const target = BASE + to, [where, hash] = to.split("#");
+  fs.mkdirSync(path.join(OUT, from), { recursive: true });
+  fs.writeFileSync(path.join(OUT, from, "index.html"), `<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>This page moved · TheTerr0rTw!ns</title><meta name="robots" content="noindex">
+<link rel="canonical" href="${esc(SITE_URL + where)}">
+<meta http-equiv="refresh" content="0; url=${esc(target)}">
+<script>location.replace(${JSON.stringify(BASE + where).replace(/</g, "\\u003c")} + location.search${hash ? ` + ${JSON.stringify("#" + hash)}` : ""});</script>
+</head><body><p>This page moved. <a href="${esc(target)}">Go to its new home</a>.</p></body></html>
+`);
+}
 fs.writeFileSync(path.join(OUT, "sitemap.xml"), `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${pageUrls.map(u => `  <url><loc>${esc(u)}</loc></url>`).join("\n")}\n</urlset>\n`);
 if (!PREVIEW) fs.writeFileSync(path.join(OUT, "robots.txt"), `User-agent: *\nAllow: /\nDisallow: ${BASE}edit/\nSitemap: ${SITE_URL}sitemap.xml\n`);
 else fs.writeFileSync(path.join(OUT, "robots.txt"), "User-agent: *\nDisallow: /\n");
