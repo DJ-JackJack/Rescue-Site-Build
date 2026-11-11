@@ -6,6 +6,8 @@
 //     The key is a fingerprint of the part's own words, like a wording key: a photo stays with its part of the page
 //     when other parts move, and if those words are rewritten in the code, the edit page says it needs a new spot.
 //     (Taea's own wording changes don't count: they're applied after this, to the same keys.)
+//     A part marked data-spot-name="…" is one named spot of its own (just above it), keyed by that name, and
+//     data-spot-look="…" says the look its photos take, like the day-out montage on Rescues on Sniffari.
 //   - data-pi="i.home.1a2b3c4d": a photo already on the page (a fingerprint of its file name), so it can be
 //     changed or hidden. That's every <img> from assets/photos, and each photo on the home page's photo wall, which
 //     site.js draws from data-img (keyed by its file name, or by its label when it has no photo yet). An empty
@@ -132,13 +134,20 @@ export function markSpots(html, scope) {
       if (photosOnly) { visit(c, here, true); continue; }
       // the part of the page each spot is in, for grouping them on the edit page: the section's first heading
       if (c.tag === "section") {
-        const hd = firstHeading(c);
-        group = hd && meaningful(words(hd)) ? clip(words(hd)) : "Further down the page";
+        const hd = firstHeading(c), named = attr(c, "aria-label");
+        group = hd && meaningful(words(hd)) ? clip(words(hd)) : named ? clip(decode(named)) : "Further down the page";
       } else if (has(c, "phead", "hero")) group = "Top of the page";
       if (FLOW(c) || CARD(c)) {
         const parts = c.children.filter(x => x.tag && !SKIP_TAGS.has(x.tag) && x.tag !== "noscript" && x.tag !== "br" && !has(x, "sr"));
         const card = CARD(c) && !FLOW(c), name = card ? boxName(c) : "";
         parts.forEach((p, i) => {
+          const spotName = attr(p, "data-spot-name");
+          if (spotName) {
+            const k = keyOf("b", "spot " + decode(spotName)), look = attr(p, "data-spot-look");
+            addAttrs(p, ` data-b="${k}" data-bs="b"`);
+            marks.set(p, [{ s: "b", k: `before:${k}`, g: group, l: decode(spotName), ...(look ? { look } : {}) }]);
+            return;
+          }
           // no spot between a small label (the eyebrow) and the heading under it
           const last = i === parts.length - 1, afterLabel = i > 0 && has(parts[i - 1], "eyebrow");
           const pos = (card ? (i === 0 ? "b" : "") : afterLabel ? "" : "b") + (last ? "a" : "");
@@ -158,7 +167,7 @@ export function markSpots(html, scope) {
     for (const c of n.children || []) {
       if (!c.tag) continue;
       const m = marks.get(c) || [];
-      for (const x of m.filter(x => x.s === "b")) spots.push({ k: x.k, l: x.l, g: x.g });
+      for (const x of m.filter(x => x.s === "b")) spots.push({ k: x.k, l: x.l, g: x.g, ...(x.look ? { look: x.look } : {}) });
       inOrder(c);
       for (const x of m.filter(x => x.s === "a")) spots.push({ k: x.k, l: x.l, g: x.g });
     }

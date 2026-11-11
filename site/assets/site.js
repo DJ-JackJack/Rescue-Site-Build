@@ -745,25 +745,10 @@ async function renderAdventures(el) {
       <span class="bd"><b>${h(a.title)}</b><small>${h([advDate(a), a.dogs].filter(Boolean).join(" · "))}</small>${bits.length ? `<span>${h(bits.join(" · "))}</span>` : ""}</span></button></li>`;
   }).join("");
   el.closest("[data-show-when-filled]")?.removeAttribute("hidden");
-  renderMontage();
   // a link to one day out (#day-out-…) opens it, on arrival or later
   const fromHash = () => { const m = location.hash.match(/^#day-out-([\w-]+)$/); if (m) openAdventure(ADVS.find(a => a.id === m[1])); };
   fromHash();
   addEventListener("hashchange", fromHash);
-}
-// The photo montage at the top of Rescues on Sniffari: photos from the day outs, taking turns between them so it's a
-// mix, each opening its day out. It stays hidden until there are a few photos to show.
-const MONTAGE_MIN = 3, MONTAGE_MAX = 9;
-function renderMontage() {
-  const box = $("[data-montage]");
-  if (!box) return;
-  const lists = ADVS.map(a => (Array.isArray(a.photos) ? a.photos : []).filter(u => photoUrl(u)).map(u => ({ a, u })));
-  const tiles = [];
-  for (let i = 0; tiles.length < MONTAGE_MAX && lists.some(l => l[i]); i++) for (const l of lists) if (l[i] && tiles.length < MONTAGE_MAX) tiles.push(l[i]);
-  if (tiles.length < MONTAGE_MIN) { box.hidden = true; box.innerHTML = ""; return; }
-  box.setAttribute("aria-label", t("js.montage.label", "Photos from our day outs"));
-  box.innerHTML = tiles.map(({ a, u }) => `<li><button class="mtile" type="button" aria-haspopup="dialog" data-adv="${h(a.id)}" aria-label="${h(t("js.montage.open", "A photo from {title}. Open this day out", { title: a.title }))}">${photoTag(u, "", (a.frames || {})[u])}</button></li>`).join("");
-  box.hidden = false;
 }
 // A reader (a day out, a Twin Squawk post): YouTube plays once tapped, photos open larger (arrow keys go through them,
 // Escape closes the photo first), and closing stops any video and takes the post off the address (away(): the address
@@ -797,7 +782,7 @@ function setupReader(dlg, away) {
   dlg.addEventListener("close", () => { body.innerHTML = ""; shut(); const back = away(); if (back) history.replaceState(null, "", back); });
 }
 setupReader($("#adventure"), () => (/^#day-out-/.test(location.hash) ? location.pathname + location.search : ""));
-document.addEventListener("click", e => { const b = e.target.closest(".advcard, .mtile"); if (b) openAdventure(ADVS.find(a => a.id === b.dataset.adv)); });
+document.addEventListener("click", e => { const b = e.target.closest(".advcard"); if (b) openAdventure(ADVS.find(a => a.id === b.dataset.adv)); });
 
 /* ---------- Twin Squawk: the news page ----------
    Newest first, by when each one went live (a post waiting for its time isn't sent to visitors at all). Each opens in a
@@ -1089,13 +1074,16 @@ if (editor && S.scope) {
 
   // photos
   const link = (q, id) => `${E}#/photos/${id ? encodeURIComponent(id) : "new"}?${q ? q + "&" : ""}back=${encodeURIComponent(S.page)}`;
-  const spotLink = k => link(`page=${encodeURIComponent(S.scope)}&spot=${encodeURIComponent(k)}`);
+  const spotLink = (k, look) => link(`page=${encodeURIComponent(S.scope)}&spot=${encodeURIComponent(k)}${look ? `&layout=${encodeURIComponent(look)}` : ""}`);
   const photosOn = () => {
     pensOff();
     document.body.classList.add("ppmode");
     $$("[data-b]").forEach(el => {
       const k = el.dataset.b, pos = el.dataset.bs || "";
-      if (pos.includes("b")) el.insertAdjacentHTML("beforebegin", `<a class="ppadd" href="${spotLink("before:" + k)}">＋ Add a photo here</a>`);
+      // a named spot (the day-out montage) takes one set of photos: once it has them, its own button changes them
+      const look = el.dataset.spotLook, named = el.dataset.spotName;
+      if (named && el.previousElementSibling?.matches("figure[data-pp]")) return;
+      if (pos.includes("b")) el.insertAdjacentHTML("beforebegin", `<a class="ppadd" href="${spotLink("before:" + k, look)}">＋ ${named ? h("Add photos to " + named.replace(/^The /, "the ")) : "Add a photo here"}</a>`);
       if (pos.includes("a")) el.insertAdjacentHTML("afterend", `<a class="ppadd" href="${spotLink("after:" + k)}">＋ Add a photo here</a>`);
     });
     $$("[data-pp-hid]").forEach(el => { el.hidden = false; el.classList.add("ppghost"); });

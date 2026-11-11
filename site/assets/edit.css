@@ -239,6 +239,7 @@
 .look-left{background-image:var(--p),var(--t),var(--t),var(--t);background-size:16px 26px,19px 3px,19px 3px,13px 3px;background-position:3px 3px,22px 6px,22px 13px,22px 20px}
 .look-right{background-image:var(--p),var(--t),var(--t),var(--t);background-size:16px 26px,19px 3px,19px 3px,13px 3px;background-position:24px 3px,3px 6px,3px 13px,3px 20px}
 .look-small{background-image:var(--p),var(--t),var(--t);background-size:16px 14px,38px 3px,26px 3px;background-position:15px 3px,3px 22px,3px 27px}
+.look-montage{background-image:var(--p),var(--p),var(--p),var(--p),var(--p);background-size:17px 17px,8px 8px,8px 8px,8px 8px,8px 8px;background-position:3px 3px,22px 3px,31px 3px,22px 12px,31px 12px}
 .look-row{background-image:var(--p),var(--p),var(--p),var(--t),var(--t);background-size:11px 11px,11px 11px,11px 11px,38px 3px,26px 3px;background-position:3px 3px,16px 3px,29px 3px,3px 21px,3px 27px}
 .opt input:checked+span .look{border-color:#fff}
 

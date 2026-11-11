@@ -363,7 +363,7 @@ const isSwap = v => /^i\./.test(v.spot || "");
 const picOf = v => (CFG.pics?.[v.page] || []).find(p => p.k === v.spot);
 const SHAPE_CHOICES = [["original", "As taken"], ["square", "Square"], ["wide", "Wide"], ["tall", "Tall"]];
 const LOOKS = [["full", "Full width"], ["banner", "Wide banner"], ["left", "Beside the text, photo on the left"], ["right", "Beside the text, photo on the right"],
-  ["small", "Small, in the middle"], ["row", "A row of photos"]];
+  ["small", "Small, in the middle"], ["row", "A row of photos"], ["montage", "A photo montage"]];
 
 // Fields marked more fold away under "More options"; those marked onSite go in the "On the site" box that ends every form.
 const SHOW = { name: "published", type: "toggle", label: "Show on the site", help: "Turn this off to hide it without losing anything.", dflt: true, onSite: true };
@@ -705,6 +705,7 @@ const SECTIONS = {
       { name: "photos", type: "gallery", alt: true, label: "Photo", max: 12, folder: v => `pages/${v.page || "other"}`,
         shapes: v => (isSwap(v) ? [{ a: picOf(v)?.a || 0, label: "Where it shows" }]
           : v.layout === "row" ? [{ a: 1, label: "In the row" }]
+          : v.layout === "montage" ? [{ a: 1, label: "In the montage" }]
           : v.layout === "banner" ? [{ a: 3, label: "On a computer" }, { a: 2, label: "On a phone" }]
           : [{ a: PP.SHAPES[v.shape] || 0, label: "On the page" }]),
         current: v => (isSwap(v) ? picOf(v) : null), // a photo that came with the site can be reframed without replacing it
@@ -712,7 +713,7 @@ const SECTIONS = {
         validate: (list, v) => isSwap(v)
           ? (list.length > 1 ? "Pick just one photo to put in its place." : !list.length && picOf(v) && !picOf(v).src ? "Add a photo to put here." : "")
           : !list.length ? "Add a photo."
-          : v.layout !== "row" && list.length > 1 ? "This look shows one photo. To show several, pick “A row of photos”." : "" },
+          : !PP.MANY.includes(v.layout) && list.length > 1 ? "This look shows one photo. To show several, pick “A row of photos” or “A photo montage”." : "" },
       { name: "caption", type: "text", label: "Caption", max: 300, when: v => !isSwap(v), help: "Optional. Shown under the photo." },
       SHOW, { ...SORT, help: "When there are a few photos in the same spot, lower numbers show first." },
     ],
@@ -752,6 +753,7 @@ async function route() {
     if (sec === "visitors") return await showVisitors(id || "7");
     if (sec === "scheduled") return await showScheduled();
     if (sec === "settings") return await showSettings();
+    if (sec === "montage") return await showMontage();
     if (!SECTIONS[sec]) return go("#/");
     return id ? await showForm(sec, id, params) : await showList(sec);
   } catch (e) {
@@ -872,26 +874,36 @@ const GROUPS = [
   ["Post", "The Twin Squawk page", ["squawk", "scheduled"]],
   ["Animals", "Happy Tales, the Story Spotlight and the Willow Woods horses", ["animals"]],
   ["Shelters and rescues", "The Rescues page, Shelter Goals and the Foster page", ["partners", "goals", "events", "collabs", "fosters"]],
-  ["Rescues on Sniffari", "The Rescues on Sniffari page", ["sniffari", "adventures", "videos", "places"]],
+  ["Rescues on Sniffari", "The Rescues on Sniffari page", ["montage", "sniffari", "adventures", "videos", "places"]],
   ["Every page", "The words and photos on any page", ["text", "photos"]],
   ["Help pages", "Help keeping your pet, Caring for Yourself and Wildlife", ["help"]],
   ["Inbox and settings", "Behind the scenes", ["messages", "visitors", "deleted", "settings"]],
 ];
-const SCREENS = { messages: ["✉️", "Messages"], scheduled: ["⏰", "Scheduled"], text: ["✏️", "Wording"], visitors: ["📈", "Visitors"], deleted: ["🗑️", "Recently deleted"], settings: ["⚙️", "Settings"] };
+const SCREENS = { montage: ["🎞️", "Day-out montage"], messages: ["✉️", "Messages"], scheduled: ["⏰", "Scheduled"], text: ["✏️", "Wording"], visitors: ["📈", "Visitors"], deleted: ["🗑️", "Recently deleted"], settings: ["⚙️", "Settings"] };
 const tileOf = k => SCREENS[k] || [SECTIONS[k].icon, SECTIONS[k].short || SECTIONS[k].title];
 
 // Photos: the pages, each opening on the site with its photo buttons showing (?edit=photos), then the spots still
 // waiting for a photo (an empty frame on a card, a photo-wall spot with none yet), each straight to its form.
 function photosAbove(rows) {
   const taken = new Set(rows.filter(r => r.published && r.photos?.length).map(r => r.spot));
-  const waiting = PAGES.flatMap(([page, title]) => spotsOf(page).filter(x => x.src === "" && !taken.has(x.k)).map(x => ({ ...x, page, title })));
+  const waiting = PAGES.flatMap(([page, title]) => spotsOf(page).filter(x => (x.src === "" || x.look) && !taken.has(x.k)).map(x => ({ ...x, page, title })));
   const at = page => (AREAS.find(a => a.scope === page)?.path || "/").replace(/^\//, "");
   return `<h2 class="sub">Pick a page</h2>
     <div class="pagepick">${PAGES.map(([page, title]) => { const n = rows.filter(r => r.page === page).length;
       return `<a href="${h(CFG.base + at(page))}?edit=photos">${h(title)}${n ? ` <small>${n}</small>` : ""}</a>`; }).join("")}</div>
     <p class="small"><a href="#/photos/new">Or add one here without opening the page</a></p>
     ${waiting.length ? `<h2 class="sub">Waiting for a photo</h2><ul class="todo">${waiting.map(x => `<li><b>${h(x.l)}</b><small>On ${h(x.title)}</small>
-      <div class="btns"><a class="btn royal sm" href="#/photos/new?page=${encodeURIComponent(x.page)}&spot=${encodeURIComponent(x.k)}">＋ Put a photo here</a></div></li>`).join("")}</ul>` : ""}`;
+      <div class="btns"><a class="btn royal sm" href="#/photos/new?page=${encodeURIComponent(x.page)}&spot=${encodeURIComponent(x.k)}${x.look ? `&layout=${encodeURIComponent(x.look)}` : ""}">＋ ${x.look ? "Add photos" : "Put a photo here"}</a></div></li>`).join("")}</ul>` : ""}`;
+}
+
+// The day-out montage on Rescues on Sniffari: its own set of photos (one page_photos row at its named spot), picked
+// and ordered here. The tile opens it, or starts it when it has none yet.
+async function showMontage() {
+  const spot = (CFG.spots?.sniffari || []).find(x => x.look === "montage");
+  if (!spot) return go("#/photos");
+  const rows = await api.list("page_photos", `select=id,published,photos&page=eq.sniffari&spot=eq.${encodeURIComponent(spot.k)}&order=sort.asc,created_at.asc`);
+  const row = rows.find(r => r.published) || rows[0];
+  go(row ? `#/photos/${encodeURIComponent(row.id)}` : `#/photos/new?page=sniffari&spot=${encodeURIComponent(spot.k)}&layout=montage`);
 }
 
 // move: { up, down } for a row that can be moved with arrows (each false at the top or bottom of its group)
@@ -1621,7 +1633,7 @@ const WORDS = CFG.textDefaults || [], AREAS = CFG.areas || [];
 const PHRASE_GROUPS = {
   goal: "Shelter goals", status: "Animal labels", count: "Animal counts", animal: "Happy Tales", stat: "The adoption number",
   journey: "An animal's journey (the pop-up)", rescue: "Rescues", horse: "Willow Woods horses", event: "Events",
-  spotlight: "Animal Story Spotlight", squawk: "Twin Squawk", collab: "Working together", program: "Sniffari programs", foster: "Foster programs", adventure: "Our day outs", montage: "The day-out photo montage", video: "Day-out videos", place: "Dog-friendly places", help: "Help listings",
+  spotlight: "Animal Story Spotlight", squawk: "Twin Squawk", collab: "Working together", program: "Sniffari programs", foster: "Foster programs", adventure: "Our day outs", video: "Day-out videos", place: "Dog-friendly places", help: "Help listings",
   form: "Contact forms", failed: "When part of a page can't load",
 };
 const clip = (s, n = 60) => (s.length > n ? s.slice(0, n - 1) + "…" : s);
