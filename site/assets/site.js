@@ -168,7 +168,7 @@ const statusLabel = s => ({
 const WHO = S.ownerFirst || "she";
 const BG = ["g1", "g2", "g3", "g4", "g5", "g6"];
 const daysToHome = a => (a.status === "adopted" && a.featured_on && a.adopted_on) ? daysBetween(asDate(a.featured_on), asDate(a.adopted_on)) : null;
-// Animals We've Helped (Happy Tails, the counts and the adoption stat) or the Animal Story Spotlight page
+// Happy Tales (the animals page: the wall, the counts and the adoption stat) or the Animal Story Spotlight on Stories
 const helped = a => (a.section || "helped") === "helped";
 
 function stats(animals) {
@@ -331,8 +331,10 @@ async function renderHorses(el) {
   } catch { failed(el, t("js.failed.horses", "The horses couldn't load right now. Please try again in a little while.")); }
 }
 
-/* Animal Story Spotlight: animals in their forever homes and sanctuaries, by where they live */
+/* Animal Story Spotlight (on the Stories page): animals in their forever homes and sanctuaries, by where they live.
+   data-heading sets the level of each home's heading (h3 under the section's own heading). */
 async function renderSpotlight(el) {
+  const hx = /^h[2-4]$/.test(el.dataset.heading || "") ? el.dataset.heading : "h2";
   let list;
   try { list = (await getAnimals()).filter(a => !helped(a)); }
   catch { await wordingReady; failed(el, t("js.failed.spotlight", "The spotlight couldn't load right now. Please try again in a little while.")); return; }
@@ -342,7 +344,7 @@ async function renderSpotlight(el) {
   el.innerHTML = homes.map(slug => {
     const here = list.filter(a => (a.partner?.slug || "") === slug), name = here[0].partner?.name;
     const page = OWN_PAGE[slug] ? `<a class="more" href="${h(S.base + OWN_PAGE[slug])}">${h(t("js.spotlight.visit", "More about {name}", { name }))}</a>` : "";
-    return `<div class="spot-home"><h2 class="h2">${h(name ? t("js.spotlight.at", "At {name}", { name }) : t("js.spotlight.more", "More stories"))}</h2>${page}
+    return `<div class="spot-home"><${hx} class="${hx === "h2" ? "h2" : "spot-h"}">${h(name ? t("js.spotlight.at", "At {name}", { name }) : t("js.spotlight.more", "More stories"))}</${hx}>${page}
       ${herdsHTML(here, here.every(a => a.species === "horse") ? t("js.horse.more", "More horses") : t("js.spotlight.meet", "Meet them"))}</div>`;
   }).join("");
 }
@@ -1048,7 +1050,7 @@ const EDIT_LISTS = { squawk: "Twin Squawk posts", animals: "Animals", goals: "Sh
   collabs: "Working together", fosters: "Foster programs", sniffari: "Sniffari programs", adventures: "Our day outs", videos: "Day-out videos",
   places: "Dog-friendly places", help: "Help listings" };
 // the lists each page shows, so the menu offers them even while the page has none yet
-const PAGE_LISTS = { home: ["animals", "goals"], animals: ["animals"], spotlight: ["animals"], "willow-woods": ["animals", "goals", "events", "collabs"],
+const PAGE_LISTS = { home: ["animals", "goals"], animals: ["animals"], stories: ["animals"], "willow-woods": ["animals", "goals", "events", "collabs"],
   rescues: ["partners", "animals", "events", "collabs"], "shelter-goals": ["goals"], sniffari: ["sniffari", "adventures", "videos", "places"],
   foster: ["fosters"], help: ["help"], "care-for-yourself": ["help"], wildlife: ["help"], "twin-squawk": ["squawk"] };
 let editor = false;
@@ -1072,13 +1074,16 @@ if (editor && S.scope) {
 
   // photos
   const link = (q, id) => `${E}#/photos/${id ? encodeURIComponent(id) : "new"}?${q ? q + "&" : ""}back=${encodeURIComponent(S.page)}`;
-  const spotLink = k => link(`page=${encodeURIComponent(S.scope)}&spot=${encodeURIComponent(k)}`);
+  const spotLink = (k, look) => link(`page=${encodeURIComponent(S.scope)}&spot=${encodeURIComponent(k)}${look ? `&layout=${encodeURIComponent(look)}` : ""}`);
   const photosOn = () => {
     pensOff();
     document.body.classList.add("ppmode");
     $$("[data-b]").forEach(el => {
       const k = el.dataset.b, pos = el.dataset.bs || "";
-      if (pos.includes("b")) el.insertAdjacentHTML("beforebegin", `<a class="ppadd" href="${spotLink("before:" + k)}">＋ Add a photo here</a>`);
+      // a named spot (the day-out montage) takes one set of photos: once it has them, its own button changes them
+      const look = el.dataset.spotLook, named = el.dataset.spotName;
+      if (named && el.previousElementSibling?.matches("figure[data-pp]")) return;
+      if (pos.includes("b")) el.insertAdjacentHTML("beforebegin", `<a class="ppadd" href="${spotLink("before:" + k, look)}">＋ ${named ? h("Add photos to " + named.replace(/^The /, "the ")) : "Add a photo here"}</a>`);
       if (pos.includes("a")) el.insertAdjacentHTML("afterend", `<a class="ppadd" href="${spotLink("after:" + k)}">＋ Add a photo here</a>`);
     });
     $$("[data-pp-hid]").forEach(el => { el.hidden = false; el.classList.add("ppghost"); });

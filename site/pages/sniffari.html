@@ -8,53 +8,13 @@
   </div>
 </div>
 
-<section id="programs">
+<section class="montagesec" aria-label="Photos from our day outs">
   <div class="wrap">
-    <h2 class="h2">Shelter day-out programs around Hampton Roads</h2>
-    <p class="lede">Run by the shelters themselves. Sign up on their page, and follow their rules.</p>
-    <div class="sniff-filters" id="sniff-filters" role="group" aria-label="Filter programs">
-      <button aria-pressed="true" data-s="all">All programs</button>
-      <button aria-pressed="false" data-s="free">Free</button>
-      <button aria-pressed="false" data-s="half">Half-day option</button>
-      <button aria-pressed="false" data-s="kids">Kids welcome</button>
-      <button aria-pressed="false" data-s="first">Good for first-timers</button>
-      <button aria-pressed="false" data-s="sleepover">Sleepovers</button>
-    </div>
-    <p class="sr" id="sniff-count" aria-live="polite"></p>
-    <div class="slist" data-sniffari data-filters="#sniff-filters" data-live="#sniff-count" data-loading></div>
+    <div class="montage-spot" data-spot-name="The day-out photo montage" data-spot-look="montage"></div>
   </div>
 </section>
 
-<section style="padding-top:0">
-  <div class="wrap">
-    <div class="split">
-    <div>
-    <p class="eyebrow">{{owner_first}}'s Sniffari tips</p>
-    <h2 class="h2">A great day out doesn't cost much.</h2>
-    <p class="lede">Most of my day outs cost $6 to $10. Here's what makes them work.</p>
-    <div class="tips">
-      <div class="tip"><b>Let them make the calls</b><span>It's the dog's day out. Some dogs will want sniffys, some will want a nap in the car. It's all OK. Try to match their mood and interests.</span></div>
-      <div class="tip"><b>Pack light</b><span>Water, a bowl, poop bags, a few treats, and a towel for the car.</span></div>
-      <div class="tip"><b>Ask for the content creator</b><span>Get the shelter content creator's email for videos and pics.</span></div>
-      <div class="tip"><b>Follow their rules</b><span>Every shelter sets its own. Read theirs before you go, every time.</span></div>
-    </div>
-    </div>
-    <figure class="photo"><img src="{{base}}assets/photos/sniffari-day-out.jpg" width="720" height="900" alt="{{owner_first}} in the car on a day out, with a spotted dog resting his head on hers" loading="lazy"></figure>
-    </div>
-  </div>
-</section>
-
-<section style="padding-top:0" data-show-when-filled hidden>
-  <div class="wrap">
-    <p class="eyebrow">Sleepovers</p>
-    <h2 class="h2">Some shelters let a dog stay the night.</h2>
-    <p class="lede">A sleepover is a night or a weekend in a real home. The dog gets a break from the kennel, and the shelter learns how they act in a house, which helps them find the right family.</p>
-    <div class="box callbox" data-sleepovers></div>
-    <p class="small" style="margin-top:12px">Each shelter sets its own rules for sleepovers, like age limits, other pets at home and how long a stay can be. Read theirs before you sign up.</p>
-  </div>
-</section>
-
-<section id="day-outs" style="padding-top:0" data-show-when-filled hidden>
+<section id="day-outs" data-show-when-filled hidden>
   <div class="wrap">
     <p class="eyebrow">Our day outs</p>
     <h2 class="h2">Where we've been.</h2>
@@ -84,12 +44,58 @@
   </div>
 </section>
 
+<section style="padding-top:0">
+  <div class="wrap">
+    <div class="split">
+    <div>
+    <p class="eyebrow">{{owner_first}}'s Sniffari tips</p>
+    <h2 class="h2">A great day out doesn't cost much.</h2>
+    <p class="lede">Most of my day outs cost $6 to $10. Here's what makes them work.</p>
+    <div class="tips">
+      <div class="tip"><b>Let them make the calls</b><span>It's the dog's day out. Some dogs will want sniffys, some will want a nap in the car. It's all OK. Try to match their mood and interests.</span></div>
+      <div class="tip"><b>Pack light</b><span>Water, a bowl, poop bags, a few treats, and a towel for the car.</span></div>
+      <div class="tip"><b>Ask for the content creator</b><span>Get the shelter content creator's email for videos and pics.</span></div>
+      <div class="tip"><b>Follow their rules</b><span>Every shelter sets its own. Read theirs before you go, every time.</span></div>
+    </div>
+    </div>
+    <figure class="photo"><img src="{{base}}assets/photos/sniffari-day-out.jpg" width="720" height="900" alt="{{owner_first}} in the car on a day out, with a spotted dog resting his head on hers" loading="lazy"></figure>
+    </div>
+  </div>
+</section>
+
 <section style="padding-top:0" data-show-when-filled hidden>
   <div class="wrap">
     <p class="eyebrow">{{owner_first}}'s picks</p>
     <h2 class="h2">Dog-friendly places</h2>
     <p class="lede">Places I like to take a dog on a day out, and why I pick each one.</p>
     <ul class="places" data-places></ul>
+  </div>
+</section>
+
+<section id="programs" style="padding-top:0">
+  <div class="wrap">
+    <h2 class="h2">Shelter day-out programs around Hampton Roads</h2>
+    <p class="lede">Run by the shelters themselves. Sign up on their page, and follow their rules.</p>
+    <div class="sniff-filters" id="sniff-filters" role="group" aria-label="Filter programs">
+      <button aria-pressed="true" data-s="all">All programs</button>
+      <button aria-pressed="false" data-s="free">Free</button>
+      <button aria-pressed="false" data-s="half">Half-day option</button>
+      <button aria-pressed="false" data-s="kids">Kids welcome</button>
+      <button aria-pressed="false" data-s="first">Good for first-timers</button>
+      <button aria-pressed="false" data-s="sleepover">Sleepovers</button>
+    </div>
+    <p class="sr" id="sniff-count" aria-live="polite"></p>
+    <div class="slist" data-sniffari data-filters="#sniff-filters" data-live="#sniff-count" data-loading></div>
+  </div>
+</section>
+
+<section style="padding-top:0" data-show-when-filled hidden>
+  <div class="wrap">
+    <p class="eyebrow">Sleepovers</p>
+    <h2 class="h2">Some shelters let a dog stay the night.</h2>
+    <p class="lede">A sleepover is a night or a weekend in a real home. The dog gets a break from the kennel, and the shelter learns how they act in a house, which helps them find the right family.</p>
+    <div class="box callbox" data-sleepovers></div>
+    <p class="small" style="margin-top:12px">Each shelter sets its own rules for sleepovers, like age limits, other pets at home and how long a stay can be. Read theirs before you sign up.</p>
   </div>
 </section>
 

@@ -9,7 +9,8 @@
   const safe = u => { try { const x = new URL(u); return x.protocol === "https:" && !x.username && !x.password ? x.href : ""; } catch { return ""; } };
   // an https link as it is; a photo that came with the site, under the site's base path
   const src = (u, base = "/") => (/^assets\/photos\/[\w.-]+$/.test(u || "") ? base + u : safe(u));
-  const LAYOUTS = ["full", "banner", "left", "right", "small", "row"];
+  const LAYOUTS = ["full", "banner", "left", "right", "small", "row", "montage"];
+  const MANY = ["row", "montage"]; // looks that show all of a spot's photos, as tiles that open larger
   const pics = row => (Array.isArray(row.photos) ? row.photos : []).filter(p => p && src(p.url));
   const size = p => (p.w > 0 && p.h > 0 ? ` width="${Math.round(p.w)}" height="${Math.round(p.h)}"` : "");
 
@@ -43,11 +44,11 @@
   const shapeCSS = row => (["full", "small", "left", "right"].includes(row.layout) && RATIOS[row.shape] ? `aspect-ratio:${RATIOS[row.shape]};object-fit:cover;` : "");
   const img = (p, style, base) => `<img src="${esc(src(p.url, base))}" alt="${esc(p.alt || "")}"${size(p)}${style ? ` style="${esc(style)}"` : ""} loading="lazy" decoding="async">`;
 
-  // One spot's photo (or row of photos), or "" if there's nothing to show. A row's photos open larger when tapped.
+  // One spot's photo (or row or montage of photos), or "" if there's nothing to show. Their photos open larger when tapped.
   function figure(row, base) {
     const list = pics(row);
     if (!list.length || !LAYOUTS.includes(row.layout)) return "";
-    const inner = row.layout === "row"
+    const inner = MANY.includes(row.layout)
       ? `<ul>${list.map((p, i) => `<li><button type="button" data-pp-open="${i}">${img(p, frameCSS(p), base)}</button></li>`).join("")}</ul>`
       : img(list[0], shapeCSS(row) + frameCSS(list[0]), base);
     return `<figure class="pp pp-${row.layout}" data-pp="${esc(row.id)}">${inner}${row.caption ? `<figcaption>${esc(row.caption)}</figcaption>` : ""}</figure>`;
@@ -82,6 +83,6 @@
   // What's saved for a page, in short, so site.js can tell whether the built page already has it.
   const stamp = rows => rows.map(r => `${r.id}@${r.updated_at}`).sort().join(" ");
 
-  const api = { figure, swap, swapCSS, plan, stamp, safe, src, side, sideOpen, TEXT_OPEN, leadIn, frame, frameStyle, frameCSS, SHAPES };
+  const api = { MANY, figure, swap, swapCSS, plan, stamp, safe, src, side, sideOpen, TEXT_OPEN, leadIn, frame, frameStyle, frameCSS, SHAPES };
   if (typeof module === "object" && module.exports) module.exports = api; else window.PagePhotos = api;
 })();
