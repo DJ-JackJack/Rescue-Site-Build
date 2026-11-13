@@ -929,7 +929,7 @@ function setupFanartForm(form) {
   form.addEventListener("submit", async e => {
     e.preventDefault();
     const fd = new FormData(form);
-    const thanks = t("js.fanart.thanks", "Thank you! Your art reached {name}. If it goes up on this page, it'll be credited the way you asked.", { name: WHO });
+    const thanks = t("js.fanart.thanks", "Thank you! Your art reached {name}. If it's shared, here or in a video or post, it'll be credited the way you asked.", { name: WHO });
     if (fd.get("website")) { form.reset(); clearPreview(); return say(thanks); } // bot trap
     btn.disabled = true; say(t("js.form.sending", "Sending…"));
     try {

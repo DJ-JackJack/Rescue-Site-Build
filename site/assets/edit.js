@@ -1092,7 +1092,7 @@ async function showFanartReview(id) {
       ${link ? `<dt>Their art page</dt><dd><a href="${h(link)}" target="_blank" rel="noopener nofollow">${h(link.replace(/^https:\/\//, ""))}</a></dd>` : ""}
       <dt>Email</dt><dd>${h(s.email)}</dd>
     </dl>
-    <p class="small">When they sent it, they said they made it (or their child did), that it's OK to show it on this site with this credit, and that they're 13 or older or a parent or guardian.</p>
+    <p class="small">When they sent it, they said they made it (or their child did), that it's OK to show it on this site and in your videos and posts with this credit, and that they're 13 or older or a parent or guardian.</p>
     <div class="btns"><a class="btn ghost sm" href="mailto:${h(mail)}?subject=${encodeURIComponent("Your fan art for TheTerr0rTw!ns")}">Ask them a question</a></div>
     <form class="form eform" id="fa-review" novalidate>
       <h2 class="sub">Approve it</h2>
