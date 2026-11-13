@@ -53,7 +53,7 @@ The same page has three more parts, each hidden until it has a published row:
 
 ## Going live at a set time
 
-Every table with `published` (`articles`, `animals`, `goals`, `partners`, `events`, `collabs`, `sniffari_programs`, `foster_programs`, `adventures`, `videos`, `places`, `help_resources`, `page_photos`) also has `publish_at`. Empty means it shows as soon as it's published. A time in the future keeps it from visitors until then: each table has two extra "restrictive" read rules (`<table>_on_time` and `<table>_on_time_signed_in`, `20261029_scheduler_twin_squawk.sql`), so it appears at that exact minute with nothing to run, and editors always see it. Every other rule about who sees what stays as it was.
+Every table with `published` (`articles`, `animals`, `goals`, `partners`, `events`, `collabs`, `sniffari_programs`, `foster_programs`, `adventures`, `videos`, `places`, `help_resources`, `page_photos`, `supporters`, `fanart`) also has `publish_at`. Empty means it shows as soon as it's published. A time in the future keeps it from visitors until then: each table has two extra "restrictive" read rules (`<table>_on_time` and `<table>_on_time_signed_in`, `20261029_scheduler_twin_squawk.sql` and `20261113_supporters_fanart.sql`), so it appears at that exact minute with nothing to run, and editors always see it. Every other rule about who sees what stays as it was.
 
 Every 5 minutes, the pg_cron job `announce-scheduled` checks `live_due()` for anything that went live in the last 2 days and hasn't been announced. If there's something, it calls `notify-message` with `{"action": "live"}`. The function trusts nothing in the call: `live_claim()` (server only) notes each one in `went_live` and returns what to announce, so each one is announced once (and again if it's rescheduled). Animals only count once `people_ok` is ticked, and rescues once `feature_ok` is. The edit page's **Scheduled** screen lists what's coming up and what went live in the past week.
 
@@ -68,6 +68,12 @@ Add a row to `events` with the organization, `title`, `starts_on` (date), and op
 ## Messages
 
 Every form on the site lands in `messages`, tagged by topic (`partner`, `help`, `dog`, `sniffari`, `request`, `other`). `request` comes from the Requests and Questions page (/ask/): asking her to cover a topic, react to a video or answer a question, with what kind, a video link, how they would like an answer, and whether their name can be said in a video. Tick `handled` once it's dealt with. Only signed-in admins can read this table; the public site can't.
+
+## Supporters and fan art
+
+- `supporters`: the Supporters page. `name` (as they'd like it shown), `tier` (optional, shown under the name), `published`, `sort`. Only people who asked to be listed; nothing comes from Patreon on its own.
+- `fanart`: the Fan Art page. `photo_url` (in the photos bucket, `fanart/`), `photo_alt`, `credit` (the artist, as they asked), `credit_url` (optional, `https://` only; the site links it with `rel="nofollow ugc"`), `title`, `w` and `h`, `published`, `sort`.
+- `fanart_submissions`: art sent through the Fan Art page's form, waiting for a look. Only editors can read it. The image is in the private `fanart-inbox` bucket (`image_path`), with `w`, `h`, `title`, `credit`, `credit_url`, `note`, `email`. The only way in is the `submit-fanart` Edge Function (deployed with JWT checks off; it checks everything itself): it takes the art as a JPEG the sender's browser has already redrawn (so no GPS or camera data), checks the ticked boxes, allows 5 a day per email and 30 an hour overall (`fanart_room`, `fanart_add`), saves the image with the server's key, then the row. A new row makes the `fanart_notify` trigger ask `notify-message` to send the editors' phones "New fan art, from <credit>" (`fanart_claim` announces each once). Approving on the edit page redraws the art into the photos bucket, adds a `fanart` row, then deletes the file and the submission; declining deletes both. Submissions keep no history, so a declined piece and its sender's email are gone for good, as the Privacy page says. Migration: `20261113_supporters_fanart.sql`.
 
 ## Photos
 

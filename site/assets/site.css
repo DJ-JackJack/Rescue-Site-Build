@@ -437,6 +437,25 @@ dialog.adv{max-width:min(720px,calc(100vw - 24px))}
 .form label.tick{flex-direction:row;align-items:center;font-weight:700;gap:10px}
 .form label.tick input{min-height:0;width:20px;height:20px;accent-color:var(--royal);flex:none}
 .formcard{background:#fff;border-radius:var(--r);box-shadow:var(--shadow);padding:22px}
+.form label small{font-weight:600;font-size:.85rem;color:var(--ink2)}
+.form .ticks{display:grid;gap:10px}
+
+/* Supporters: a wall of names */
+.supporters{list-style:none;margin:0;padding:0;display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(min(100%,180px),1fr))}
+.supporters li{background:#fff;border-radius:16px;box-shadow:var(--shadow);padding:14px 16px;display:flex;flex-direction:column;gap:2px;position:relative}
+.supporters b{font-size:1.05rem;overflow-wrap:anywhere}
+.supporters small{color:var(--ink2);font-weight:700;font-size:.8rem;text-transform:uppercase;letter-spacing:.04em}
+
+/* Fan Art: the gallery (each piece whole, never cropped), and the form's preview */
+.fanart{list-style:none;margin:0;padding:0;columns:2 160px;column-gap:12px}
+@media (min-width:720px){.fanart{columns:3 220px;column-gap:16px}}
+.fanart li{break-inside:avoid;margin:0 0 14px;background:#fff;border-radius:16px;box-shadow:var(--shadow);overflow:hidden;position:relative}
+.fa-open{display:block;width:100%;padding:0;border:0;background:var(--wash);cursor:zoom-in}
+.fa-open img{display:block;width:100%;height:auto;border-radius:0}
+.fa-open:focus-visible{outline:3px solid var(--ocean);outline-offset:-3px}
+.fanart p{margin:0;padding:10px 12px 12px;display:flex;flex-direction:column;gap:2px;font-size:.92rem}
+.fanart p span{color:var(--ink2)}
+.fa-preview img{display:block;max-width:100%;max-height:260px;border-radius:12px;box-shadow:var(--shadow)}
 
 /* footer */
 footer{background:var(--midnight);color:#D9CFF7;padding:40px 0 calc(40px + env(safe-area-inset-bottom,0px));margin-top:20px}

@@ -177,7 +177,7 @@ async function tidyPhotos() {
   await walk("", 0);
   const used = new Set(), note = u => { u = u?.url ?? u; if (typeof u === "string" && u.startsWith(PHOTOS)) used.add(decodeURIComponent(u.slice(PHOTOS.length).split("?")[0])); };
   const [rows, many, deleted] = await Promise.all([
-    Promise.all(["animals", "goals", "collabs", "places", "videos", "articles"].map(t => api.list(t, "select=photo_url&photo_url=not.is.null"))),
+    Promise.all(["animals", "goals", "collabs", "places", "videos", "articles", "fanart"].map(t => api.list(t, "select=photo_url&photo_url=not.is.null"))),
     Promise.all(["adventures", "page_photos", "articles"].map(t => api.list(t, "select=photos"))),
     api.list("content_history", "select=data&op=eq.delete&restored_at=is.null"),
   ]);
@@ -683,6 +683,43 @@ const SECTIONS = {
       SHOW, SORT,
     ],
   },
+  fanart: {
+    table: "fanart", title: "Fan art", one: "piece of fan art", icon: "🖌️", canAdd: true,
+    intro: "The Fan Art page: art people have made, each credited the way the artist asked. Art sent through the page's form waits here until you approve it.",
+    query: "select=*&order=sort.asc,created_at.desc",
+    reorder: {},
+    // art sent through the form, waiting for a look, above what's on the page
+    load: () => api.list("fanart_submissions", "select=id,image_path,title,credit,created_at&order=created_at.asc"),
+    above: (rows, waiting) => fanartWaiting(waiting),
+    ready: () => inboxThumbs(),
+    listHeading: "On the Fan Art page",
+    titleOf: r => r.title || `By ${r.credit}`,
+    row: r => ({ title: r.title || "Untitled", emoji: "🖌️", photo: r.photo_url, sub: `By ${r.credit}`, flags: [!r.published && "Hidden"] }),
+    fields: [
+      { name: "photo_url", type: "photo", label: "The art", folder: "fanart", required: true },
+      { name: "photo_alt", type: "text", label: "What's in it", required: true, max: 300,
+        help: "A few words for people who can't see it, like “A drawing of Tyce running on the beach”." },
+      { name: "credit", type: "text", label: "Credit", required: true, max: 80,
+        help: "The artist, exactly as they asked to be credited. For kids, a first name or nickname only." },
+      { name: "credit_url", type: "url", label: "Link to the artist's page", help: "Optional. Where people can see more of their art.",
+        check: [/^https:\/\//, "Links need to start with https://"] },
+      { name: "title", type: "text", label: "Title", max: 120, help: "Optional. What the artist called it." },
+      SHOW, { ...SORT, help: "Lower numbers show first; the ↑ ↓ arrows on the list set this for you. Art with the same number shows newest first." },
+    ],
+  },
+  supporters: {
+    table: "supporters", title: "Supporters", one: "supporter", icon: "💜",
+    intro: "Patreon supporters on the Supporters page. Add someone only once they've said they'd like their name there, and the way they'd like it shown.",
+    query: "select=*&order=sort.asc,name.asc",
+    reorder: {},
+    titleOf: r => r.name,
+    row: r => ({ title: r.name, emoji: "💜", sub: r.tier || "", flags: [!r.published && "Hidden"] }),
+    fields: [
+      { name: "name", type: "text", label: "Name to show", required: true, max: 80, help: "Exactly as they'd like it, like a first name, a nickname or their Patreon name." },
+      { name: "tier", type: "text", label: "Tier", max: 40, help: "Optional. Their Patreon tier, if they'd like it shown." },
+      SHOW, { ...SORT, help: "Lower numbers show first; the ↑ ↓ arrows on the list set this for you. Names with the same number show A to Z." },
+    ],
+  },
   photos: {
     table: "page_photos", title: "Photos", one: "photo", icon: "🖼️",
     intro: "Pick a page to open it on the site with its photo buttons showing: “＋ Add a photo here” at every spot, and a button on each photo to change or hide it.",
@@ -756,6 +793,7 @@ async function route() {
     if (sec === "scheduled") return await showScheduled();
     if (sec === "settings") return await showSettings();
     if (sec === "montage") return await showMontage();
+    if (sec === "fanart-review") return await showFanartReview(id);
     if (!SECTIONS[sec]) return go("#/");
     return id ? await showForm(sec, id, params) : await showList(sec);
   } catch (e) {
@@ -803,7 +841,7 @@ function showNotEditor() {
 
 async function showHome() {
   const now = encodeURIComponent(new Date().toISOString());
-  const [msgs, animals, goals, progs, help, events, week, videos, places, collabs, fosters, advs, pics, posts, coming] = await Promise.all([
+  const [msgs, animals, goals, progs, help, events, week, videos, places, collabs, fosters, advs, pics, posts, coming, fanart, fanWaiting, supporters] = await Promise.all([
     api.list("messages", "select=id&handled=is.false"),
     api.list("animals", "select=id,name,status,published,checked_on"),
     api.list("goals", "select=id,title,status,published,figures_updated_at,bars:goal_bars(id)"),
@@ -819,10 +857,15 @@ async function showHome() {
     api.list("page_photos", "select=id,page,spot,layout,photos,published"),
     api.list("articles", "select=id"),
     Promise.all(Object.values(SECTIONS).map(S => api.list(S.table, `select=id&published=is.true&publish_at=gt.${now}`))),
+    api.list("fanart", "select=id"),
+    api.list("fanart_submissions", "select=id"),
+    api.list("supporters", "select=id"),
   ]);
   const soon = coming.flat().length;
   const todo = [];
   if (msgs.length) todo.push(`<li><b>${plural(msgs.length, "new message")}</b><div class="btns"><a class="btn royal sm" href="#/messages">Read ${msgs.length === 1 ? "it" : "them"}</a></div></li>`);
+  if (fanWaiting.length) todo.push(`<li><b>${plural(fanWaiting.length, "new piece", "new pieces")} of fan art</b><small>Sent through the Fan Art page. Nothing shows until you approve it.</small>
+    <div class="btns"><a class="btn royal sm" href="#/fanart">Look at ${fanWaiting.length === 1 ? "it" : "them"}</a></div></li>`);
   for (const a of animals.filter(a => a.status === "looking" && a.published && stale(a.checked_on, 21)).sort((x, y) => (x.checked_on || "").localeCompare(y.checked_on || ""))) {
     const d = daysAgo(a.checked_on);
     todo.push(`<li><b>${h(a.name)}: still available?</b><small>${d === null ? "Never checked." : d >= 28 ? `Hidden from the site until re-checked. Last checked ${h(nice(a.checked_on))}.` : `Last checked ${h(nice(a.checked_on))}. Hides itself after 4 weeks.`}</small>
@@ -859,6 +902,7 @@ async function showHome() {
     collabs: plural(collabs.length, "collaboration"), sniffari: plural(progs.length, "program"), fosters: plural(fosters.length, "program"), adventures: plural(advs.length, "day out"),
     videos: plural(videos.length, "video"), places: plural(places.length, "place"), photos: plural(pics.length, "photo"), help: plural(help.length, "listing"),
     visitors: week ? plural(week.days.reduce((a, d) => a + d[1], 0), "view") + " this week" : "",
+    fanart: fanWaiting.length ? `${fanWaiting.length} waiting` : plural(fanart.length, "piece"), supporters: plural(supporters.length, "name"),
   };
   badge(msgs.length);
   recheckSub();
@@ -877,6 +921,7 @@ const GROUPS = [
   ["Animals", "Happy Tales, the Story Spotlight and the Willow Woods horses", ["animals"]],
   ["Shelters and rescues", "The Rescues page, Shelter Goals and the Foster page", ["partners", "goals", "events", "collabs", "fosters"]],
   ["Rescues on Sniffari", "The Rescues on Sniffari page", ["montage", "sniffari", "adventures", "videos", "places"]],
+  ["Fans and supporters", "The Fan Art and Supporters pages", ["fanart", "supporters"]],
   ["Every page", "The words and photos on any page", ["text", "photos"]],
   ["Help pages", "Help keeping your pet, Caring for Yourself and Wildlife", ["help"]],
   ["Inbox and settings", "Behind the scenes", ["messages", "visitors", "deleted", "settings"]],
@@ -923,7 +968,7 @@ function rowHTML(S, key, r, move) {
 // row up or down within its group (S.reorder.group), which numbers the group's Order 10, 20, 30…
 async function showList(key) {
   const S = SECTIONS[key];
-  let rows = await api.list(S.table, S.query);
+  let [rows, extra] = await Promise.all([api.list(S.table, S.query), S.load ? S.load() : null]);
   if (S.order) rows = rows.sort(S.order);
   const sorts = S.sorts || (S.reorder ? [["site", "As on the site", (a, b) => (a.sort ?? 100) - (b.sort ?? 100)], ["az", "A–Z", (a, b) => String(S.titleOf(a)).localeCompare(String(S.titleOf(b)), "en", { sensitivity: "base", numeric: true })]] : null);
   const groupKey = r => S.reorder?.group?.(r) ?? "";
@@ -943,14 +988,14 @@ async function showList(key) {
     }).join("");
   };
   render(`<a class="back" href="#/">‹ Start</a>
-    <div class="lhead"><h1>${h(S.title)}</h1>${S.above ? "" : `<a class="btn royal" href="#/${key}/new">+ Add ${h(S.one)}</a>`}</div>
+    <div class="lhead"><h1>${h(S.title)}</h1>${S.above && !S.canAdd ? "" : `<a class="btn royal" href="#/${key}/new">+ Add ${h(S.one)}</a>`}</div>
     ${S.intro ? `<p class="lede">${h(S.intro)}</p>` : ""}
-    ${S.above ? S.above(rows) : ""}
+    ${S.above ? S.above(rows, extra) : ""}
     ${S.listHeading ? `<h2 class="sub">${h(S.listHeading)}</h2>` : ""}
     ${S.filters ? `<div class="fchips" role="group" aria-label="Show">${S.filters.map(([v, l]) => `<button type="button" data-filter="${h(v)}" aria-pressed="${v === filter}">${h(l)}</button>`).join("")}</div>` : ""}
     ${rows.length > 4 ? `<label class="sr" for="find">Search</label><input class="search" id="find" type="search" placeholder="Search ${h(S.title.toLowerCase())}" autocomplete="off">` : ""}
     ${sorts && rows.length > 1 ? `<div class="sortby" role="group" aria-label="Order"><span>Order:</span>${sorts.map(([v, l]) => `<button type="button" data-sort="${h(v)}" aria-pressed="${v === sort}">${h(l)}</button>`).join("")}</div>` : ""}
-    ${rows.length ? `<ul class="rows">${listHTML()}</ul>` : `<p class="allgood">${S.above ? "Nothing yet." : `Nothing here yet. Tap “Add ${h(S.one)}” to start.`}</p>`}
+    ${rows.length ? `<ul class="rows">${listHTML()}</ul>` : `<p class="allgood">${S.above && !S.canAdd ? "Nothing yet." : `Nothing here yet. Tap “Add ${h(S.one)}” to start.`}</p>`}
     <p class="small none" hidden>No matches.</p>`);
   const apply = () => {
     const term = ($("#find")?.value || "").trim().toLowerCase();
@@ -1004,6 +1049,93 @@ async function showList(key) {
   }));
   apply();
   showFrames(app);
+  S.ready?.(extra);
+}
+
+/* ---------- fan art sent through the Fan Art page ----------
+   It waits in fanart_submissions (the sender's details) and the private fanart-inbox bucket (the art) until it's
+   approved or declined here. Approving redraws the art into the site's photos, adds it to the Fan Art page with the
+   credit and description given here, then deletes the submission, its file and the sender's email. Declining deletes
+   them straight away. */
+const fanartWaiting = list => (!list?.length ? "" : `<h2 class="sub">Waiting for you <small>${list.length}</small></h2>
+  <ul class="todo fa-wait">${list.map(s => `<li><a class="fa-thumb" href="#/fanart-review/${h(s.id)}" aria-hidden="true" tabindex="-1"><img data-inbox="${h(s.image_path)}" alt=""></a>
+    <span><b>${h(s.title || "Untitled")}</b><small>From ${h(s.credit)} · ${h(when(s.created_at))}</small></span>
+    <div class="btns"><a class="btn royal sm" href="#/fanart-review/${h(s.id)}">Look at it</a></div></li>`).join("")}</ul>`);
+async function inboxArt(path) {
+  let r;
+  try { r = await fetch(`${API}/storage/v1/object/authenticated/fanart-inbox/${encodeURIComponent(path)}`, { headers: { apikey: KEY, Authorization: `Bearer ${await token()}` } }); }
+  catch { throw new Error("The art couldn't be loaded. Check your connection and try again."); }
+  if (r.status === 401) { keep(null); throw new SignedOut(); }
+  if (!r.ok) throw new Error("The art couldn't be loaded. It may have been deleted already.");
+  return r.blob();
+}
+const inboxThumbs = () => $$("img[data-inbox]", app).forEach(img => inboxArt(img.dataset.inbox).then(b => { img.src = URL.createObjectURL(b); }, () => {}));
+async function clearInbox(path) {
+  try { await storage("DELETE", "fanart-inbox", { prefixes: [path] }); }
+  catch (e) { if (e instanceof SignedOut) throw e; throw new Error("The art's file couldn't be deleted. Please try again."); }
+}
+async function showFanartReview(id) {
+  const [s] = await api.list("fanart_submissions", `select=*&id=eq.${encodeURIComponent(id || "")}`);
+  if (!s) {
+    render(`<a class="back" href="#/fanart">‹ Fan art</a><h1>Not found</h1><p class="note">That one wasn't found. It may have been approved or declined already.</p>`);
+    return;
+  }
+  const art = await inboxArt(s.image_path);
+  const fields = SECTIONS.fanart.fields.filter(f => ["photo_alt", "credit", "credit_url", "title"].includes(f.name));
+  const link = safeUrl(s.credit_url), mail = encodeURIComponent(s.email).replace(/%40/g, "@");
+  render(`<a class="back" href="#/fanart">‹ Fan art</a>
+    <h1>${h(s.title || "Fan art")}</h1>
+    <p class="small">From ${h(s.credit)}, sent ${h(when(s.created_at))}</p>
+    <figure class="fa-big"><img src="${h(URL.createObjectURL(art))}" alt="The art they sent"></figure>
+    <dl class="mdet">
+      ${s.note ? `<dt>Their note</dt><dd class="mbody">${h(s.note)}</dd>` : ""}
+      ${link ? `<dt>Their art page</dt><dd><a href="${h(link)}" target="_blank" rel="noopener nofollow">${h(link.replace(/^https:\/\//, ""))}</a></dd>` : ""}
+      <dt>Email</dt><dd>${h(s.email)}</dd>
+    </dl>
+    <p class="small">When they sent it, they said they made it (or their child did), that it's OK to show it on this site with this credit, and that they're 13 or older or a parent or guardian.</p>
+    <div class="btns"><a class="btn ghost sm" href="mailto:${h(mail)}?subject=${encodeURIComponent("Your fan art for TheTerr0rTw!ns")}">Ask them a question</a></div>
+    <form class="form eform" id="fa-review" novalidate>
+      <h2 class="sub">Approve it</h2>
+      <p class="small">It goes on the Fan Art page straight away, with the credit below. Check it's the way they asked, and that nothing in it shows a person or where someone lives.</p>
+      ${fields.map(f => fieldHTML(f, s[f.name], { vals: s })).join("")}
+      <div class="btns"><button class="btn royal" type="submit">Approve and show it</button><button class="btn ghost" type="button" data-act="decline">Decline</button></div>
+      <p class="formmsg" role="status" aria-live="polite"></p>
+    </form>`);
+  const form = $("#fa-review", app), out = $(".formmsg", form), btns = $$("button", form);
+  const busy = (on, text = "") => { btns.forEach(b => { b.disabled = on; }); out.textContent = text; };
+  form.addEventListener("submit", async e => {
+    e.preventDefault();
+    const v = readForm(form, fields), bad = validate(form, fields, v);
+    if (bad) { out.textContent = "Please fix the highlighted fields."; $("input,textarea", bad)?.focus(); return; }
+    busy(true, "Approving…");
+    let added = false;
+    try {
+      const { url, w, h: tall } = await upload(art, "fanart", v.credit); // redrawn again here, so only the picture goes public
+      await api.add("fanart", { ...v, photo_url: url, w, h: tall, published: true });
+      added = true;
+      await clearInbox(s.image_path);
+      await api.drop("fanart_submissions", s.id);
+      toast("Approved ✓ It's on the Fan Art page.");
+      go("#/fanart");
+    } catch (err) {
+      if (err instanceof SignedOut) return route();
+      busy(false, added ? `It's on the Fan Art page, but the copy they sent wasn't cleared out: ${err.message} Tap Decline to finish clearing it.` : err.message);
+      if (added) $("[type=submit]", form).disabled = true;
+    }
+  });
+  $('[data-act="decline"]', form).addEventListener("click", async () => {
+    if (!confirm("Decline this art?\n\nIt's deleted for good, along with the sender's email. (If you've just approved it, it stays on the Fan Art page.)")) return;
+    busy(true, "Deleting…");
+    try {
+      await clearInbox(s.image_path);
+      await api.drop("fanart_submissions", s.id);
+      toast("Declined, and deleted");
+      go("#/fanart");
+    } catch (err) {
+      if (err instanceof SignedOut) return route();
+      busy(false, err.message);
+    }
+  });
 }
 
 /* ---------- forms ---------- */
@@ -1778,7 +1910,7 @@ const KIND = {
   events: ["Event", r => r.title], collabs: ["Collaboration", r => r.title], partners: ["Rescue or shelter", r => r.name], sniffari_programs: ["Day-out program", r => r.program_name || r.shelter_name],
   foster_programs: ["Foster program", r => r.program_name || r.shelter_name], adventures: ["Day out", r => r.title],
   videos: ["Day-out video", r => r.title], places: ["Dog-friendly place", r => r.name], page_photos: ["Photo on a page", r => SECTIONS.photos.titleOf(r)],
-  help_resources: ["Help listing", r => r.name], articles: ["Twin Squawk post", r => r.title], messages: ["Message", r => (r.name ? `From ${r.name}` : `From ${r.email}`)],
+  help_resources: ["Help listing", r => r.name], articles: ["Twin Squawk post", r => r.title], fanart: ["Fan art", r => r.title || `By ${r.credit}`], supporters: ["Supporter", r => r.name], messages: ["Message", r => (r.name ? `From ${r.name}` : `From ${r.email}`)],
 };
 async function showDeleted() {
   const rows = await api.list("content_history", "select=id,at,tx,tbl,row_key,data,by_email&op=eq.delete&restored_at=is.null&order=at.desc&limit=300");
