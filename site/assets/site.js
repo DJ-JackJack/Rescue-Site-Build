@@ -857,6 +857,107 @@ document.addEventListener("click", async e => {
   try { await navigator.clipboard.writeText(url); share.textContent = t("js.squawk.copied", "Link copied ✓"); } catch { share.textContent = url; }
 });
 
+/* ---------- Supporters: Patreon supporters who asked to have their name on the page ---------- */
+async function renderSupporters(el) {
+  let rows = [];
+  try { rows = await q("supporters", "select=id,name,tier&order=sort.asc,name.asc"); } catch { return; }
+  if (!rows.length) return;
+  await wordingReady;
+  el.innerHTML = rows.map(r => `<li${ed("supporters", r.id, r.name)}><b>${h(r.name)}</b>${r.tier ? `<small>${h(r.tier)}</small>` : ""}</li>`).join("");
+  el.hidden = false;
+  $$("[data-supporters-empty]").forEach(x => { x.hidden = true; });
+}
+
+/* ---------- Fan Art: the art Taea has approved, each credited as its artist asked, and the form for sending art ---------- */
+async function renderFanart(el) {
+  let rows = [];
+  try { rows = (await q("fanart", "select=id,title,credit,credit_url,photo_url,photo_alt,w,h&order=sort.asc,created_at.desc")).filter(r => photoUrl(r.photo_url)); } catch { return; }
+  if (!rows.length) return;
+  await wordingReady;
+  const altOf = r => r.photo_alt || r.title || t("js.fanart.alt", "Fan art by {name}", { name: r.credit });
+  el.innerHTML = rows.map((r, i) => {
+    const link = safeUrl(r.credit_url), who = link ? `<a href="${h(link)}" target="_blank" rel="noopener nofollow ugc">${h(r.credit)}</a>` : h(r.credit);
+    const size = r.w > 0 && r.h > 0 ? ` width="${h(r.w)}" height="${h(r.h)}"` : "";
+    return `<li class="fa"${ed("fanart", r.id, r.title || r.credit)}><button type="button" class="fa-open" data-fa="${i}"><img src="${h(photoUrl(r.photo_url))}" alt="${h(altOf(r))}"${size} loading="lazy"></button>
+      <p>${r.title ? `<b>${h(r.title)}</b>` : ""}<span>${h(t("js.fanart.by", "by {name}")).replace("{name}", who)}</span></p></li>`;
+  }).join("");
+  el.hidden = false;
+  $$("[data-fanart-empty]").forEach(x => { x.hidden = true; });
+  el.addEventListener("click", e => {
+    const b = e.target.closest(".fa-open");
+    if (!b || document.body.classList.contains("penmode")) return;
+    openPhotos(rows.map(r => ({ src: photoUrl(r.photo_url), alt: altOf(r) })), Number(b.dataset.fa));
+  });
+}
+
+// The art is redrawn here before it's sent: a JPEG of at most 2000 pixels a side, which carries only the picture,
+// never the location, camera or date hidden in a photo. Transparent parts come out white.
+async function shrinkArt(file) {
+  if (file.type && !file.type.startsWith("image/")) throw new Error(t("js.fanart.not-image", "That file isn't a picture. Try a photo or a scan of your art."));
+  const url = URL.createObjectURL(file);
+  try {
+    const img = new Image();
+    img.src = url;
+    try { await img.decode(); } catch { throw new Error(t("js.fanart.cant-open", "That picture can't be opened here. Try a JPEG or PNG, or a screenshot of it.")); }
+    const MAX = 2000, s = Math.min(1, MAX / Math.max(img.naturalWidth, img.naturalHeight));
+    const c = document.createElement("canvas");
+    c.width = Math.max(1, Math.round(img.naturalWidth * s));
+    c.height = Math.max(1, Math.round(img.naturalHeight * s));
+    const g = c.getContext("2d");
+    g.fillStyle = "#fff";
+    g.fillRect(0, 0, c.width, c.height);
+    g.drawImage(img, 0, 0, c.width, c.height);
+    const blob = await new Promise((ok, no) => c.toBlob(b => (b ? ok(b) : no(new Error(t("js.fanart.cant-open", "That picture can't be opened here. Try a JPEG or PNG, or a screenshot of it.")))), "image/jpeg", 0.86));
+    return { blob, w: c.width, h: c.height };
+  } finally { URL.revokeObjectURL(url); }
+}
+function setupFanartForm(form) {
+  const file = form.elements.image, prev = $(".fa-preview", form), msg = $(".formmsg", form), btn = $("button[type=submit]", form);
+  let ready = null, shown = "";
+  const say = (text, bad) => { msg.className = "formmsg" + (bad ? " is-err" : text ? " is-ok" : ""); msg.textContent = text; };
+  const clearPreview = () => { prev.hidden = true; if (shown) URL.revokeObjectURL(shown); shown = ""; $("img", prev).removeAttribute("src"); };
+  const prepare = async () => {
+    ready = null; clearPreview();
+    const f = file.files[0];
+    if (!f) return null;
+    ready = await shrinkArt(f);
+    $("img", prev).src = shown = URL.createObjectURL(ready.blob);
+    prev.hidden = false;
+    return ready;
+  };
+  file.addEventListener("change", () => { say(""); prepare().catch(err => { say(err.message, true); file.value = ""; }); });
+  form.addEventListener("submit", async e => {
+    e.preventDefault();
+    const fd = new FormData(form);
+    const thanks = t("js.fanart.thanks", "Thank you! Your art reached {name}. If it's shared, here or in a video or post, it'll be credited the way you asked.", { name: WHO });
+    if (fd.get("website")) { form.reset(); clearPreview(); return say(thanks); } // bot trap
+    btn.disabled = true; say(t("js.form.sending", "Sending…"));
+    try {
+      let art = ready;
+      try { art ||= await prepare(); } catch (err) { throw Object.assign(new Error("image"), { shown: err.message }); }
+      if (!art) throw new Error("pick");
+      const out = new FormData();
+      for (const k of ["credit", "title", "link", "note", "email", "made", "ok", "age", "website"]) out.append(k, String(fd.get(k) || ""));
+      out.append("w", String(art.w)); out.append("h", String(art.h));
+      out.append("image", art.blob, "art.jpg");
+      let r;
+      try { r = await fetch(`${S.supabaseUrl}/functions/v1/submit-fanart`, { method: "POST", body: out }); } catch { throw new Error("fail"); }
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "fail");
+      form.reset(); ready = null; clearPreview();
+      say(thanks);
+    } catch (err) {
+      say(err.shown || ({
+        pick: t("js.fanart.pick", "Pick your art first."),
+        slow: t("js.fanart.slow", "That's a lot of art from this email today. Please try again tomorrow."),
+        email: t("js.form.email", "That email address doesn't look right. Please check it."),
+        link: t("js.fanart.link", "That link doesn't look right. It should start with https://"),
+        big: t("js.fanart.big", "That picture is too big to send. Try a smaller photo of it."),
+        image: t("js.fanart.cant-open", "That picture can't be opened here. Try a JPEG or PNG, or a screenshot of it."),
+      })[err.message] || t("js.fanart.failed", "Couldn't send right now. Please try again, or send it to {name} on TikTok or Instagram.", { name: WHO }), true);
+    } finally { btn.disabled = false; }
+  });
+}
+
 /* ---------- visitor counts ---------- */
 // One count per page view, kept in the site's own database (count_view): just the page, the day and where
 // the visit came from (TikTok, Google, ...). No cookies, and nothing about the visitor is stored or sent.
@@ -1055,11 +1156,12 @@ document.addEventListener("click", e => {
    showing, the button says Done; they stay on when coming back from the edit page. */
 const EDIT_LISTS = { squawk: "Twin Squawk posts", animals: "Animals", goals: "Shelter goals", partners: "Rescues and shelters", events: "Events",
   collabs: "Working together", fosters: "Foster programs", sniffari: "Sniffari programs", adventures: "Our day outs", videos: "Day-out videos",
-  places: "Dog-friendly places", help: "Help listings" };
+  places: "Dog-friendly places", help: "Help listings", supporters: "Supporters", fanart: "Fan art" };
 // the lists each page shows, so the menu offers them even while the page has none yet
 const PAGE_LISTS = { home: ["animals", "goals"], animals: ["animals"], stories: ["animals"], "willow-woods": ["animals", "goals", "events", "collabs"],
   rescues: ["partners", "animals", "events", "collabs"], "shelter-goals": ["goals"], sniffari: ["sniffari", "adventures", "videos", "places"],
-  foster: ["fosters"], help: ["help"], "care-for-yourself": ["help"], wildlife: ["help"], "twin-squawk": ["squawk"] };
+  foster: ["fosters"], help: ["help"], "care-for-yourself": ["help"], wildlife: ["help"], "twin-squawk": ["squawk"],
+  supporters: ["supporters"], "fan-art": ["fanart"] };
 let editor = false;
 try { editor = !!localStorage.getItem("tt-editor-session"); } catch {}
 if (editor && S.scope) {
@@ -1188,5 +1290,8 @@ $$("[data-videos]").forEach(renderVideos);
 $$("[data-places]").forEach(renderPlaces);
 $$("[data-adventures]").forEach(renderAdventures);
 $$("[data-articles]").forEach(renderArticles);
+$$("[data-supporters]").forEach(renderSupporters);
+$$("[data-fanart]").forEach(renderFanart);
+$$("form[data-fanart-form]").forEach(setupFanartForm);
 countView();
 })();

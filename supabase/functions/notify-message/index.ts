@@ -4,6 +4,8 @@
 //   each one once, so an extra or forged call can't repeat or invent anything.
 // - The edit page calls it for the public key ({"action":"key"}) and, signed in, to send a test
 //   ({"action":"test","endpoint":...}).
+// - When someone sends fan art through the Fan Art page, the database's fanart_notify trigger calls it with
+//   {"action":"fanart"}. It asks the database (fanart_claim) which pieces haven't been announced, and announces each once.
 // - Every 5 minutes, if something scheduled has gone live, the database's announce-scheduled job calls it with
 //   {"action":"live"}. Again it trusts nothing in the call: it asks the database (live_claim) what has gone live and
 //   not been announced yet, and announces each one once.
@@ -76,6 +78,18 @@ async function announceNew() {
   return { sent: await deliver(subs, { ...data, count: unhandled, url: "./#/messages" }), messages: messages.length };
 }
 
+// Fan art sent through the Fan Art page, waiting for a look. It says who it's from (the credit they asked for), never more.
+async function announceFanart() {
+  const { items = [] } = (await db("rpc/fanart_claim", { method: "POST", body: "{}" })) || {};
+  if (!items.length) return { sent: 0, items: 0 };
+  const from = (i: { credit?: string }) => `From ${short(String(i.credit || "someone"), 60)}`;
+  const data = items.length === 1
+    ? { title: `${BRAND} New fan art`, body: from(items[0]) }
+    : { title: `${BRAND} ${items.length} new pieces of fan art`, body: `Latest: ${from(items[items.length - 1])}` };
+  const subs: Sub[] = await db("push_subscriptions?select=endpoint,p256dh,auth");
+  return { sent: await deliver(subs, { ...data, url: "./#/fanart" }, "fanart"), items: items.length };
+}
+
 // Things that were scheduled and have now gone live on the site.
 async function announceLive() {
   const { items = [] } = (await db("rpc/live_claim", { method: "POST", body: "{}" })) || {};
@@ -107,6 +121,7 @@ Deno.serve(async req => {
     if (body.action === "key") return reply(200, { key: (await vapid()).publicKey });
     if (body.action === "test") return await sendTest(req, String(body.endpoint || ""));
     if (body.action === "live") return reply(200, await announceLive());
+    if (body.action === "fanart") return reply(200, await announceFanart());
     return reply(200, await announceNew());
   } catch (e) {
     console.error(String(e));

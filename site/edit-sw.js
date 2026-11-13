@@ -1,7 +1,8 @@
 /* The site editor's notifications (served as /edit/sw.js, so it only looks after the edit page).
    Shows a notification when the notify-message function sends one (with the paw in the status bar, where
    Android shows a small one-colour icon), puts the number of new messages on the app icon where the phone
-   supports it, and opens Messages (or Scheduled, for something that went live) when the notification is tapped.
+   supports it, and opens Messages (or Scheduled, for something that went live, or Fan art, for new art) when the
+   notification is tapped.
    It doesn't cache pages or touch anything else. */
 const ICON = "{{asset:icon-192.png}}", BADGE = "{{asset:badge-96.png}}";
 // A new version takes over straight away instead of waiting for every editor tab to close: it keeps no
@@ -11,8 +12,8 @@ self.addEventListener("activate", e => e.waitUntil(self.clients.claim()));
 self.addEventListener("push", e => {
   let d = {};
   try { d = e.data ? e.data.json() : {}; } catch {}
-  // a newer notification replaces the last one of its kind: messages, and things going live, each have their own
-  const url = d.url || "./#/messages", tag = url.endsWith("#/scheduled") ? "live" : "messages";
+  // a newer notification replaces the last one of its kind: messages, things going live and fan art each have their own
+  const url = d.url || "./#/messages", tag = url.endsWith("#/scheduled") ? "live" : url.endsWith("#/fanart") ? "fanart" : "messages";
   const shown = self.registration.showNotification(d.title || "TheTerr0rTw!ns · New message", {
     body: d.body || "", icon: ICON, badge: BADGE, tag, renotify: true, data: { url },
   });

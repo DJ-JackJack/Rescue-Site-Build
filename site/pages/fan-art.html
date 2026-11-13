@@ -1,0 +1,45 @@
+<!--{"title":"Fan Art","description":"Art people have made of the flock and the rescue animals, and how to send yours to {{owner_first}}.","nav":"fanart","path":"fan-art/"}-->
+<div class="phead">
+  <div class="wrap">
+    <p class="eyebrow">Fan art</p>
+    <h1>Art from the flock.</h1>
+    <p class="lede">Drawings, paintings and crafts people have made of the animals. Made something? Send it in below.</p>
+    <div class="btns" style="margin-top:18px"><a class="btn royal" href="#send">Send your art</a></div>
+  </div>
+</div>
+
+<section>
+  <div class="wrap">
+    <ul class="fanart" data-fanart hidden></ul>
+    <p class="lede" data-fanart-empty>No fan art up yet. Yours could be the first.</p>
+  </div>
+</section>
+
+<section style="padding-top:0" id="send">
+  <div class="wrap">
+    <div class="formcard">
+      <h2 class="h2" style="font-size:1.5rem">Send your art</h2>
+      <p class="lede" style="margin-bottom:16px">I look at everything that comes in. If I share it, here or in my videos and posts, it's credited the way you ask.</p>
+      <form class="form" method="post" data-fanart-form>
+        <label>Your art<input name="image" type="file" accept="image/*" required></label>
+        <div class="fa-preview" hidden><img alt="Your art, ready to send"></div>
+        <label>Credit me as<input name="credit" required maxlength="80" autocomplete="nickname"><small>A first name, nickname or handle. For kids, a first name or nickname only, please.</small></label>
+        <label>What's it called? (optional)<input name="title" maxlength="120"></label>
+        <label>Where people can see more of your art (optional)<input name="link" type="url" inputmode="url" placeholder="https://" maxlength="500"></label>
+        <label>Anything you'd like to tell me? (optional)<textarea name="note" rows="3" maxlength="1000"></textarea></label>
+        <label>Your email<input name="email" type="email" autocomplete="email" required maxlength="200"><small>Only used if I have a question about your art, and deleted once I've looked at it.</small></label>
+        <fieldset><legend>Before you send</legend>
+          <div class="ticks">
+            <label class="tick"><input type="checkbox" name="made" value="yes" required> I made this, or my child did.</label>
+            <label class="tick"><input type="checkbox" name="ok" value="yes" required> It's OK to show it on this site and in {{owner_first}}'s videos and posts, credited as above.</label>
+            <label class="tick"><input type="checkbox" name="age" value="yes" required> I'm 13 or older, or I'm a parent or guardian sending this for my child.</label>
+          </div>
+        </fieldset>
+        <label class="sr" aria-hidden="true">Leave this empty<input name="website" tabindex="-1" autocomplete="off"></label>
+        <button class="btn royal" type="submit">Send my art</button>
+        <p class="formmsg" role="status" aria-live="polite"></p>
+      </form>
+      <p class="small" style="margin-top:14px">Please don't send photos of people, or anything that shows where someone lives. Your art is shrunk, and hidden data like location is removed, before it's sent. More on the <a href="{{base}}privacy/">Privacy</a> page.</p>
+    </div>
+  </div>
+</section>
