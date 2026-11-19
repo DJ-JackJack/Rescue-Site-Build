@@ -19,7 +19,12 @@ The website for TheTerr0rTw!ns (tae): rescue features, shelter goals, dog day ou
 - **Message notifications:** editors can turn on phone notifications for new messages from the edit page. A database trigger calls the Edge Function in `supabase/functions/notify-message/`, which sends an encrypted Web Push to each signed-up device. New fan art sends one too.
 - **Fan art:** the Fan Art page's form goes to the Edge Function in `supabase/functions/submit-fanart/`, which keeps the art privately until an editor approves or declines it on the edit page. See `docs/updating-content.md`.
 - **The Alliance games:** Go on Green, Baby Steps, Matching and the level quizzes, on the Animal Guardian Alliance page (`site/assets/games.js`). Their content is edited on the edit page; players' progress stays in their own browser. See `docs/updating-content.md`.
-- **Tests:** `tests/games.test.mjs` plays the games in Chromium against a fake Supabase (how to run it is at the top of the file); `tests/serve.mjs` serves the built site for it.
+- **Tests:** `node tests/run-all.mjs` runs them all (about 4 minutes; needs Node and Playwright's Chromium). They open the built site in Chromium against a stand-in for Supabase (`tests/fake-supabase.mjs`, with made-up data and the same "who can see what" rules), so nothing touches the real database:
+  - `build.test.mjs`: what the build bakes in (saved wording, photos on pages, each Twin Squawk post's own page and link preview, the sitemap, preview mode). Run it first: it leaves `_site` built the way the others need.
+  - `pages.test.mjs`: every page loads on a phone, with no errors, and fits the screen.
+  - `site.test.mjs`: the live parts of each page (who's shown and who must not be, the numbers, links), the forms, the fan art form, wording, visitor counts.
+  - `edit.test.mjs`: the edit page: signing in and out, the start screen, lists and forms, photos (shrunk, location removed, framed), messages, wording, scheduling, fan art, recently deleted, visitors.
+  - `games.test.mjs`: plays the Alliance games.
 - **Twin Squawk posts** each get a page of their own when the site is built, so a shared link previews that post. `.github/workflows/new-posts.yml` rebuilds the site within about 15 minutes of a post going live or changing. See `docs/updating-content.md`.
 - **Scheduling:** anything with "Show on the site" can be given a time to go live (`publish_at`). The database keeps it from visitors until that minute, and a job every 5 minutes asks `notify-message` to tell the editors' phones once it's live. See `docs/updating-content.md`.
 - **Visitor counts:** the site counts page views and where visits come from in its own database, with no cookies. Editors see them on the edit page.
