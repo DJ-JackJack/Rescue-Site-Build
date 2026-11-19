@@ -16,7 +16,7 @@ const VOID = new Set("area base br col embed hr img input link meta source track
 const RAW = new Set(["script", "style", "textarea", "title"]);
 export const SKIP_TAGS = new Set(["head", "svg", "script", "style", "textarea", "title", "template"]);
 // attributes or ids whose content site.js writes itself
-export const SKIP_ATTR = /\sdata-(?:text|stat|goals|wall|rescues|horses|events|sniffari|videos|places|spotlight|counts|collabs|partner-links|sleepovers|fosters|foster-free|adventures|articles)\b|\saria-hidden="true"|\sclass="formmsg\b|\sid="(?:wall-count|sniff-count|jname|jsteps|jchip|jpic|jstory|jnotes|hwsvg|apic|aname|ameta|abody|alight)"/;
+export const SKIP_ATTR = /\sdata-(?:text|stat|goals|wall|rescues|horses|events|sniffari|videos|places|spotlight|counts|collabs|partner-links|sleepovers|fosters|foster-free|adventures|articles|games)\b|\saria-hidden="true"|\sclass="formmsg\b|\sid="(?:wall-count|sniff-count|jname|jsteps|jchip|jpic|jstory|jnotes|hwsvg|apic|aname|ameta|abody|alight)"/;
 const INLINE = new Set("a b strong em i u span small mark q cite abbr time sub sup".split(" "));
 // elements that hold a sentence (rather than a section of the page)
 const SENTENCE = new Set("p h1 h2 h3 h4 li dt dd label button a small span b strong em i figcaption summary legend blockquote td th q".split(" "));
@@ -148,14 +148,14 @@ export const blockHTML = (s, inline) => inline
   : s.trim().split(/\n\s*\n/).map(b => b.startsWith("## ") ? `<h2 class="h2">${esc(b.slice(3).trim())}</h2>` : `<p>${esc(b.trim()).replace(/\n/g, "<br>")}</p>`).join("");
 
 // The phrases site.js writes itself, from its t("js.key", "Default words {name}") calls.
-export function scriptPhrases(src) {
+export function scriptPhrases(src, file = "site.js") {
   const calls = [...src.matchAll(/\bt\(\s*"(js\.[a-z0-9_.-]+)",\s*"((?:[^"\\]|\\.)*)"/g)];
   const count = (src.match(/\bt\(\s*"js\./g) || []).length;
-  if (calls.length !== count) throw new Error(`site.js: ${count - calls.length} t("js...") call(s) don't follow the t("js.key", "text") form`);
+  if (calls.length !== count) throw new Error(`${file}: ${count - calls.length} t("js...") call(s) don't follow the t("js.key", "text") form`);
   const out = new Map();
   for (const [, key, raw] of calls) {
     const text = JSON.parse(`"${raw}"`);
-    if (out.has(key) && out.get(key) !== text) throw new Error(`site.js: t("${key}") has two different texts`);
+    if (out.has(key) && out.get(key) !== text) throw new Error(`${file}: t("${key}") has two different texts`);
     out.set(key, text);
   }
   return out;

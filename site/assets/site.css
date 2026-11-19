@@ -660,3 +660,111 @@ h2.eyebrow{font-family:var(--f-body);line-height:1.55}
 .hang>.ppfix{position:absolute;top:-4px;left:50%;transform:translateX(-50%);z-index:3;white-space:nowrap;font-size:.72rem;padding:5px 9px}
 .ppghost{opacity:.45}
 @media print{.editfab,.editfabs,.editpen{display:none}}
+
+/* The Animal Guardian Alliance games (games.js): who's playing, the game cards, and the full-screen game window.
+   Soft blue and purple, big buttons for small fingers, nothing that flashes or rushes. */
+.games{margin-top:18px}
+.glabel{font-weight:800;margin:0 0 8px}
+.gpetrow{display:flex;flex-wrap:wrap;gap:8px}
+.gpet{font:inherit;font-weight:800;font-size:.9rem;display:flex;flex-direction:column;align-items:center;gap:2px;min-width:78px;padding:10px 8px;border-radius:16px;border:2px solid var(--lavender);background:#fff;color:var(--ink);cursor:pointer}
+.gpet span{font-size:1.9rem;line-height:1.1}
+.gpet.on{border-color:var(--royal);background:var(--wash);box-shadow:0 0 0 3px rgba(96,66,156,.18)}
+.gpet.add{border-style:dashed;color:var(--royal)}
+.gpets{margin-bottom:16px}
+.gpets h3{margin:0}
+.gcardsl{list-style:none;margin:18px 0 0;padding:0;display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(min(100%,220px),1fr))}
+.gcardl{background:linear-gradient(160deg,#EEF4FF,#F3EAFF);border-radius:var(--r);box-shadow:var(--shadow);padding:18px;display:flex;flex-direction:column;gap:6px}
+.gcardl h3{margin:0;font-size:1.25rem}
+.gcardl p{margin:0;color:var(--ink2)}
+.gcardl .btn,.gsoon{margin-top:auto;align-self:flex-start}
+.gsoon{font-weight:800;color:var(--royal);background:#fff;border-radius:999px;padding:8px 14px}
+.gic{font-size:2rem;line-height:1}
+.gstars span{color:#CFC6E3;font-size:1.2rem;margin-right:2px}
+.gstars span.on{color:#F2B705}
+.ggrown{margin-top:18px;background:#fff;border-radius:16px;padding:12px 16px;box-shadow:var(--shadow)}
+.ggrown summary{font-weight:800;cursor:pointer}
+.gcode{display:flex;gap:8px;margin:6px 0 10px}
+.gcode input{flex:1;min-width:0;font:inherit;font-size:.85rem;border-radius:12px;border:1.5px solid var(--midviolet);padding:8px 10px}
+.gbox{width:100%;max-width:none;height:100%;max-height:none;margin:0;padding:0;border:0;background:linear-gradient(165deg,#E3EEFF 0%,#EDE3FF 55%,#F7E6FB 100%);color:var(--ink);overflow:hidden}
+.gbox[open]{display:flex;flex-direction:column}
+.gbox::backdrop{background:rgba(25,19,51,.5)}
+.ghead{display:flex;align-items:center;gap:8px;padding:10px max(12px,env(safe-area-inset-left,0px));background:rgba(255,255,255,.7);border-bottom:1px solid rgba(96,66,156,.15)}
+.ghead h2{margin:0;font-size:1.15rem;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gwho{font-size:1.6rem}
+.gscore{font-weight:800;white-space:nowrap}
+.gicon{font:inherit;font-size:1.2rem;width:44px;height:44px;border-radius:50%;border:0;background:#fff;box-shadow:var(--shadow);cursor:pointer;flex:none}
+.gbody{flex:1;overflow:auto;padding:16px max(16px,env(safe-area-inset-left,0px)) calc(24px + env(safe-area-inset-bottom,0px))}
+.gbody>*{max-width:760px;margin-left:auto;margin-right:auto}
+.gwait{text-align:center;margin-top:40px;font-weight:700}
+.glayer{position:absolute;inset:0;background:rgba(25,19,51,.42);display:flex;align-items:center;justify-content:center;padding:16px;z-index:2}
+.glayer[hidden]{display:none}
+.gpop{background:#fff;border-radius:var(--r);box-shadow:var(--shadow);padding:20px;width:min(100%,520px);max-height:100%;overflow:auto;text-align:center}
+.gpop h3,.gq{margin:4px 0 8px;font-size:1.25rem}
+.gq2{font-weight:700;margin:8px 0}
+.gkicker{margin:0;font-weight:800;text-transform:uppercase;letter-spacing:.06em;font-size:.78rem;color:var(--royal)}
+.gread{font:inherit;font-weight:700;font-size:.9rem;border:0;background:var(--wash);color:var(--ink);border-radius:999px;padding:8px 14px;cursor:pointer;margin:4px 0}
+.gchoices{display:flex;flex-direction:column;gap:8px;margin-top:10px;text-align:left}
+.gchoices.tf{flex-direction:row}
+.gchoices.tf .gchoice{flex:1;text-align:center}
+.gchoice{font:inherit;font-weight:700;font-size:1rem;padding:14px 16px;border-radius:16px;border:2px solid var(--lavender);background:#fff;color:var(--ink);cursor:pointer;min-height:52px}
+.gchoice b{color:var(--royal);margin-right:4px}
+.gchoice.right{border-color:#2E9E5B;background:#E4F7EC}
+.gchoice.notthis{opacity:.55;text-decoration:line-through}
+.gfeed{min-height:1.4em;margin:12px 0 0;font-weight:700;color:var(--ink2)}
+.gbtns{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:12px}
+.gbtns.col{flex-direction:column;align-items:stretch}
+.gstep{text-align:center;color:var(--ink2);font-size:.88rem;margin-top:14px}
+.gtip{text-align:center;color:var(--ink2);margin:0 0 12px}
+.gart{display:inline-block;max-width:100%}
+img.gart{object-fit:contain}
+.gemoji{font-size:1.8rem;line-height:1}
+.gbigart{font-size:5rem;max-height:160px}
+.gpop .gbigart{display:block;margin:0 auto 6px}
+.gpop .m-red{filter:saturate(.6);opacity:.85}
+/* Go on Green: the situation on the left, the three lights on the right */
+.gog{display:grid;grid-template-columns:1.2fr 1fr;gap:14px;align-items:start}
+.gscene{background:#fff;border-radius:var(--r);box-shadow:var(--shadow);padding:16px;text-align:center;position:relative}
+.gsit{font-weight:800;font-size:1.05rem;margin:8px 0}
+.gbone{position:absolute;top:8px;right:8px;border:0;background:#FFF6D6;border-radius:50%;width:48px;height:48px;cursor:pointer;box-shadow:var(--shadow);animation:gwiggle 1.6s ease-in-out infinite}
+.gbone .gemoji{font-size:1.5rem}
+@keyframes gwiggle{0%,100%{transform:rotate(-8deg)}50%{transform:rotate(8deg)}}
+.glights{display:flex;flex-direction:column;gap:10px}
+.glight{font:inherit;font-weight:800;font-size:1.05rem;display:flex;align-items:center;gap:10px;padding:14px;border-radius:18px;border:2px solid transparent;background:#fff;cursor:pointer;min-height:60px;box-shadow:var(--shadow);color:var(--ink)}
+.glight span{font-size:1.7rem}
+.glight.l-green{border-color:#7BCB97}.glight.l-yellow{border-color:#EBCB62}.glight.l-red{border-color:#E59A9A}
+.glight.right{background:#E4F7EC;border-color:#2E9E5B}
+.glight.notthis{opacity:.5}
+.gog .gfeed,.gog .gbtns,.gog .gstep{grid-column:1/-1}
+@media (max-width:420px){.gog{grid-template-columns:1fr 1fr;gap:10px}.gbigart{font-size:3.6rem}.glight{font-size:.92rem;padding:10px 8px;gap:6px}.glight span{font-size:1.4rem}}
+/* Baby Steps: the board */
+.ggrid{display:grid;grid-template-columns:repeat(var(--cols),1fr);gap:4px;max-width:420px;margin:0 auto}
+.gcell{aspect-ratio:1;border:0;border-radius:10px;background:rgba(255,255,255,.65);display:flex;align-items:center;justify-content:center;padding:2px;font:inherit;cursor:default;min-width:0}
+.gcell .gemoji{font-size:clamp(1.1rem,6vw,1.8rem)}
+.gcell img.gart{width:100%;height:100%}
+.gcell.step{background:#fff;box-shadow:0 0 0 2px var(--peri) inset;cursor:pointer}
+.gcell.me{background:var(--lavender)}
+.gtoken{font-size:clamp(1.3rem,7vw,2rem)}
+.gcell.ani{cursor:pointer}
+.gcell.m-red{box-shadow:0 0 0 3px #E59A9A inset}
+.gdice{font-size:4rem;margin:10px 0;animation:groll .3s linear infinite}
+@keyframes groll{to{transform:rotate(360deg)}}
+/* Matching: the cards */
+.gcards{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;max-width:520px;margin:0 auto}
+@media (min-width:600px){.gcards{grid-template-columns:repeat(4,1fr)}}
+.gflip{aspect-ratio:1;border:0;padding:0;border-radius:14px;cursor:pointer;position:relative;overflow:hidden;background:linear-gradient(135deg,#9BB8F8,#9A6ACB);box-shadow:var(--shadow)}
+.gback{font-size:2rem;color:#fff;display:flex;align-items:center;justify-content:center;height:100%}
+.gface{position:absolute;inset:0;display:none}
+.gface img{width:100%;height:100%;object-fit:cover}
+.gflip.up .gface{display:block}
+.gflip.up .gback{display:none}
+.gflip.matched{box-shadow:0 0 0 3px #2E9E5B}
+.gpairimg{display:block;max-width:100%;max-height:200px;margin:8px auto;border-radius:14px}
+.gcue{background:var(--wash);border-radius:12px;padding:8px 12px;margin:6px 0}
+/* the end of a round */
+.gdone{text-align:center;background:#fff;border-radius:var(--r);box-shadow:var(--shadow);padding:24px 18px}
+.gbig{font-size:3.4rem;margin:0}
+.gpoints{font-weight:800;font-size:1.15rem}
+.gbadge{display:inline-block;background:#FFF6D6;border-radius:999px;padding:8px 14px;font-weight:800}
+.gconfetti{position:absolute;inset:0;pointer-events:none;z-index:3}
+.gsparkle{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:3rem;pointer-events:none;z-index:3}
+@media (prefers-reduced-motion:reduce){.gbone,.gdice{animation:none}}
