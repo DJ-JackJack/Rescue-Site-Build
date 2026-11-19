@@ -195,9 +195,11 @@ function postPhoto(p) {
 const clip = (s, n) => (s.length > n ? s.slice(0, n - 1).replace(/\s+\S*$/, "") + "…" : s);
 const postBlurb = p => clip((p.summary || String(p.body || "").split(/\n\s*\n/).map(b => b.replace(/^##\s.*(\n|$)/, "")).join(" ")).replace(/\s+/g, " ").trim(), 200);
 
-// The phrases site.js writes as pages load (labels, empty lists, form replies), from its t("js.key", "...") calls.
-// Saved versions go to every page in window.SITE.t, so they're right from the start.
-const phrases = scriptPhrases(fs.readFileSync(path.join(SRC, "assets", "site.js"), "utf8"));
+// The phrases site.js writes as pages load (labels, empty lists, form replies), from its t("js.key", "...") calls, and
+// the Alliance games' own (games.js, keys starting js.games.). Saved versions go to every page in window.SITE.t, so
+// they're right from the start.
+const phrases = new Map([...scriptPhrases(fs.readFileSync(path.join(SRC, "assets", "site.js"), "utf8")),
+  ...scriptPhrases(fs.readFileSync(path.join(SRC, "assets", "games.js"), "utf8"), "games.js")]);
 const scriptItems = [...phrases].map(([key, text]) => ({ key, scope: "js", kind: "Written by the site as the page loads", text }));
 const scriptSaved = Object.fromEntries([...phrases.keys()].filter(k => saved[k]).map(k => [k, saved[k]]));
 

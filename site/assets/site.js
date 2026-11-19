@@ -1156,12 +1156,13 @@ document.addEventListener("click", e => {
    showing, the button says Done; they stay on when coming back from the edit page. */
 const EDIT_LISTS = { squawk: "Twin Squawk posts", animals: "Animals", goals: "Shelter goals", partners: "Rescues and shelters", events: "Events",
   collabs: "Working together", fosters: "Foster programs", sniffari: "Sniffari programs", adventures: "Our day outs", videos: "Day-out videos",
-  places: "Dog-friendly places", help: "Help listings", supporters: "Supporters", fanart: "Fan art" };
+  places: "Dog-friendly places", help: "Help listings", supporters: "Supporters", fanart: "Fan art",
+  situations: "Go on Green situations", pairs: "Matching pairs", questions: "Game questions", gameart: "Game pictures" };
 // the lists each page shows, so the menu offers them even while the page has none yet
 const PAGE_LISTS = { home: ["animals", "goals"], animals: ["animals"], stories: ["animals"], "willow-woods": ["animals", "goals", "events", "collabs"],
   rescues: ["partners", "animals", "events", "collabs"], "shelter-goals": ["goals"], sniffari: ["sniffari", "adventures", "videos", "places"],
   foster: ["fosters"], help: ["help"], "care-for-yourself": ["help"], wildlife: ["help"], "twin-squawk": ["squawk"],
-  supporters: ["supporters"], "fan-art": ["fanart"] };
+  supporters: ["supporters"], "fan-art": ["fanart"], "animal-guardian-alliance": ["situations", "pairs", "questions", "gameart"] };
 let editor = false;
 try { editor = !!localStorage.getItem("tt-editor-session"); } catch {}
 if (editor && S.scope) {

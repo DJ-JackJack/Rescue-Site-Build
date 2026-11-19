@@ -114,7 +114,7 @@ const amEditor = () => (editorCheck ??= db("POST", "rpc/is_admin", {}).catch(e =
 
 /* ---------- photos ---------- */
 // returns the new JPEG and its size
-async function shrink(file) {
+async function shrink(file, { alpha = false } = {}) {
   if (file.type && !file.type.startsWith("image/")) throw new Error("That file isn't a photo.");
   const url = URL.createObjectURL(file);
   try {
@@ -126,23 +126,24 @@ async function shrink(file) {
     c.width = Math.max(1, Math.round(img.naturalWidth * s));
     c.height = Math.max(1, Math.round(img.naturalHeight * s));
     const g = c.getContext("2d");
-    g.fillStyle = "#fff";
-    g.fillRect(0, 0, c.width, c.height);
+    if (!alpha) { g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height); }
     g.drawImage(img, 0, 0, c.width, c.height);
-    // A new JPEG drawn from the canvas carries only the pixels: no GPS, camera or date data.
-    const blob = await new Promise((ok, no) => c.toBlob(b => (b ? ok(b) : no(new Error("This photo couldn't be prepared."))), "image/jpeg", 0.82));
-    return { blob, w: c.width, h: c.height };
+    // A new image drawn from the canvas carries only the pixels: no GPS, camera or date data. Pictures that need a
+    // see-through background (alpha, like the games' art) stay PNGs.
+    const type = alpha ? "image/png" : "image/jpeg";
+    const blob = await new Promise((ok, no) => c.toBlob(b => (b ? ok(b) : no(new Error("This photo couldn't be prepared."))), type, 0.82));
+    return { blob, w: c.width, h: c.height, type, ext: alpha ? "png" : "jpg" };
   } finally { URL.revokeObjectURL(url); }
 }
 // returns the photo's address and size: { url, w, h }
-async function upload(file, folder, name) {
-  const { blob, w, h } = await shrink(file);
-  const path = `${folder}/${Date.now().toString(36)}-${slugify(name)}.jpg`;
+async function upload(file, folder, name, opts) {
+  const { blob, w, h, type, ext } = await shrink(file, opts);
+  const path = `${folder}/${Date.now().toString(36)}-${slugify(name)}.${ext}`;
   let r;
   try {
     r = await fetch(`${API}/storage/v1/object/photos/${path}`, {
       method: "POST",
-      headers: { apikey: KEY, Authorization: `Bearer ${await token()}`, "Content-Type": "image/jpeg", "x-upsert": "false", "cache-control": "max-age=31536000" },
+      headers: { apikey: KEY, Authorization: `Bearer ${await token()}`, "Content-Type": type, "x-upsert": "false", "cache-control": "max-age=31536000" },
       body: blob,
     });
   } catch { throw new Error("The photo didn't upload. Check your connection and try again."); }
@@ -177,7 +178,7 @@ async function tidyPhotos() {
   await walk("", 0);
   const used = new Set(), note = u => { u = u?.url ?? u; if (typeof u === "string" && u.startsWith(PHOTOS)) used.add(decodeURIComponent(u.slice(PHOTOS.length).split("?")[0])); };
   const [rows, many, deleted] = await Promise.all([
-    Promise.all(["animals", "goals", "collabs", "places", "videos", "articles", "fanart"].map(t => api.list(t, "select=photo_url&photo_url=not.is.null"))),
+    Promise.all(["animals", "goals", "collabs", "places", "videos", "articles", "fanart", "match_pairs", "game_art"].map(t => api.list(t, "select=photo_url&photo_url=not.is.null"))),
     Promise.all(["adventures", "page_photos", "articles"].map(t => api.list(t, "select=photos"))),
     api.list("content_history", "select=data&op=eq.delete&restored_at=is.null"),
   ]);
@@ -366,6 +367,11 @@ const LOOKS = [["full", "Full width"], ["banner", "Wide banner"], ["left", "Besi
   ["small", "Small, in the middle"], ["row", "A row of photos"], ["montage", "A photo montage"]];
 
 // Fields marked more fold away under "More options"; those marked onSite go in the "On the site" box that ends every form.
+const LEVEL_CHOICES = [[1, "Level 1 (easy)"], [2, "Level 2"], [3, "Level 3 (hard)"]];
+const LIGHT_CHOICES = [["green", "Green: go"], ["yellow", "Yellow: slow down"], ["red", "Red: stop"]];
+const GAME_SPECIES = [["dog", "Dog"], ["cat", "Cat"], ["bunny", "Bunny"]];
+const QUESTION_KINDS = [["mc", "Multiple choice"], ["tf", "True or false"], ["scenario", "Scenario"]];
+const ART_KINDS = [["dog", "Dog"], ["cat", "Cat"], ["bunny", "Bunny"], ["bone", "Bone"], ["bowl", "Food bowl"]];
 const SHOW = { name: "published", type: "toggle", label: "Show on the site", help: "Turn this off to hide it without losing anything.", dflt: true, onSite: true };
 const SORT = { name: "sort", type: "number", label: "Order", help: "Lower numbers show first. The ↑ ↓ arrows on the list set this for you.", dflt: 100, more: true };
 // When it goes live: as soon as it's saved, or on its own at a set time (publish_at). The database keeps it from visitors
@@ -683,6 +689,92 @@ const SECTIONS = {
       SHOW, SORT,
     ],
   },
+  situations: {
+    table: "game_situations", title: "Go on Green", one: "situation", icon: "🚦",
+    intro: "The situations in Go on Green, on the Animal Guardian Alliance page. Each one is shown in words with a picture of the animal, and a child picks a light. A round is 6, mixed up, from the child's level.",
+    query: "select=*&order=level.asc,sort.asc",
+    reorder: { group: r => r.level },
+    filters: [["all", "All"], ["1", "Level 1"], ["2", "Level 2"], ["3", "Level 3"], ["hidden", "Hidden"]],
+    tokens: r => [String(r.level), r.published ? "" : "hidden"],
+    titleOf: r => r.situation,
+    row: r => ({ title: r.situation, emoji: { green: "🟢", yellow: "🟡", red: "🔴" }[r.light], sub: `Level ${r.level} · ${label(LIGHT_CHOICES, r.light)}`, flags: [!r.published && "Hidden"] }),
+    fields: [
+      { name: "level", type: "choice", label: "Level", options: LEVEL_CHOICES, dflt: 1, num: true },
+      { name: "species", type: "choice", label: "Which animal?", options: GAME_SPECIES, dflt: "dog" },
+      { name: "situation", type: "textarea", rows: 2, max: 300, label: "The situation", required: true, help: "In words, like “A dog sleeping curled up in his bed.”" },
+      { name: "light", type: "choice", label: "The right light", options: LIGHT_CHOICES, dflt: "red" },
+      { name: "why", type: "textarea", rows: 2, max: 400, label: "Why it's right", help: "Shown with the right answer." },
+      { name: "green_line", type: "textarea", rows: 2, max: 300, label: "If they tap Green", help: "Praise if Green is right; if not, a gentle nudge that connects to how the child feels." },
+      { name: "yellow_line", type: "textarea", rows: 2, max: 300, label: "If they tap Yellow", help: "Praise if Yellow is right; if not, a gentle nudge." },
+      { name: "red_line", type: "textarea", rows: 2, max: 300, label: "If they tap Red", help: "Praise if Red is right; if not, a gentle nudge." },
+      SHOW, SORT,
+    ],
+  },
+  pairs: {
+    table: "match_pairs", title: "Matching pairs", short: "Matching", one: "pair", icon: "🃏",
+    intro: "The cards in Matching, on the Animal Guardian Alliance page. Each pair is one photo shown on two cards; a match asks what the animal is telling us. A pair only shows once it has a photo and “Show on the site” is on.",
+    query: "select=*&order=level.asc,sort.asc",
+    reorder: { group: r => r.level },
+    filters: [["all", "All"], ["1", "Level 1"], ["2", "Level 2"], ["3", "Level 3"], ["nophoto", "Needs a photo"], ["hidden", "Hidden"]],
+    tokens: r => [String(r.level), r.photo_url ? "" : "nophoto", r.published ? "" : "hidden"],
+    titleOf: r => r.title,
+    row: r => ({ title: r.title, emoji: "🃏", photo: r.photo_url, frame: r.photo_frame, sub: [`Level ${r.level}`, r.species].filter(Boolean).join(" · "),
+      flags: [!r.published && "Hidden", !r.photo_url && "!Needs a photo", r.photo_url && !r.cue && "Needs “what to notice”"] }),
+    fields: [
+      { name: "level", type: "choice", label: "Level", options: LEVEL_CHOICES, dflt: 1, num: true },
+      { name: "title", type: "text", label: "Name of the behavior", required: true, max: 120, help: "Like “The Play Bow”." },
+      { name: "species", type: "text", label: "Which animal?", max: 40, help: "Like Dog, Cat or Goldfish." },
+      { name: "photo_url", type: "photo", label: "The photo", folder: "games", frame: "photo_frame", shapes: [{ a: 1, label: "On the card" }],
+        help: "The photo with your cue arrows drawn on it, square, at least 800 pixels wide. No words on it: those show when the pair is matched." },
+      { name: "tile", type: "textarea", rows: 2, max: 400, label: "What's in the photo", help: "Read out for people who can't see it." },
+      { name: "cue", type: "text", max: 300, label: "What to notice", help: "The cue your arrow points to, like “Ears pinned back: she's scared.”" },
+      { name: "question", type: "textarea", rows: 2, max: 400, label: "The question on a match", required: true },
+      { name: "choices", type: "lines", rows: 4, label: "The answers to pick from", help: "One answer per line, 2 to 5 of them.",
+        validate: v => (v.length < 2 || v.length > 5 ? "Add between 2 and 5 answers, one per line." : "") },
+      { name: "answer", type: "number", label: "Which one is right?", dflt: 1, help: "Its line number: 1 for the first answer, 2 for the second, and so on.",
+        validate: (v, vals) => (!(v >= 1 && v <= (vals.choices || []).length) ? "Pick the line number of the right answer." : "") },
+      { name: "reward", type: "textarea", rows: 2, max: 500, label: "When they get it right", help: "Also shown, gently, when they don't." },
+      SHOW, SORT,
+    ],
+  },
+  questions: {
+    table: "game_questions", title: "Game questions", short: "Questions", one: "question", icon: "❓",
+    intro: "The question bank, easy to hard. The level quizzes use it, and so do the bones in Go on Green and Baby Steps.",
+    query: "select=*&order=level.asc,sort.asc",
+    reorder: { group: r => r.level },
+    filters: [["all", "All"], ["1", "Level 1"], ["2", "Level 2"], ["3", "Level 3"], ["hidden", "Hidden"]],
+    tokens: r => [String(r.level), r.published ? "" : "hidden"],
+    titleOf: r => r.question,
+    row: r => ({ title: r.question, emoji: "❓", sub: `Level ${r.level} · ${label(QUESTION_KINDS, r.kind)}`, flags: [!r.published && "Hidden"] }),
+    fields: [
+      { name: "level", type: "choice", label: "Level", options: LEVEL_CHOICES, dflt: 1, num: true },
+      { name: "kind", type: "choice", label: "Kind of question", options: QUESTION_KINDS, dflt: "mc" },
+      { name: "question", type: "textarea", rows: 2, max: 500, label: "The question", required: true },
+      { name: "choices", type: "lines", rows: 4, label: "The answers to pick from", help: "One answer per line, 2 to 5 of them. For true or false, write True and False.",
+        validate: v => (v.length < 2 || v.length > 5 ? "Add between 2 and 5 answers, one per line." : "") },
+      { name: "answer", type: "number", label: "Which one is right?", dflt: 1, help: "Its line number: 1 for the first answer, 2 for the second, and so on.",
+        validate: (v, vals) => (!(v >= 1 && v <= (vals.choices || []).length) ? "Pick the line number of the right answer." : "") },
+      { name: "hint", type: "textarea", rows: 2, max: 400, label: "Hint after a wrong answer", help: "Optional. Shown before they try again." },
+      { name: "why", type: "textarea", rows: 2, max: 500, label: "Why it's right", help: "Optional. Shown with the answer." },
+      { name: "reward", type: "textarea", rows: 2, max: 400, label: "When they get it right", help: "Optional. Your well-done line." },
+      SHOW, SORT,
+    ],
+  },
+  gameart: {
+    table: "game_art", title: "Game pictures", short: "Pictures", one: "picture", icon: "🎨",
+    intro: "Your pictures for the games: the animals in Go on Green and Baby Steps, the bones and the food bowl. Add as many of each as you like; the games pick one. With none, they use simple emoji pictures.",
+    query: "select=*&order=kind.asc,sort.asc",
+    reorder: { group: r => r.kind },
+    titleOf: r => r.photo_alt || label(ART_KINDS, r.kind),
+    row: r => ({ title: label(ART_KINDS, r.kind), photo: r.photo_url, sub: r.photo_alt || "", flags: [!r.published && "Hidden"] }),
+    fields: [
+      { name: "kind", type: "choice", label: "What is it?", options: ART_KINDS, dflt: "dog" },
+      { name: "photo_url", type: "photo", label: "The picture", folder: "games", alpha: true, required: true,
+        help: "A PNG with a see-through background looks best on the games' colors." },
+      { name: "photo_alt", type: "text", max: 300, label: "What's in it", help: "A few words for people who can't see it, like “A golden puppy sitting”." },
+      SHOW, SORT,
+    ],
+  },
   fanart: {
     table: "fanart", title: "Fan art", one: "piece of fan art", icon: "🖌️", canAdd: true,
     intro: "The Fan Art page: art people have made, each credited the way the artist asked. Art sent through the page's form waits here until you approve it.",
@@ -922,6 +1014,7 @@ const GROUPS = [
   ["Shelters and rescues", "The Rescues page, Shelter Goals and the Foster page", ["partners", "goals", "events", "collabs", "fosters"]],
   ["Rescues on Sniffari", "The Rescues on Sniffari page", ["montage", "sniffari", "adventures", "videos", "places"]],
   ["Fans and supporters", "The Fan Art and Supporters pages", ["fanart", "supporters"]],
+  ["Animal Guardian Alliance games", "The games on the Alliance page", ["situations", "pairs", "questions", "gameart"]],
   ["Every page", "The words and photos on any page", ["text", "photos"]],
   ["Help pages", "Help keeping your pet, Caring for Yourself and Wildlife", ["help"]],
   ["Inbox and settings", "Behind the scenes", ["messages", "visitors", "deleted", "settings"]],
@@ -1273,7 +1366,7 @@ function readForm(form, fields) {
     const el = form.elements[f.name];
     switch (f.type) {
       case "toggle": out[f.name] = !!el?.checked; break;
-      case "choice": out[f.name] = $(`input[name="${f.name}"]:checked`, form)?.value ?? null; break;
+      case "choice": { const x = $(`input[name="${f.name}"]:checked`, form)?.value ?? null; out[f.name] = f.num && x !== null ? Number(x) : x; break; } // f.num: stored as a number
       case "tags": out[f.name] = $$(`input[name="${f.name}"]:checked`, form).map(i => i.value); break;
       case "lines": out[f.name] = el.value.split("\n").map(s => s.trim()).filter(Boolean); break;
       case "number": out[f.name] = el.value === "" ? (f.dflt ?? null) : Math.round(Number(el.value)); break;
@@ -1517,7 +1610,7 @@ async function showForm(key, id, params = new URLSearchParams()) {
     const f = S.fields.find(x => x.name === inp.dataset.photo), pic = $(".pf-pic", form);
     pic.innerHTML = "<span>Getting the photo ready…</span>";
     try {
-      const { url } = await upload(file, f.folder, form.elements.name?.value || form.elements.title?.value || f.folder);
+      const { url } = await upload(file, f.folder, form.elements.name?.value || form.elements.title?.value || f.folder, { alpha: !!f.alpha });
       form.elements[f.name].value = url;
       pic.innerHTML = `<img src="${h(url)}" alt="New photo">`;
       $(".pick", form).firstChild.textContent = "Change photo";
@@ -1768,7 +1861,7 @@ const PHRASE_GROUPS = {
   goal: "Shelter goals", status: "Animal labels", count: "Animal counts", animal: "Happy Tales", stat: "The adoption number",
   journey: "An animal's journey (the pop-up)", rescue: "Rescues", horse: "Willow Woods horses", event: "Events",
   spotlight: "Animal Story Spotlight", squawk: "Twin Squawk", collab: "Working together", program: "Sniffari programs", foster: "Foster programs", adventure: "Our day outs", video: "Day-out videos", place: "Dog-friendly places", help: "Help listings",
-  form: "Contact forms", failed: "When part of a page can't load",
+  form: "Contact forms", failed: "When part of a page can't load", games: "The Alliance games",
 };
 const clip = (s, n = 60) => (s.length > n ? s.slice(0, n - 1) + "…" : s);
 const areaTitle = scope => AREAS.find(a => a.scope === scope)?.title || scope;
@@ -1910,7 +2003,8 @@ const KIND = {
   events: ["Event", r => r.title], collabs: ["Collaboration", r => r.title], partners: ["Rescue or shelter", r => r.name], sniffari_programs: ["Day-out program", r => r.program_name || r.shelter_name],
   foster_programs: ["Foster program", r => r.program_name || r.shelter_name], adventures: ["Day out", r => r.title],
   videos: ["Day-out video", r => r.title], places: ["Dog-friendly place", r => r.name], page_photos: ["Photo on a page", r => SECTIONS.photos.titleOf(r)],
-  help_resources: ["Help listing", r => r.name], articles: ["Twin Squawk post", r => r.title], fanart: ["Fan art", r => r.title || `By ${r.credit}`], supporters: ["Supporter", r => r.name], messages: ["Message", r => (r.name ? `From ${r.name}` : `From ${r.email}`)],
+  help_resources: ["Help listing", r => r.name], articles: ["Twin Squawk post", r => r.title], fanart: ["Fan art", r => r.title || `By ${r.credit}`], supporters: ["Supporter", r => r.name],
+  game_situations: ["Go on Green situation", r => r.situation], match_pairs: ["Matching pair", r => r.title], game_questions: ["Game question", r => r.question], game_art: ["Game picture", r => r.photo_alt || r.kind], messages: ["Message", r => (r.name ? `From ${r.name}` : `From ${r.email}`)],
 };
 async function showDeleted() {
   const rows = await api.list("content_history", "select=id,at,tx,tbl,row_key,data,by_email&op=eq.delete&restored_at=is.null&order=at.desc&limit=300");
