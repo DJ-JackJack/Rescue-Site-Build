@@ -273,6 +273,50 @@ async function answerPop(p, data, wrong = false) {
   await ctx.close();
 }
 
+// ---------- Baby Steps to the end of a board, with a dice that always says yes ----------
+{
+  const { ctx, p } = await newPage({ random: 0.1 });
+  await p.goto(B + "animal-guardian-alliance/#play-bs"); await wait(p, 600);
+  await p.click('.gpets [data-pet="bee"]'); await wait(p, 600);
+  const near = (a, b) => Math.abs(a % 6 - b % 6) + Math.abs(Math.floor(a / 6) - Math.floor(b / 6)) === 1;
+  for (let k = 0; k < 3; k++) {
+    for (let guard = 0; guard < 60; guard++) {
+      const cs = await p.$$eval(".gcell", c => c.map(x => ({ i: Number(x.dataset.i), me: x.classList.contains("me"), ani: x.classList.contains("ani"), step: x.classList.contains("step") })));
+      const at = cs.find(c => c.me).i, a = cs.find(c => c.ani && near(c.i, at));
+      if (a) { await p.click(`.gcell[data-i="${a.i}"]`); await wait(p, 1200); await p.click('.gpop [data-k="pet"]'); await wait(p, 300); break; }
+      // a step toward the nearest animal (straight line, around anything in the way)
+      const goal = cs.filter(c => c.ani).sort((x, y) => Math.abs(x.i % 6 - at % 6) + Math.abs(Math.floor(x.i / 6) - Math.floor(at / 6)) - (Math.abs(y.i % 6 - at % 6) + Math.abs(Math.floor(y.i / 6) - Math.floor(at / 6))))[0];
+      const steps = cs.filter(c => c.step).sort((x, y) => (Math.abs(x.i % 6 - goal.i % 6) + Math.abs(Math.floor(x.i / 6) - Math.floor(goal.i / 6))) - (Math.abs(y.i % 6 - goal.i % 6) + Math.abs(Math.floor(y.i / 6) - Math.floor(goal.i / 6))));
+      await p.click(`.gcell[data-i="${steps[0].i}"]`); await wait(p, 120);
+      if (await p.locator(".gpop .gchoice").count()) { await p.click('.gpop .gchoice[data-i="1"]'); await wait(p, 100); await p.click(".gpop [data-next]"); await wait(p, 120); }
+    }
+  }
+  const done = (await p.locator(".gdone").innerText()).replace(/\s+/g, " ");
+  ok(/Every animal said yes!/.test(done) && /15 points/.test(done) && /New badge: Baby Steps, Level 1!/.test(done) && /Next board/.test(done), "petting every animal finishes the board: 15 points and a badge: " + done);
+  await p.click(".gdone [data-again]"); await wait(p, 400);
+  ok((await p.locator(".gcell.ani").count()) === 4 && /Level 2/.test(await p.locator(".gbs .gstep").innerText()), "the next board is Level 2, with 4 animals");
+  ok(!p.errs.length, "Baby Steps board: no errors" + (p.errs.length ? ": " + p.errs.join(" | ") : ""));
+  await ctx.close();
+}
+
+// ---------- Go on Green: a round with too few first tries stays at the level ----------
+{
+  const { ctx, p, data } = await newPage();
+  await p.goto(B + "animal-guardian-alliance/#play-gog"); await wait(p, 600);
+  await p.click('.gpets [data-pet="owl"]'); await wait(p, 600);
+  for (let n = 0; n < 8; n++) {
+    if (await p.locator(".gdone").count()) break;
+    const text = (await p.locator(".gsit").innerText()).trim(), s = data.game_situations.find(x => x.situation === text);
+    for (const l of ["green", "yellow", "red"].filter(l => l !== s.light)) { await p.click(`[data-light="${l}"]`); await wait(p, 80); }
+    await p.click(`[data-light="${s.light}"]`); await wait(p, 120);
+    await p.click(".gog [data-next]"); await wait(p, 200);
+  }
+  const done = (await p.locator(".gdone").innerText()).replace(/\s+/g, " ");
+  const st = await saved(p);
+  ok(/0 of 6 on the first try/.test(done) && /practice this level again/.test(done) && !/badge/i.test(done) && st.prog[st.current].gog.level === 1, "few first tries: practice the level again, no badge, still Level 1: " + done);
+  await ctx.close();
+}
+
 // ---------- the edit page: the games' sections ----------
 {
   const { ctx, p, data, log } = await newPage();

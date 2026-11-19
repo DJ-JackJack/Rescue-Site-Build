@@ -182,7 +182,7 @@ const box = document.body.lastElementChild, body = $(".gbody", box), layer = $("
 const muteLabel = () => { const b = $(".gmute", box); b.textContent = state.muted ? "🔇" : "🔊"; b.setAttribute("aria-label", state.muted ? t("js.games.unmute", "Turn sounds on") : t("js.games.mute", "Turn sounds off")); b.setAttribute("aria-pressed", String(state.muted)); };
 $(".gmute", box).addEventListener("click", () => { state.muted = !state.muted; save(); muteLabel(); });
 $(".gclose", box).addEventListener("click", () => box.close());
-box.addEventListener("close", () => { stopSpeaking(); layer.hidden = true; layer.innerHTML = ""; body.innerHTML = ""; drawLauncher(); history.replaceState(null, "", location.pathname + location.search + "#games"); });
+box.addEventListener("close", () => { stopSpeaking(); $$(".gconfetti, .gsparkle", box).forEach(x => x.remove()); layer.hidden = true; layer.innerHTML = ""; body.innerHTML = ""; drawLauncher(); history.replaceState(null, "", location.pathname + location.search + "#games"); });
 box.addEventListener("click", e => { const r = e.target.closest("[data-read]"); if (r) speak(r.closest("[data-say]")?.dataset.say || ""); });
 let score = 0;
 const setScore = (n, extra = "") => { score = n; $(".gscore", box).innerHTML = `⭐ ${h(n)}${extra}`; };
