@@ -589,6 +589,8 @@ function choosePet(then) {
     then?.();
   };
 }
+// whether a game has enough switched on to play (until the content has loaded, it's assumed it does)
+const ready = k => !data || (k === "gog" ? data.situations.length >= 3 : k === "match" ? data.pairs.length >= 2 : data.questions.length >= 1);
 function drawLauncher() {
   const p = player(), pg = p ? prog() : null;
   const stars = key => LEVELS.map(l => `<span class="${pg?.badges.includes(`${key}-${l}`) ? "on" : ""}" title="${h(t("js.games.level", "Level {n}", { n: l }))}">★</span>`).join("");
@@ -597,7 +599,7 @@ function drawLauncher() {
     ${freePets().length ? `<button type="button" class="gpet add" data-new><span aria-hidden="true">＋</span>${h(t("js.games.new-player", "New player"))}</button>` : ""}</div></div>
     <ul class="gcardsl">${Object.entries(GAMES).map(([k, g]) => `<li class="gcardl"><span class="gic" aria-hidden="true">${g.icon}</span><h3>${h(g.name())}</h3><p>${h(g.blurb())}</p>
       ${p ? `<p class="gstars" aria-label="${h(t("js.games.badges-of", "Badges: {n} of 3", { n: LEVELS.filter(l => pg.badges.includes(`${k}-${l}`)).length }))}">${stars(k)}</p>` : ""}
-      <button type="button" class="btn royal" data-play="${k}">${h(t("js.games.play", "Play"))}</button></li>`).join("")}</ul>
+      ${ready(k) ? `<button type="button" class="btn royal" data-play="${k}">${h(t("js.games.play", "Play"))}</button>` : `<span class="gsoon">${h(t("js.games.soon-card", "Coming soon"))}</span>`}</li>`).join("")}</ul>
     <details class="ggrown"><summary>${h(t("js.games.grownups", "For grown-ups: saving and moving progress"))}</summary>
       <p class="small">${h(t("js.games.saved-here", "Progress is saved in this browser, on this device only. Nothing about your child is sent to us. Clearing this browser's data erases it."))}</p>
       ${saving ? "" : `<p class="small"><b>${h(t("js.games.cant-save", "This browser isn't letting the games save, so progress lasts only until the page is closed."))}</b></p>`}
@@ -633,6 +635,7 @@ root.addEventListener("click", e => {
 });
 if (!player() && state.players.length) { state.current = state.players[0].id; save(); }
 drawLauncher();
+loadContent().then(() => { if (!box.open && !$(".gpets", root)) drawLauncher(); }, () => {}); // so a game with nothing to play yet says "Coming soon"
 const asked0 = location.hash.match(/^#play-(gog|bs|match|quiz)$/);
 if (asked0) openGame(asked0[1]);
 })();

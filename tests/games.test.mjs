@@ -216,6 +216,16 @@ async function answerPop(p, data, wrong = false) {
   await ctx.close();
 }
 
+// ---------- a game with nothing switched on yet says "Coming soon" ----------
+{
+  const { ctx, p, data } = await newPage();
+  data.game_situations.length = 0; data.match_pairs.length = 1;
+  await p.goto(B + "animal-guardian-alliance/"); await wait(p, 700);
+  const cards = await p.$$eval(".gcardl", cs => cs.map(c => c.querySelector("h3").innerText + ":" + (c.querySelector("[data-play]") ? "Play" : c.querySelector(".gsoon")?.innerText)));
+  ok(cards.join("|") === "Go on Green:Coming soon|Baby Steps:Play|Matching:Coming soon|Quizzes:Play", "games with too little switched on say Coming soon instead of Play " + cards.join("|"));
+  await ctx.close();
+}
+
 // ---------- Baby Steps, with a dice that always says no until the fourth roll ----------
 {
   const { ctx, p, data } = await newPage({ random: 0.9 });

@@ -676,7 +676,8 @@ h2.eyebrow{font-family:var(--f-body);line-height:1.55}
 .gcardl{background:linear-gradient(160deg,#EEF4FF,#F3EAFF);border-radius:var(--r);box-shadow:var(--shadow);padding:18px;display:flex;flex-direction:column;gap:6px}
 .gcardl h3{margin:0;font-size:1.25rem}
 .gcardl p{margin:0;color:var(--ink2)}
-.gcardl .btn{margin-top:auto;align-self:flex-start}
+.gcardl .btn,.gsoon{margin-top:auto;align-self:flex-start}
+.gsoon{font-weight:800;color:var(--royal);background:#fff;border-radius:999px;padding:8px 14px}
 .gic{font-size:2rem;line-height:1}
 .gstars span{color:#CFC6E3;font-size:1.2rem;margin-right:2px}
 .gstars span.on{color:#F2B705}
