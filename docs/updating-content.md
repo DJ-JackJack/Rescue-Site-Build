@@ -79,6 +79,16 @@ The games on the Animal Guardian Alliance page (`site/assets/games.js`): Go on G
 - `game_art`: `kind` (dog, cat, bunny, bone, bowl), `photo_url`, `photo_alt`. The edit page keeps these as PNGs, so a see-through background stays see-through. With none of a kind, the games show an emoji.
 - Baby Steps has no table of its own: a 6 by 9 board, made fresh each time, with 3, 4 or 5 animals by level, 4 to 6 bones (a bank question each; a wrong answer and the bone is gone) and a food bowl (a treat to offer). Next to an animal, a tap rolls the dice: 50/50, but never more than 3 no's in a row from the same animal. A yes is 5 points; offering a bone or the bowl rolls again; trying to pet a no sends the child back to the start.
 
+## Photos sent for the games
+
+The Send a Photo page (`site/pages/send-a-photo.html`) asks visitors for photos of their own pets for the Matching game. Migrations: `20261121_game_photo_submissions.sql` (tables, bucket, functions) and `20261121_zz_game_photos_content.sql` (a draft pair and the starting list).
+
+- `match_pairs.wanted`: ticked on the edit page as "Ask for photos of this". `game_photo_wishlist()` (callable by anyone) returns the wanted pairs that still have no photo, even hidden ones: the page lists them and offers them in the form.
+- The form posts to the Edge Function in `supabase/functions/submit-game-photo/` (verify_jwt off), which checks the fields, the three boxes and that the image is a JPEG (the browser redraws it first, so no location data), keeps each email to 5 a day and everyone to 30 an hour (`game_photo_room`), stores the image in the private `game-photo-inbox` bucket and the details in `game_photo_submissions` (`game_photo_add`). Only editors can read either.
+- **Nothing sent ever goes on the site by itself.** The edit page shows waiting photos at the top of Matching, with a screen to look at, download, email the sender about, or delete each one. There is no approve or publish button: a photo is only used if an editor draws arrows on it and adds it to a pair herself.
+- A new photo sends the editors a phone alert: the `game_photo_notify` trigger calls `notify-message` with `{"action":"gamephoto"}`, and it announces each photo once (`game_photo_claim`), naming only the behavior.
+- Deleting removes the image and the row for good (no history is kept), as the Privacy page says. Backups leave the table out.
+
 ## Supporters and fan art
 
 - `supporters`: the Supporters page. `name` (as they'd like it shown), `tier` (optional, shown under the name), `published`, `sort`. Only people who asked to be listed; nothing comes from Patreon on its own.

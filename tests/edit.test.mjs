@@ -253,6 +253,42 @@ async function signIn(p, password = "right-pass") {
   await ctx.close();
 }
 
+// ---------- photos sent for the games: look, download, delete, but never publish ----------
+{
+  const { ctx, p, sb } = await newPage(browser, { session: true });
+  await p.goto(E); await wait(p, 800);
+  ok(/1 photo sent for the games/.test(await p.locator(".todo").innerText()), "needs attention: a photo sent for the games");
+  await p.goto(E + "#/pairs"); await wait(p, 900);
+  const waiting = p.locator(".fa-wait li");
+  ok((await waiting.count()) === 1 && /The Whale Eye<img/.test(await waiting.innerText()), "Matching shows the photo waiting, its pair's name as plain text");
+  ok(((await p.locator(".fa-wait img").getAttribute("src")) || "").startsWith("blob:"), "its thumbnail loads privately");
+  ok((await p.locator('.lhead a[href="#/pairs/new"]').count()) === 1, "pairs can still be added");
+  await p.click('[data-filter="wanted"]'); await wait(p, 200);
+  ok((await p.locator(".rows li[data-s]:visible").count()) === 2, "Asking for photos shows the pairs listed on Send a Photo");
+  await p.click('[data-filter="all"]');
+  await p.goto(E + "#/gamephoto/gp1"); await wait(p, 900);
+  ok(/For The Whale Eye<img/.test(await h1(p)) && ((await p.locator(".fa-big img").getAttribute("src")) || "").startsWith("blob:"), "a sent photo opens, loaded privately");
+  const det = await p.locator(".mdet").innerText();
+  ok(/thunder <img/.test(det) && /robin@example\.com/.test(det), "with their note (as plain text) and email");
+  const dl = p.locator("a[download]");
+  ok((await dl.count()) === 1 && ((await dl.getAttribute("href")) || "").startsWith("blob:"), "Download the photo saves the private copy");
+  ok(!/approve|publish|show it/i.test(await p.locator("#app").innerText()) && !(await p.locator("#app form, #app [type=submit]").count()), "there is no way to approve or publish it from here");
+  ok((await p.locator('a[href="#/pairs/mp1"]').count()) === 1, "Open the pair goes to the pair it's for");
+  await p.locator('[data-act="gp-delete"]').scrollIntoViewIfNeeded(); await wait(p, 600);
+  await p.click('[data-act="gp-delete"]'); await wait(p, 800);
+  ok(/Delete this photo\?/.test(p.dialogs.at(-1)) && !sb.D.game_photo_submissions.length && sb.log.some(l => l.bucket === "game-photo-inbox" && l.inboxDeleted?.includes("g1.jpg")), "Delete asks, then removes the photo and their email for good");
+  ok(!sb.writes().some(w => w.table !== "game_photo_submissions") && !sb.log.some(l => l.upload), "nothing was copied to the site or to a pair");
+  await p.goto(E + "#/gamephoto/gp1"); await wait(p, 700);
+  ok((await h1(p)) === "Not found", "a deleted one is gone");
+  await p.goto(E + "#/pairs/mp3"); await wait(p, 700);
+  await p.click('label.switch:has([name="wanted"])'); await wait(p, 100);
+  ok(await p.locator('[name="wanted"]').isChecked(), "the Ask for photos of this switch turns on");
+  await p.click(".savebar .btn"); await wait(p, 700);
+  ok(writes(sb, "match_pairs", "PATCH").some(w => w.body.wanted === true), "Ask for photos of this saves");
+  ok(!(await pwned(p)) && !p.errs.length, "game photos: no errors" + errors(p));
+  await ctx.close();
+}
+
 // ---------- the order arrows ----------
 {
   const { ctx, p, sb } = await newPage(browser, { session: true });

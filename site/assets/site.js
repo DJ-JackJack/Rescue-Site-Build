@@ -911,7 +911,10 @@ async function shrinkArt(file) {
     return { blob, w: c.width, h: c.height };
   } finally { URL.revokeObjectURL(url); }
 }
-function setupFanartForm(form) {
+// A form that sends a picture (the Fan Art page and the Send a Photo page): the picture is redrawn and previewed as soon
+// as it's picked, then sent with the form's other fields to an Edge Function. o: { endpoint, fields, thanks, msgs, failed }
+// (msgs: what to say for each error the function can answer with).
+function setupSendForm(form, o) {
   const file = form.elements.image, prev = $(".fa-preview", form), msg = $(".formmsg", form), btn = $("button[type=submit]", form);
   let ready = null, shown = "";
   const say = (text, bad) => { msg.className = "formmsg" + (bad ? " is-err" : text ? " is-ok" : ""); msg.textContent = text; };
@@ -929,32 +932,80 @@ function setupFanartForm(form) {
   form.addEventListener("submit", async e => {
     e.preventDefault();
     const fd = new FormData(form);
-    const thanks = t("js.fanart.thanks", "Thank you! Your art reached {name}. If it's shared, here or in a video or post, it'll be credited the way you asked.", { name: WHO });
-    if (fd.get("website")) { form.reset(); clearPreview(); return say(thanks); } // bot trap
+    if (fd.get("website")) { form.reset(); clearPreview(); return say(o.thanks()); } // bot trap
     btn.disabled = true; say(t("js.form.sending", "Sending…"));
     try {
       let art = ready;
       try { art ||= await prepare(); } catch (err) { throw Object.assign(new Error("image"), { shown: err.message }); }
       if (!art) throw new Error("pick");
       const out = new FormData();
-      for (const k of ["credit", "title", "link", "note", "email", "made", "ok", "age", "website"]) out.append(k, String(fd.get(k) || ""));
+      for (const k of [...o.fields, "website"]) out.append(k, String(fd.get(k) || ""));
       out.append("w", String(art.w)); out.append("h", String(art.h));
-      out.append("image", art.blob, "art.jpg");
+      out.append("image", art.blob, "photo.jpg");
       let r;
-      try { r = await fetch(`${S.supabaseUrl}/functions/v1/submit-fanart`, { method: "POST", body: out }); } catch { throw new Error("fail"); }
+      try { r = await fetch(`${S.supabaseUrl}/functions/v1/${o.endpoint}`, { method: "POST", body: out }); } catch { throw new Error("fail"); }
       if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "fail");
       form.reset(); ready = null; clearPreview();
-      say(thanks);
+      say(o.thanks());
     } catch (err) {
-      say(err.shown || ({
-        pick: t("js.fanart.pick", "Pick your art first."),
-        slow: t("js.fanart.slow", "That's a lot of art from this email today. Please try again tomorrow."),
-        email: t("js.form.email", "That email address doesn't look right. Please check it."),
-        link: t("js.fanart.link", "That link doesn't look right. It should start with https://"),
-        big: t("js.fanart.big", "That picture is too big to send. Try a smaller photo of it."),
-        image: t("js.fanart.cant-open", "That picture can't be opened here. Try a JPEG or PNG, or a screenshot of it."),
-      })[err.message] || t("js.fanart.failed", "Couldn't send right now. Please try again, or send it to {name} on TikTok or Instagram.", { name: WHO }), true);
+      say(err.shown || o.msgs()[err.message] || o.failed(), true);
     } finally { btn.disabled = false; }
+  });
+}
+const PICTURE_MSGS = () => ({
+  email: t("js.form.email", "That email address doesn't look right. Please check it."),
+  big: t("js.fanart.big", "That picture is too big to send. Try a smaller photo of it."),
+  image: t("js.fanart.cant-open", "That picture can't be opened here. Try a JPEG or PNG, or a screenshot of it."),
+});
+function setupFanartForm(form) {
+  setupSendForm(form, {
+    endpoint: "submit-fanart", fields: ["credit", "title", "link", "note", "email", "made", "ok", "age"],
+    thanks: () => t("js.fanart.thanks", "Thank you! Your art reached {name}. If it's shared, here or in a video or post, it'll be credited the way you asked.", { name: WHO }),
+    msgs: () => ({ ...PICTURE_MSGS(),
+      pick: t("js.fanart.pick", "Pick your art first."),
+      slow: t("js.fanart.slow", "That's a lot of art from this email today. Please try again tomorrow."),
+      link: t("js.fanart.link", "That link doesn't look right. It should start with https://") }),
+    failed: () => t("js.fanart.failed", "Couldn't send right now. Please try again, or send it to {name} on TikTok or Instagram.", { name: WHO }),
+  });
+}
+
+/* ---------- Send a Photo: photos for the Matching game ----------
+   The page lists the behaviors still needing a photo (game_photo_wishlist: the pairs Taea marked "Ask for photos of
+   this" that have none yet), and its form sends a photo to submit-game-photo. Sent photos stay private: they never
+   show on the site unless Taea adds one to a pair herself. */
+async function renderGamePhotoWishlist(el) {
+  let rows = [];
+  try {
+    const r = await fetch(`${S.supabaseUrl}/rest/v1/rpc/game_photo_wishlist`, { method: "POST", headers: { apikey: S.supabaseKey, "Content-Type": "application/json" }, body: "{}" });
+    if (!r.ok) throw new Error(r.status);
+    rows = await r.json();
+  } catch { return; }
+  if (!Array.isArray(rows) || !rows.length) return;
+  await wordingReady;
+  el.innerHTML = rows.map(p => `<li><b>${h(p.title)}</b>${p.species ? `<small>${h(p.species)}</small>` : ""}${p.tile ? `<span>${h(p.tile)}</span>` : ""}
+    <button type="button" class="linkbtn" data-pick="${h(p.id)}">${h(t("js.gamephoto.send-one", "I have one of these"))}</button></li>`).join("");
+  el.hidden = false;
+  $$("[data-gamephoto-wishlist-empty]").forEach(x => { x.hidden = true; });
+  $$("select[data-gamephoto-pairs]").forEach(sel => {
+    sel.insertAdjacentHTML("afterbegin", rows.map(p => `<option value="${h(p.id)}">${h(p.title)}${p.species ? ` (${h(p.species)})` : ""}</option>`).join(""));
+    sel.selectedIndex = 0;
+  });
+  el.addEventListener("click", e => {
+    const b = e.target.closest("[data-pick]");
+    if (!b) return;
+    const sel = $("select[data-gamephoto-pairs]");
+    if (sel) { sel.value = b.dataset.pick; sel.closest("form").scrollIntoView({ behavior: "smooth", block: "start" }); }
+  });
+}
+function setupGamePhotoForm(form) {
+  setupSendForm(form, {
+    endpoint: "submit-game-photo", fields: ["pair", "note", "credit", "email", "mine", "ok", "age"],
+    thanks: () => t("js.gamephoto.thanks", "Thank you! Your photo reached {name}. If it's used in the game, it'll have arrows drawn on it to point out what the animal is saying.", { name: WHO }),
+    msgs: () => ({ ...PICTURE_MSGS(),
+      pick: t("js.gamephoto.pick", "Pick your photo first."),
+      slow: t("js.gamephoto.slow", "That's a lot of photos from this email today. Please try again tomorrow."),
+      pair: t("js.gamephoto.pair", "That one isn't on the list any more. Pick another, or choose Something else.") }),
+    failed: () => t("js.gamephoto.failed", "Couldn't send right now. Please try again in a little while."),
   });
 }
 
@@ -1162,7 +1213,7 @@ const EDIT_LISTS = { squawk: "Twin Squawk posts", animals: "Animals", goals: "Sh
 const PAGE_LISTS = { home: ["animals", "goals"], animals: ["animals"], stories: ["animals"], "willow-woods": ["animals", "goals", "events", "collabs"],
   rescues: ["partners", "animals", "events", "collabs"], "shelter-goals": ["goals"], sniffari: ["sniffari", "adventures", "videos", "places"],
   foster: ["fosters"], help: ["help"], "care-for-yourself": ["help"], wildlife: ["help"], "twin-squawk": ["squawk"],
-  supporters: ["supporters"], "fan-art": ["fanart"], "animal-guardian-alliance": ["situations", "pairs", "questions", "gameart"] };
+  supporters: ["supporters"], "fan-art": ["fanart"], "animal-guardian-alliance": ["situations", "pairs", "questions", "gameart"], "send-a-photo": ["pairs"] };
 let editor = false;
 try { editor = !!localStorage.getItem("tt-editor-session"); } catch {}
 if (editor && S.scope) {
@@ -1294,5 +1345,7 @@ $$("[data-articles]").forEach(renderArticles);
 $$("[data-supporters]").forEach(renderSupporters);
 $$("[data-fanart]").forEach(renderFanart);
 $$("form[data-fanart-form]").forEach(setupFanartForm);
+$$("[data-gamephoto-wishlist]").forEach(renderGamePhotoWishlist);
+$$("form[data-gamephoto-form]").forEach(setupGamePhotoForm);
 countView();
 })();

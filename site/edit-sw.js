@@ -12,8 +12,8 @@ self.addEventListener("activate", e => e.waitUntil(self.clients.claim()));
 self.addEventListener("push", e => {
   let d = {};
   try { d = e.data ? e.data.json() : {}; } catch {}
-  // a newer notification replaces the last one of its kind: messages, things going live and fan art each have their own
-  const url = d.url || "./#/messages", tag = url.endsWith("#/scheduled") ? "live" : url.endsWith("#/fanart") ? "fanart" : "messages";
+  // a newer notification replaces the last one of its kind: messages, things going live, fan art and game photos each have their own
+  const url = d.url || "./#/messages", tag = url.endsWith("#/scheduled") ? "live" : url.endsWith("#/fanart") ? "fanart" : url.endsWith("#/pairs") ? "gamephoto" : "messages";
   const shown = self.registration.showNotification(d.title || "TheTerr0rTw!ns · New message", {
     body: d.body || "", icon: ICON, badge: BADGE, tag, renotify: true, data: { url },
   });

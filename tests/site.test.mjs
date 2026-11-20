@@ -215,6 +215,57 @@ async function clean(p, what) {
   await ctx.close();
 }
 
+// ---------- Send a Photo: photos for the Matching game ----------
+{
+  const { ctx, p, sb } = await open("send-a-photo/");
+  const items = await p.$$eval("[data-gamephoto-wishlist] li b", bs => bs.map(b => b.textContent));
+  ok(items.length === 2 && items[0].startsWith("The Whale Eye<img") && items[1] === "The Skin Ripple", "Send a Photo lists the pairs asked for that have no photo, hidden ones too, as plain text: " + items.join(" | "));
+  ok(!items.some(t => /Head Tilt|Play Bow/.test(t)), "but not pairs nobody asked for, or that already have a photo");
+  ok(!(await p.locator("[data-gamephoto-wishlist-empty]").isVisible()), "the 'nothing needed' line hides");
+  const opts = await p.$$eval("select[data-gamephoto-pairs] option", os => os.map(o => o.value));
+  ok(opts.join(",") === "mp1,mp2,other", "the form offers the same list, plus Something else: " + opts.join(","));
+  await p.click('[data-pick="mp2"]'); await wait(p, 300);
+  ok((await p.inputValue("select[data-gamephoto-pairs]")) === "mp2", "I have one of these picks it in the form");
+  const form = p.locator("form[data-gamephoto-form]");
+  await form.locator('[name="email"]').fill("pet@example.com");
+  for (const n of ["mine", "ok", "age"]) await form.locator(`[name="${n}"]`).check();
+  await form.locator('[type="submit"]').click(); await wait(p, 300);
+  ok(await form.locator('[name="image"]').evaluate(i => !i.validity.valid) && !sb.log.some(l => l.gamephoto), "sending without a photo is stopped: the photo is required");
+  await form.locator('[name="image"]').setInputFiles(fixture("photo-with-location.jpg")); await wait(p, 1200);
+  ok(await form.locator(".fa-preview").isVisible(), "a preview of the photo shows");
+  await form.locator('[name="note"]').fill("Her back twitched when I petted her"); await form.locator('[name="credit"]').fill("Sam");
+  await form.locator('[type="submit"]').click(); await wait(p, 1200);
+  const sent = sb.log.find(l => l.gamephoto);
+  ok(sent && sent.gamephoto.pair === "mp2" && sent.gamephoto.email === "pet@example.com" && ["mine", "ok", "age"].every(k => sent.gamephoto[k] === "yes") && sent.gamephoto.note.startsWith("Her back"), "the photo goes to the private inbox with what it shows, the note and the boxes ticked");
+  ok(sent && sent.image.jpeg && !sent.image.exif && !sent.image.gps, "the photo is redrawn first: no camera or location data");
+  ok(/Thank you! Your photo reached/.test(await form.locator(".formmsg").innerText()) && sb.D.game_photo_submissions.length === 2, "and says thank you");
+  ok(!sb.writes().length, "sending a photo changes nothing on the site");
+  await clean(p, "Send a Photo");
+  await ctx.close();
+}
+{
+  const sb = fakeSupabase(); sb.D.match_pairs.forEach(x => { x.wanted = false; });
+  const { ctx, p } = await open("send-a-photo/", { sb });
+  ok(await p.locator("[data-gamephoto-wishlist-empty]").isVisible() && !(await p.locator("[data-gamephoto-wishlist]").isVisible()), "with nothing asked for, the page says so");
+  ok((await p.$$eval("select[data-gamephoto-pairs] option", os => os.map(o => o.value))).join() === "other", "and the form still takes something else");
+  await ctx.close();
+}
+{
+  const { ctx, p } = await open("send-a-photo/", { sb: fakeSupabase({ gamePhotoReply: { status: 429, body: { error: "slow" } } }) });
+  const form = p.locator("form[data-gamephoto-form]");
+  await form.locator('[name="email"]').fill("pet@example.com");
+  for (const n of ["mine", "ok", "age"]) await form.locator(`[name="${n}"]`).check();
+  await form.locator('[name="image"]').setInputFiles(fixture("small.jpg")); await wait(p, 600);
+  await form.locator('[type="submit"]').click(); await wait(p, 800);
+  ok(/a lot of photos from this email today/.test(await form.locator(".formmsg").innerText()) && await form.locator('[type="submit"]').isEnabled(), "too many photos from one email is told to try tomorrow");
+  await ctx.close();
+}
+{
+  const { ctx, p } = await open("animal-guardian-alliance/");
+  ok((await p.locator('#games a[href="/send-a-photo/"]').count()) === 1, "the games section links to Send a Photo");
+  await ctx.close();
+}
+
 // ---------- the message forms ----------
 {
   const { ctx, p, sb } = await open("help/");

@@ -711,21 +711,27 @@ const SECTIONS = {
     ],
   },
   pairs: {
-    table: "match_pairs", title: "Matching pairs", short: "Matching", one: "pair", icon: "🃏",
+    table: "match_pairs", title: "Matching pairs", short: "Matching", one: "pair", icon: "🃏", canAdd: true,
     intro: "The cards in Matching, on the Animal Guardian Alliance page. Each pair is one photo shown on two cards; a match asks what the animal is telling us. A pair only shows once it has a photo and “Show on the site” is on.",
     query: "select=*&order=level.asc,sort.asc",
+    // photos sent through the Send a Photo page, waiting for a look, above the pairs (none of them are on the site)
+    load: () => api.list("game_photo_submissions", "select=id,image_path,pair_title,credit,created_at&order=created_at.asc"),
+    above: (rows, waiting) => gamePhotosWaiting(waiting),
+    ready: () => inboxThumbs(),
+    listHeading: "The pairs",
     reorder: { group: r => r.level },
-    filters: [["all", "All"], ["1", "Level 1"], ["2", "Level 2"], ["3", "Level 3"], ["nophoto", "Needs a photo"], ["hidden", "Hidden"]],
-    tokens: r => [String(r.level), r.photo_url ? "" : "nophoto", r.published ? "" : "hidden"],
+    filters: [["all", "All"], ["1", "Level 1"], ["2", "Level 2"], ["3", "Level 3"], ["nophoto", "Needs a photo"], ["wanted", "Asking for photos"], ["hidden", "Hidden"]],
+    tokens: r => [String(r.level), r.photo_url ? "" : "nophoto", r.wanted && !r.photo_url ? "wanted" : "", r.published ? "" : "hidden"],
     titleOf: r => r.title,
     row: r => ({ title: r.title, emoji: "🃏", photo: r.photo_url, frame: r.photo_frame, sub: [`Level ${r.level}`, r.species].filter(Boolean).join(" · "),
-      flags: [!r.published && "Hidden", !r.photo_url && "!Needs a photo", r.photo_url && !r.cue && "Needs “what to notice”"] }),
+      flags: [!r.published && "Hidden", !r.photo_url && "!Needs a photo", !r.photo_url && r.wanted && "On Send a Photo", r.photo_url && !r.cue && "Needs “what to notice”"] }),
     fields: [
       { name: "level", type: "choice", label: "Level", options: LEVEL_CHOICES, dflt: 1, num: true },
       { name: "title", type: "text", label: "Name of the behavior", required: true, max: 120, help: "Like “The Play Bow”." },
       { name: "species", type: "text", label: "Which animal?", max: 40, help: "Like Dog, Cat or Goldfish." },
       { name: "photo_url", type: "photo", label: "The photo", folder: "games", frame: "photo_frame", shapes: [{ a: 1, label: "On the card" }],
         help: "The photo with your cue arrows drawn on it, square, at least 800 pixels wide. No words on it: those show when the pair is matched." },
+      { name: "wanted", type: "toggle", label: "Ask for photos of this", help: "While it has no photo, the Send a Photo page lists it, so visitors can send one in. What they send is never shown on the site: it waits at the top of Matching for you to look at." },
       { name: "tile", type: "textarea", rows: 2, max: 400, label: "What's in the photo", help: "Read out for people who can't see it." },
       { name: "cue", type: "text", max: 300, label: "What to notice", help: "The cue your arrow points to, like “Ears pinned back: she's scared.”" },
       { name: "question", type: "textarea", rows: 2, max: 400, label: "The question on a match", required: true },
@@ -886,6 +892,7 @@ async function route() {
     if (sec === "settings") return await showSettings();
     if (sec === "montage") return await showMontage();
     if (sec === "fanart-review") return await showFanartReview(id);
+    if (sec === "gamephoto") return await showGamePhoto(id);
     if (!SECTIONS[sec]) return go("#/");
     return id ? await showForm(sec, id, params) : await showList(sec);
   } catch (e) {
@@ -933,7 +940,7 @@ function showNotEditor() {
 
 async function showHome() {
   const now = encodeURIComponent(new Date().toISOString());
-  const [msgs, animals, goals, progs, help, events, week, videos, places, collabs, fosters, advs, pics, posts, coming, fanart, fanWaiting, supporters] = await Promise.all([
+  const [msgs, animals, goals, progs, help, events, week, videos, places, collabs, fosters, advs, pics, posts, coming, fanart, fanWaiting, supporters, gameWaiting] = await Promise.all([
     api.list("messages", "select=id&handled=is.false"),
     api.list("animals", "select=id,name,status,published,checked_on"),
     api.list("goals", "select=id,title,status,published,figures_updated_at,bars:goal_bars(id)"),
@@ -952,12 +959,15 @@ async function showHome() {
     api.list("fanart", "select=id"),
     api.list("fanart_submissions", "select=id"),
     api.list("supporters", "select=id"),
+    api.list("game_photo_submissions", "select=id"),
   ]);
   const soon = coming.flat().length;
   const todo = [];
   if (msgs.length) todo.push(`<li><b>${plural(msgs.length, "new message")}</b><div class="btns"><a class="btn royal sm" href="#/messages">Read ${msgs.length === 1 ? "it" : "them"}</a></div></li>`);
   if (fanWaiting.length) todo.push(`<li><b>${plural(fanWaiting.length, "new piece", "new pieces")} of fan art</b><small>Sent through the Fan Art page. Nothing shows until you approve it.</small>
     <div class="btns"><a class="btn royal sm" href="#/fanart">Look at ${fanWaiting.length === 1 ? "it" : "them"}</a></div></li>`);
+  if (gameWaiting.length) todo.push(`<li><b>${plural(gameWaiting.length, "photo")} sent for the games</b><small>From the Send a Photo page. None of them show on the site.</small>
+    <div class="btns"><a class="btn royal sm" href="#/pairs">Look at ${gameWaiting.length === 1 ? "it" : "them"}</a></div></li>`);
   for (const a of animals.filter(a => a.status === "looking" && a.published && stale(a.checked_on, 21)).sort((x, y) => (x.checked_on || "").localeCompare(y.checked_on || ""))) {
     const d = daysAgo(a.checked_on);
     todo.push(`<li><b>${h(a.name)}: still available?</b><small>${d === null ? "Never checked." : d >= 28 ? `Hidden from the site until re-checked. Last checked ${h(nice(a.checked_on))}.` : `Last checked ${h(nice(a.checked_on))}. Hides itself after 4 weeks.`}</small>
@@ -995,6 +1005,7 @@ async function showHome() {
     videos: plural(videos.length, "video"), places: plural(places.length, "place"), photos: plural(pics.length, "photo"), help: plural(help.length, "listing"),
     visitors: week ? plural(week.days.reduce((a, d) => a + d[1], 0), "view") + " this week" : "",
     fanart: fanWaiting.length ? `${fanWaiting.length} waiting` : plural(fanart.length, "piece"), supporters: plural(supporters.length, "name"),
+    pairs: gameWaiting.length ? `${plural(gameWaiting.length, "photo")} sent` : "",
   };
   badge(msgs.length);
   recheckSub();
@@ -1154,18 +1165,62 @@ const fanartWaiting = list => (!list?.length ? "" : `<h2 class="sub">Waiting for
   <ul class="todo fa-wait">${list.map(s => `<li><a class="fa-thumb" href="#/fanart-review/${h(s.id)}" aria-hidden="true" tabindex="-1"><img data-inbox="${h(s.image_path)}" alt=""></a>
     <span><b>${h(s.title || "Untitled")}</b><small>From ${h(s.credit)} · ${h(when(s.created_at))}</small></span>
     <div class="btns"><a class="btn royal sm" href="#/fanart-review/${h(s.id)}">Look at it</a></div></li>`).join("")}</ul>`);
-async function inboxArt(path) {
+const FAN_INBOX = "fanart-inbox", GAME_INBOX = "game-photo-inbox";
+async function inboxArt(path, bucket = FAN_INBOX) {
   let r;
-  try { r = await fetch(`${API}/storage/v1/object/authenticated/fanart-inbox/${encodeURIComponent(path)}`, { headers: { apikey: KEY, Authorization: `Bearer ${await token()}` } }); }
+  try { r = await fetch(`${API}/storage/v1/object/authenticated/${bucket}/${encodeURIComponent(path)}`, { headers: { apikey: KEY, Authorization: `Bearer ${await token()}` } }); }
   catch { throw new Error("The art couldn't be loaded. Check your connection and try again."); }
   if (r.status === 401) { keep(null); throw new SignedOut(); }
   if (!r.ok) throw new Error("The art couldn't be loaded. It may have been deleted already.");
   return r.blob();
 }
-const inboxThumbs = () => $$("img[data-inbox]", app).forEach(img => inboxArt(img.dataset.inbox).then(b => { img.src = URL.createObjectURL(b); }, () => {}));
-async function clearInbox(path) {
-  try { await storage("DELETE", "fanart-inbox", { prefixes: [path] }); }
-  catch (e) { if (e instanceof SignedOut) throw e; throw new Error("The art's file couldn't be deleted. Please try again."); }
+const inboxThumbs = () => $$("img[data-inbox]", app).forEach(img => inboxArt(img.dataset.inbox, img.dataset.bucket || FAN_INBOX).then(b => { img.src = URL.createObjectURL(b); }, () => {}));
+async function clearInbox(path, bucket = FAN_INBOX) {
+  try { await storage("DELETE", bucket, { prefixes: [path] }); }
+  catch (e) { if (e instanceof SignedOut) throw e; throw new Error("The file couldn't be deleted. Please try again."); }
+}
+
+/* ---------- photos people send for the games ----------
+   Sent through the Send a Photo page and kept privately. There is deliberately no way to approve or publish one from
+   here: an editor can look at it, download it, ask the sender a question, or delete it. To use a photo, she draws her
+   arrows on it and adds it to a pair like any other photo. */
+const gamePhotosWaiting = list => (!list?.length ? "" : `<h2 class="sub">Photos people sent <small>${list.length}</small></h2>
+  <p class="small">From the Send a Photo page. None of these are on the site.</p>
+  <ul class="todo fa-wait">${list.map(s => `<li><a class="fa-thumb" href="#/gamephoto/${h(s.id)}" aria-hidden="true" tabindex="-1"><img data-inbox="${h(s.image_path)}" data-bucket="${GAME_INBOX}" alt=""></a>
+    <span><b>${h(s.pair_title || "Something else")}</b><small>${s.credit ? `From ${h(s.credit)} · ` : ""}${h(when(s.created_at))}</small></span>
+    <div class="btns"><a class="btn royal sm" href="#/gamephoto/${h(s.id)}">Look at it</a></div></li>`).join("")}</ul>`);
+async function showGamePhoto(id) {
+  const [s] = await api.list("game_photo_submissions", `select=*&id=eq.${encodeURIComponent(id || "")}`);
+  if (!s) {
+    render(`<a class="back" href="#/pairs">‹ Matching</a><h1>Not found</h1><p class="note">That one wasn't found. It may have been deleted already.</p>`);
+    return;
+  }
+  const url = URL.createObjectURL(await inboxArt(s.image_path, GAME_INBOX)), mail = encodeURIComponent(s.email).replace(/%40/g, "@");
+  const file = `game-photo-${slugify(s.pair_title || "other")}-${s.created_at.slice(0, 10)}.jpg`;
+  render(`<a class="back" href="#/pairs">‹ Matching</a>
+    <h1>${h(s.pair_title ? `For ${s.pair_title}` : "A photo for the games")}</h1>
+    <p class="small">${s.credit ? `From ${h(s.credit)}, sent` : "Sent"} ${h(when(s.created_at))}</p>
+    <figure class="fa-big"><img src="${h(url)}" alt="The photo they sent"></figure>
+    <dl class="mdet">
+      <dt>What they say it shows</dt><dd>${h(s.pair_title || "Something not on the list")}</dd>
+      ${s.note ? `<dt>Their note</dt><dd class="mbody">${h(s.note)}</dd>` : ""}
+      <dt>Email</dt><dd>${h(s.email)}</dd>
+    </dl>
+    <p class="small">When they sent it, they said they took the photo and it's their pet (or the owner said it's OK), that it's OK to use it in the games with arrows drawn on it, and that they're 13 or older or a parent or guardian.</p>
+    <p class="note">This photo isn't on the site, and nothing on this screen can put it there. To use it, download it, draw your arrows on it, and add it to the pair under Matching, like any other photo. Check first that nothing in it shows a person or where someone lives.</p>
+    <div class="btns"><a class="btn royal" href="${h(url)}" download="${h(file)}">Download the photo</a>
+      ${s.pair_id ? `<a class="btn ghost" href="#/pairs/${h(s.pair_id)}">Open the pair</a>` : ""}
+      <a class="btn ghost" href="mailto:${h(mail)}?subject=${encodeURIComponent("Your photo for the Animal Guardian Alliance games")}">Ask them a question</a></div>
+    <div class="danger"><button class="linkbtn" type="button" data-act="gp-delete">Delete this photo</button></div>`);
+  $('[data-act="gp-delete"]', app).addEventListener("click", async () => {
+    if (!confirm("Delete this photo?\n\nIt's deleted for good, along with the sender's email. A copy you've downloaded stays with you.")) return;
+    try {
+      await clearInbox(s.image_path, GAME_INBOX);
+      await api.drop("game_photo_submissions", s.id);
+      toast("Deleted");
+      go("#/pairs");
+    } catch (err) { if (err instanceof SignedOut) return route(); toast(err.message, true); }
+  });
 }
 async function showFanartReview(id) {
   const [s] = await api.list("fanart_submissions", `select=*&id=eq.${encodeURIComponent(id || "")}`);

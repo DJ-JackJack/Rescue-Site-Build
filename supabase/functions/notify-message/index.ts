@@ -6,6 +6,8 @@
 //   ({"action":"test","endpoint":...}).
 // - When someone sends fan art through the Fan Art page, the database's fanart_notify trigger calls it with
 //   {"action":"fanart"}. It asks the database (fanart_claim) which pieces haven't been announced, and announces each once.
+// - When someone sends a photo through the Send a Photo page, the game_photo_notify trigger calls it with
+//   {"action":"gamephoto"}, and it does the same with game_photo_claim.
 // - Every 5 minutes, if something scheduled has gone live, the database's announce-scheduled job calls it with
 //   {"action":"live"}. Again it trusts nothing in the call: it asks the database (live_claim) what has gone live and
 //   not been announced yet, and announces each one once.
@@ -90,6 +92,18 @@ async function announceFanart() {
   return { sent: await deliver(subs, { ...data, url: "./#/fanart" }, "fanart"), items: items.length };
 }
 
+// Photos sent for the games through the Send a Photo page (they wait privately; the alert names only the behavior).
+async function announceGamePhotos() {
+  const { items = [] } = (await db("rpc/game_photo_claim", { method: "POST", body: "{}" })) || {};
+  if (!items.length) return { sent: 0, items: 0 };
+  const what = (i: { pair?: string }) => (i.pair ? `For ${short(String(i.pair), 80)}` : "For something not on the list");
+  const data = items.length === 1
+    ? { title: `${BRAND} A photo for the games`, body: what(items[0]) }
+    : { title: `${BRAND} ${items.length} photos for the games`, body: `Latest: ${what(items[items.length - 1])}` };
+  const subs: Sub[] = await db("push_subscriptions?select=endpoint,p256dh,auth");
+  return { sent: await deliver(subs, { ...data, url: "./#/pairs" }, "gamephoto"), items: items.length };
+}
+
 // Things that were scheduled and have now gone live on the site.
 async function announceLive() {
   const { items = [] } = (await db("rpc/live_claim", { method: "POST", body: "{}" })) || {};
@@ -122,6 +136,7 @@ Deno.serve(async req => {
     if (body.action === "test") return await sendTest(req, String(body.endpoint || ""));
     if (body.action === "live") return reply(200, await announceLive());
     if (body.action === "fanart") return reply(200, await announceFanart());
+    if (body.action === "gamephoto") return reply(200, await announceGamePhotos());
     return reply(200, await announceNew());
   } catch (e) {
     console.error(String(e));
