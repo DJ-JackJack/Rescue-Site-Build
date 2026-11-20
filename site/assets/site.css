@@ -140,7 +140,7 @@ section{padding:44px 0}
 .goal.feature{background:var(--deep);color:#fff;border:0}
 .goal .who{font-weight:800;font-size:.8rem;letter-spacing:.1em;text-transform:uppercase;color:var(--violet)}
 .goal.feature .who{color:var(--cyan)}
-.goal h2,.goal h3{font-size:1.55rem;margin:6px 0 4px}
+.goal h2,.goal h3{font-size:1.55rem;margin:6px 0 4px;overflow-wrap:anywhere}
 .goal .why{color:var(--ink2)}
 .goal.feature .why{color:#E6DCFF}
 .goal .price{display:inline-block;margin-top:10px;font-weight:800;font-size:.9rem;background:rgba(255,255,255,.14);border-radius:999px;padding:6px 12px}
@@ -441,6 +441,12 @@ dialog.adv{max-width:min(720px,calc(100vw - 24px))}
 .form .ticks{display:grid;gap:10px}
 
 /* Supporters: a wall of names */
+.wishlist{list-style:none;margin:16px 0 0;padding:0;display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(min(100%,260px),1fr))}
+.wishlist li{background:#fff;border-radius:16px;box-shadow:var(--shadow);padding:16px;display:flex;flex-direction:column;gap:4px}
+.wishlist b{font-size:1.05rem}
+.wishlist small{color:var(--ink2);font-weight:700;font-size:.8rem;text-transform:uppercase;letter-spacing:.04em}
+.wishlist span{color:var(--ink2)}
+.wishlist button{align-self:flex-start;margin-top:auto;padding:8px 0 0;background:none;border:0;font:inherit;font-weight:800;color:var(--royal);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
 .supporters{list-style:none;margin:0;padding:0;display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(min(100%,180px),1fr))}
 .supporters li{background:#fff;border-radius:16px;box-shadow:var(--shadow);padding:14px 16px;display:flex;flex-direction:column;gap:2px;position:relative}
 .supporters b{font-size:1.05rem;overflow-wrap:anywhere}

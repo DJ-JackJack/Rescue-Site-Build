@@ -1,0 +1,46 @@
+<!--{"title":"Send a Photo","description":"Help kids learn to read animals: send a photo of your pet for the Matching game on the Animal Guardian Alliance page.","nav":"aga","path":"send-a-photo/"}-->
+<div class="phead">
+  <div class="wrap">
+    <p class="eyebrow">Animal Guardian Alliance</p>
+    <h1>Help kids learn to read animals.</h1>
+    <p class="lede">The Matching game on the Animal Guardian Alliance page teaches kids what animals are telling us with their bodies. Each card is a photo with arrows I draw on it, pointing out things like pinned-back ears or a tucked tail. Some of these moments are hard to catch on camera, so I'm asking for your help.</p>
+    <div class="btns" style="margin-top:18px"><a class="btn royal" href="#send">Send a photo</a><a class="btn ghost" href="{{base}}animal-guardian-alliance/#games">See the games</a></div>
+  </div>
+</div>
+
+<section>
+  <div class="wrap">
+    <h2 class="h2">Photos I'm looking for</h2>
+    <p class="lede">Got a photo of your own pet doing one of these? It doesn't need to be fancy. A clear phone photo where you can see the animal's face and body is perfect.</p>
+    <ul class="wishlist" data-gamephoto-wishlist hidden></ul>
+    <p class="lede" data-gamephoto-wishlist-empty>I have photos for everything right now. Thank you! Check back later for more.</p>
+  </div>
+</section>
+
+<section style="padding-top:0" id="send">
+  <div class="wrap">
+    <div class="formcard">
+      <h2 class="h2" style="font-size:1.5rem">Send a photo</h2>
+      <p class="lede" style="margin-bottom:16px">I look at every photo. If I use yours, I'll draw my arrows on it and add it to the game myself. Nothing you send shows on the site unless I pick it.</p>
+      <form class="form" method="post" data-gamephoto-form>
+        <label>Your photo<input name="image" type="file" accept="image/*" required></label>
+        <div class="fa-preview" hidden><img alt="Your photo, ready to send"></div>
+        <label>What's it a photo of?<select name="pair" data-gamephoto-pairs><option value="other">Something else (tell me below)</option></select></label>
+        <label>What's happening in the photo? (optional)<textarea name="note" rows="3" maxlength="1000" placeholder="She'd just heard the vacuum turn on in the next room."></textarea></label>
+        <label>Your first name (optional)<input name="credit" maxlength="80" autocomplete="given-name"><small>So I can thank you.</small></label>
+        <label>Your email<input name="email" type="email" autocomplete="email" required maxlength="200"><small>Only used if I have a question about your photo, and deleted once I've looked at it.</small></label>
+        <fieldset><legend>Before you send</legend>
+          <div class="ticks">
+            <label class="tick"><input type="checkbox" name="mine" value="yes" required> I took this photo, and it's my pet (or the owner said it's OK).</label>
+            <label class="tick"><input type="checkbox" name="ok" value="yes" required> It's OK to use it in the Animal Guardian Alliance games on this site, with arrows drawn on it.</label>
+            <label class="tick"><input type="checkbox" name="age" value="yes" required> I'm 13 or older, or I'm a parent or guardian sending this for my child.</label>
+          </div>
+        </fieldset>
+        <label class="sr" aria-hidden="true">Leave this empty<input name="website" tabindex="-1" autocomplete="off"></label>
+        <button class="btn royal" type="submit">Send my photo</button>
+        <p class="formmsg" role="status" aria-live="polite"></p>
+      </form>
+      <p class="small" style="margin-top:14px">Please don't send photos with people in them, or anything that shows where someone lives, like a house number or a street sign. Your photo is shrunk, and hidden data like location is removed, before it's sent. More on the <a href="{{base}}privacy/">Privacy</a> page.</p>
+    </div>
+  </div>
+</section>

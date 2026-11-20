@@ -14,7 +14,7 @@ export const fixture = name => new URL(`./fixtures/${name}`, import.meta.url).pa
 const iso = ms => new Date(ms).toISOString();
 
 // rows only signed-in editors can read
-const PRIVATE = ["messages", "content_history", "page_views", "visit_sources", "missed_pages", "push_subscriptions", "fanart_submissions"];
+const PRIVATE = ["messages", "content_history", "page_views", "visit_sources", "missed_pages", "push_subscriptions", "fanart_submissions", "game_photo_submissions"];
 // tables whose deletes land in Recently deleted (content_history), as the keep_history trigger does
 const HISTORY = ["animals", "goals", "goal_bars", "events", "collabs", "partners", "sniffari_programs", "foster_programs", "adventures", "videos", "places",
   "page_photos", "help_resources", "articles", "fanart", "supporters", "messages", "game_situations", "match_pairs", "game_questions", "game_art"];
@@ -106,7 +106,17 @@ export function seed() {
     fanart_submissions: [
       { id: "fs1", image_path: "f1.jpg", w: 64, h: 48, title: "My drawing" + XSS, credit: "Jo" + XSS, credit_url: "https://example.org/jo", note: "For the twins!", email: "jo@example.com", created_at: iso(Date.now() - 3600e3), notified_at: null },
     ],
-    game_situations: [], game_questions: [], match_pairs: [], game_art: [],
+    game_situations: [], game_questions: [], game_art: [],
+    // Matching pairs: two the Send a Photo page asks for (one hidden), one it doesn't, and one that already has a photo
+    match_pairs: [
+      { id: "mp1", level: 2, title: "The Whale Eye" + XSS, species: "Dog", tile: "A dog showing the whites of his eyes", cue: null, question: "What do you do?", choices: ["Step back", "Pet him"], answer: 1, reward: "Safe choice!", photo_url: null, photo_frame: null, wanted: true, published: false, publish_at: null, sort: 140 },
+      { id: "mp2", level: 3, title: "The Skin Ripple", species: "Cat", tile: "A cat whose back twitches when petted", cue: null, question: "What is she saying?", choices: ["Stop, please", "More!"], answer: 1, reward: "Yes!", photo_url: null, photo_frame: null, wanted: true, published: true, publish_at: null, sort: 280 },
+      { id: "mp3", level: 1, title: "The Head Tilt", species: "Dog", tile: "A dog tilting his head", cue: null, question: "What is he doing?", choices: ["Listening", "Sleeping"], answer: 1, reward: "Yes!", photo_url: null, photo_frame: null, wanted: false, published: false, publish_at: null, sort: 90 },
+      { id: "mp4", level: 1, title: "The Play Bow", species: "Dog", tile: "A dog in a play bow", cue: "Bottom up", question: "What is he asking?", choices: ["Play!", "Go away"], answer: 1, reward: "Yes!", photo_url: "assets/games/pair-01-play-bow.jpg", photo_frame: null, wanted: true, published: true, publish_at: null, sort: 10 },
+    ],
+    game_photo_submissions: [
+      { id: "gp1", image_path: "g1.jpg", w: 64, h: 48, pair_id: "mp1", pair_title: "The Whale Eye" + XSS, note: "She'd just heard thunder " + XSS, credit: "Robin" + XSS, email: "robin@example.com", created_at: iso(Date.now() - 7200e3), notified_at: null },
+    ],
     messages: [
       { id: "m1", topic: "help", name: "Pat" + XSS, email: "pat@example.com", body: "Line one\nLine two " + XSS, details: { want: ["features", XSS], link: "https://example.org/x" }, page: "/help/", handled: false, created_at: iso(Date.now()) },
       { id: "m2", topic: "partner", name: null, email: "director@example.org", body: null, details: {}, page: "/partner/", handled: true, created_at: "2026-10-01T15:00:00Z" },
@@ -164,6 +174,20 @@ function ordered(rows, order) {
 // lasts, in seconds. opts.submitReply / opts.fanartReply: {status, body} the forms' functions answer with instead.
 export function fakeSupabase(opts = {}) {
   const D = seed(), log = [], tokens = new Set(), refresh = new Map(), files = {}, inbox = { "f1.jpg": fs.readFileSync(fixture("small.jpg")) };
+  const inboxes = { "fanart-inbox": inbox, "game-photo-inbox": { "g1.jpg": fs.readFileSync(fixture("small.jpg")) } };
+  // the parts of a form a page sent as multipart/form-data: its fields, and the image
+  const multipart = req => {
+    const buf = req.postDataBuffer() || Buffer.alloc(0), ct = req.headers()["content-type"] || "", fields = {};
+    const boundary = (ct.match(/boundary=(.+)$/) || [])[1];
+    let image = null;
+    if (boundary) for (const part of buf.toString("latin1").split("--" + boundary)) {
+      const mm = part.match(/name="([^"]+)"(?:; filename="[^"]*")?\r\n(?:Content-Type: ([^\r]+)\r\n)?\r\n([\s\S]*)\r\n$/);
+      if (!mm) continue;
+      if (mm[2]) image = Buffer.from(mm[3], "latin1"); else fields[mm[1]] = Buffer.from(mm[3], "latin1").toString("utf8");
+    }
+    return { fields, image, about: image && { bytes: image.length, jpeg: image[0] === 0xff && image[1] === 0xd8, exif: image.includes(Buffer.from("Exif")), gps: image.includes(Buffer.from("SecretPhone")) } };
+  };
+  const wishlist = () => D.match_pairs.filter(p => p.wanted && !p.photo_url).sort((a, b) => a.level - b.level || a.sort - b.sort).map(p => ({ id: p.id, title: p.title, species: p.species, tile: p.tile }));
   let n = 0, tx = 200;
   D.storage = [];
   const newSession = email => { n++; const t = "tok" + n, r = "r" + n; tokens.add(t); refresh.set(r, email); return { access_token: t, refresh_token: r, expires_in: opts.expiresIn ?? 3600, user: { email } }; };
@@ -251,16 +275,18 @@ export function fakeSupabase(opts = {}) {
         return buf ? route.fulfill({ status: 200, contentType: "image/jpeg", body: buf, headers: cors }) : json(404, {});
       }
       // ---------- the fan art inbox (private) ----------
-      if (u.pathname.startsWith("/storage/v1/object/authenticated/fanart-inbox/") && m === "GET") {
+      const inboxGet = u.pathname.match(/^\/storage\/v1\/object\/authenticated\/(fanart-inbox|game-photo-inbox)\/(.+)$/);
+      if (inboxGet && m === "GET") {
         if (!signedIn) return json(401, {});
-        const buf = inbox[decodeURIComponent(u.pathname.split("/").pop())];
+        const buf = inboxes[inboxGet[1]][decodeURIComponent(inboxGet[2])];
         return buf ? route.fulfill({ status: 200, contentType: "image/jpeg", body: buf, headers: cors }) : json(404, {});
       }
-      if (u.pathname === "/storage/v1/object/fanart-inbox" && m === "DELETE") {
+      const inboxDel = u.pathname.match(/^\/storage\/v1\/object\/(fanart-inbox|game-photo-inbox)$/);
+      if (inboxDel && m === "DELETE") {
         if (!admin) return json(401, {});
         const gone = (body() || {}).prefixes || [];
-        log.push({ inboxDeleted: gone });
-        for (const g of gone) delete inbox[g];
+        log.push({ inboxDeleted: gone, bucket: inboxDel[1] });
+        for (const g of gone) delete inboxes[inboxDel[1]][g];
         return json(200, gone.map(name => ({ name })));
       }
 
@@ -271,6 +297,18 @@ export function fakeSupabase(opts = {}) {
         if (b.action === "key") return json(200, { key: "BNcRdreALRFXTkOOUHK1EtK2wtaz5Ry4YfYCA_0QTpQtUbVlUls0VJXg7A8u-Ts1XbjhazAkj7I99e8QcYP7DkM" });
         if (b.action === "test") return signedIn ? json(200, { sent: 1 }) : json(401, { error: "You've been signed out. Please sign in again." });
         return json(200, { sent: 0 });
+      }
+      if (u.pathname === "/functions/v1/submit-game-photo") {
+        const { fields, image, about } = multipart(req);
+        log.push({ gamephoto: fields, image: about });
+        if (opts.gamePhotoReply) return json(opts.gamePhotoReply.status, opts.gamePhotoReply.body);
+        if (fields.website) return json(200, { ok: true });
+        const pair = fields.pair && fields.pair !== "other" ? wishlist().find(p => p.id === fields.pair) : null;
+        if (fields.pair && fields.pair !== "other" && !pair) return json(400, { error: "pair" });
+        const path = `g${D.game_photo_submissions.length + 10}.jpg`;
+        inboxes["game-photo-inbox"][path] = image;
+        D.game_photo_submissions.push({ id: "gp" + (D.game_photo_submissions.length + 10), image_path: path, w: Number(fields.w), h: Number(fields.h), pair_id: pair?.id || null, pair_title: pair?.title || null, note: fields.note || null, credit: fields.credit || null, email: fields.email, created_at: new Date().toISOString(), notified_at: null });
+        return json(200, { ok: true });
       }
       if (u.pathname === "/functions/v1/submit-fanart") {
         const buf = req.postDataBuffer() || Buffer.alloc(0), ct = req.headers()["content-type"] || "", fields = {};
@@ -303,6 +341,7 @@ export function fakeSupabase(opts = {}) {
         return empty();
       }
       if (table === "rpc/is_admin") return json(200, admin);
+      if (table === "rpc/game_photo_wishlist") { log.push({ wishlist: true }); return json(200, wishlist()); }
       if (table.startsWith("rpc/") && !admin) return json(auth && !signedIn ? 401 : 403, { code: "42501", message: "not allowed" });
       if (table === "rpc/visitor_summary") {
         const days = body().p_days, from = ago(days - 1);
@@ -373,7 +412,9 @@ export function report(name) {
   return failed ? 1 : 0;
 }
 export const wait = (p, ms = 350) => p.waitForTimeout(ms);
-export const overflow = p => p.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1);
+// Wider than the screen? On a phone, a page that's too wide makes the browser zoom out, so the layout's own width
+// (innerWidth) grows too: compare with the screen's width instead.
+export const overflow = p => p.evaluate(() => Math.max(document.documentElement.scrollWidth, innerWidth) > screen.width + 1);
 export const pwned = p => p.evaluate(() => !!window.__pwned);
 export const errors = p => (p.errs.length ? ": " + p.errs.join(" | ") : "");
 
