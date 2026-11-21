@@ -91,7 +91,7 @@ let loading = null, data = null;
 const loadContent = () => (loading ??= Promise.all([
   q("game_situations", "select=id,level,species,situation,light,why,green_line,yellow_line,red_line,sort&order=level.asc,sort.asc"),
   q("game_questions", "select=id,level,kind,question,choices,answer,hint,why,reward,sort&order=level.asc,sort.asc"),
-  q("match_pairs", "select=id,level,title,tile,cue,question,choices,answer,reward,photo_url,photo_frame,sort&photo_url=not.is.null&order=level.asc,sort.asc"),
+  q("match_pairs", "select=id,level,title,tile,cue,question,choices,answer,reward,photo_url,photo_frame,photo_credit,sort&photo_url=not.is.null&order=level.asc,sort.asc"),
   q("game_art", "select=id,kind,photo_url,photo_alt&order=sort.asc"),
 ]).then(([situations, questions, pairs, art]) => ({
   situations: situations.filter(s => s.situation && ["green", "yellow", "red"].includes(s.light)),
@@ -530,7 +530,7 @@ function askPair(p, qn) {
     const letters = ["A", "B", "C", "D", "E"];
     const say = [p.title, p.cue ? t("js.games.notice", "What to notice:") + " " + p.cue : "", qn.question, qn.choices.map((c, i) => `${letters[i]}: ${c}.`).join(" ")].filter(Boolean).join(" ");
     popUp(`<p class="gkicker">${h(t("js.games.matched", "A match!"))}</p><img class="gpairimg" src="${h(photoUrl(p.photo_url))}" alt="${h(p.tile || p.title)}">
-      <h3 class="gq">${h(p.title)}</h3>${p.cue ? `<p class="gcue"><b>${h(t("js.games.notice", "What to notice:"))}</b> ${h(p.cue)}</p>` : ""}
+      <h3 class="gq">${h(p.title)}</h3>${p.photo_credit ? `<p class="gcredit">${h(t("js.games.photo-by", "Photo by {name}", { name: p.photo_credit }))}</p>` : ""}${p.cue ? `<p class="gcue"><b>${h(t("js.games.notice", "What to notice:"))}</b> ${h(p.cue)}</p>` : ""}
       <p class="gq2">${h(qn.question)}</p>${readBtn()}
       <div class="gchoices">${qn.choices.map((c, i) => `<button type="button" class="gchoice" data-i="${i + 1}"><b>${letters[i]}</b> ${h(c)}</button>`).join("")}</div>
       <p class="gfeed" aria-live="polite"></p><div class="gbtns"></div>`, { say });

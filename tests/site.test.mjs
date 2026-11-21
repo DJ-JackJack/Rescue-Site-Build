@@ -222,6 +222,8 @@ async function clean(p, what) {
   ok(items.length === 2 && items[0].startsWith("The Whale Eye<img") && items[1] === "The Skin Ripple", "Send a Photo lists the pairs asked for that have no photo, hidden ones too, as plain text: " + items.join(" | "));
   ok(!items.some(t => /Head Tilt|Play Bow/.test(t)), "but not pairs nobody asked for, or that already have a photo");
   ok(!(await p.locator("[data-gamephoto-wishlist-empty]").isVisible()), "the 'nothing needed' line hides");
+  const thanks = await p.$$eval("[data-gamephoto-thanks] li b", bs => bs.map(b => b.textContent));
+  ok(thanks.length === 1 && thanks[0].startsWith("Jamie<img") && await p.locator("[data-gamephoto-thanks]").isVisible(), "the thank-you list credits photos in the game, as plain text, and not ones on hidden pairs: " + thanks.join(" | "));
   const opts = await p.$$eval("select[data-gamephoto-pairs] option", os => os.map(o => o.value));
   ok(opts.join(",") === "mp1,mp2,other", "the form offers the same list, plus Something else: " + opts.join(","));
   await p.click('[data-pick="mp2"]'); await wait(p, 300);
@@ -248,6 +250,9 @@ async function clean(p, what) {
   const { ctx, p } = await open("send-a-photo/", { sb });
   ok(await p.locator("[data-gamephoto-wishlist-empty]").isVisible() && !(await p.locator("[data-gamephoto-wishlist]").isVisible()), "with nothing asked for, the page says so");
   ok((await p.$$eval("select[data-gamephoto-pairs] option", os => os.map(o => o.value))).join() === "other", "and the form still takes something else");
+  sb.D.match_pairs.forEach(x => { x.photo_credit = null; });
+  await p.reload(); await wait(p, 900);
+  ok(!(await p.locator("[data-gamephoto-thanks]").isVisible()), "with no credits yet, there's no thank-you list");
   await ctx.close();
 }
 {

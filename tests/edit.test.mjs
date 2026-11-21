@@ -270,6 +270,7 @@ async function signIn(p, password = "right-pass") {
   ok(/For The Whale Eye<img/.test(await h1(p)) && ((await p.locator(".fa-big img").getAttribute("src")) || "").startsWith("blob:"), "a sent photo opens, loaded privately");
   const det = await p.locator(".mdet").innerText();
   ok(/thunder <img/.test(det) && /robin@example\.com/.test(det), "with their note (as plain text) and email");
+  ok(/Credit them as\s*Robin<img/.test(det) && /Photo by box/.test(await p.locator(".note").innerText()), "and the name they'd like to be credited as, with how to credit them");
   const dl = p.locator("a[download]");
   ok((await dl.count()) === 1 && ((await dl.getAttribute("href")) || "").startsWith("blob:"), "Download the photo saves the private copy");
   ok(!/approve|publish|show it/i.test(await p.locator("#app").innerText()) && !(await p.locator("#app form, #app [type=submit]").count()), "there is no way to approve or publish it from here");
@@ -285,6 +286,10 @@ async function signIn(p, password = "right-pass") {
   ok(await p.locator('[name="wanted"]').isChecked(), "the Ask for photos of this switch turns on");
   await p.click(".savebar .btn"); await wait(p, 700);
   ok(writes(sb, "match_pairs", "PATCH").some(w => w.body.wanted === true), "Ask for photos of this saves");
+  await p.goto(E + "#/pairs/mp4"); await wait(p, 700);
+  ok((await p.inputValue('[name="photo_credit"]')).startsWith("Jamie<img"), "a pair's Photo by box shows its credit");
+  await p.fill('[name="photo_credit"]', "Robin"); await p.click(".savebar .btn"); await wait(p, 700);
+  ok(writes(sb, "match_pairs", "PATCH").some(w => w.body.photo_credit === "Robin"), "Photo by saves");
   ok(!(await pwned(p)) && !p.errs.length, "game photos: no errors" + errors(p));
   await ctx.close();
 }

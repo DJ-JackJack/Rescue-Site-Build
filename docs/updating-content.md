@@ -88,6 +88,7 @@ The Send a Photo page (`site/pages/send-a-photo.html`) asks visitors for photos 
 - **Nothing sent ever goes on the site by itself.** The edit page shows waiting photos at the top of Matching, with a screen to look at, download, email the sender about, or delete each one. There is no approve or publish button: a photo is only used if an editor draws arrows on it and adds it to a pair herself.
 - A new photo sends the editors a phone alert: the `game_photo_notify` trigger calls `notify-message` with `{"action":"gamephoto"}`, and it announces each photo once (`game_photo_claim`), naming only the behavior.
 - Deleting removes the image and the row for good (no history is kept), as the Privacy page says. Backups leave the table out.
+- Credits: a sender can give a name to be credited as (`credit`). It's never copied anywhere on its own: an editor types it into the pair's `photo_credit` ("Photo by", migration `20261121_zzz_game_photo_credits.sql`). It shows under the photo when the pair is matched, and in the Send a Photo page's thank-you list, only while the pair is switched on and has a photo.
 
 ## Supporters and fan art
 

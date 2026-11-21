@@ -31,7 +31,7 @@ const DATA = () => ({
     { id: "bad", level: 1, kind: "mc", question: "Broken: answer out of range", choices: ["A", "B"], answer: 5, sort: 9 },
   ],
   match_pairs: [
-    { id: "p1", level: 1, title: "The Play Bow", tile: "A dog in a play bow", cue: "Bottom up, front down", question: "What is this dog asking?", choices: ["Leave me alone", "Let's play!"], answer: 2, reward: "Yes! A play bow invites play.", photo_url: "assets/games/pair-01-play-bow.jpg", photo_frame: null, sort: 1 },
+    { id: "p1", level: 1, title: "The Play Bow", tile: "A dog in a play bow", cue: "Bottom up, front down", question: "What is this dog asking?", choices: ["Leave me alone", "Let's play!"], answer: 2, reward: "Yes! A play bow invites play.", photo_url: "assets/games/pair-01-play-bow.jpg", photo_frame: null, photo_credit: "Sam" + XSS, sort: 1 },
     { id: "p2", level: 1, title: "The Slow Blink", tile: "A cat blinking slowly", cue: null, question: "What does a slow blink mean?", choices: ["Something in her eye", "She trusts you"], answer: 2, reward: "A kitty kiss!", photo_url: "assets/games/pair-02-slow-blink.jpg", photo_frame: null, sort: 2 },
     { id: "p3", level: 1, title: "The Tucked Tail" + XSS, tile: "A dog with a tucked tail", cue: "Tail tucked under", question: "What should you do?", choices: ["Hug him", "Give him space"], answer: 2, reward: "Space helps him feel brave.", photo_url: "assets/games/pair-05-tucked-tail.jpg", photo_frame: null, sort: 3 },
     { id: "p5", level: 2, title: "Raised Hackles", tile: "A dog with raised fur", cue: "Fur up along the back", question: "What does it mean?", choices: ["Big feelings", "Needs a haircut"], answer: 1, reward: "Like goosebumps!", photo_url: "assets/games/pair-06-happy-greeting.jpg", photo_frame: null, sort: 2 },
@@ -159,6 +159,7 @@ async function answerPop(p, data, wrong = false) {
   await p.click(`.gflip[data-i="${pa[0]}"]`); await p.click(`.gflip[data-i="${pa[1]}"]`); await wait(p, 300);
   const title = await p.locator(".gpop .gq").innerText(), pair = data.match_pairs.find(x => x.title === title);
   ok(pair && (await p.locator(".gpop .gpairimg").isVisible()) && (!pair.cue || (await p.locator(".gpop .gcue").innerText()).includes(pair.cue)), "a match shows the photo, what to notice and the question");
+  ok(pair.photo_credit ? (await p.locator(".gpop .gcredit").innerText()) === "Photo by " + pair.photo_credit : !(await p.locator(".gpop .gcredit").count()), "a photo someone sent shows who it's by (as plain text), and other photos show no credit");
   await p.click(`.gpop .gchoice[data-i="${pair.answer === 1 ? 2 : 1}"]`); await wait(p, 150);
   ok((await p.locator(".gpop .gfeed").innerText()).startsWith("Here's what it means:") && (await p.locator(".gpop .gchoice.right").count()) === 1, "a wrong answer explains, gently");
   await p.click(".gpop [data-next]"); await wait(p, 200);
