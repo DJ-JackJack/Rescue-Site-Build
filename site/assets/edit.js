@@ -731,6 +731,7 @@ const SECTIONS = {
       { name: "species", type: "text", label: "Which animal?", max: 40, help: "Like Dog, Cat or Goldfish." },
       { name: "photo_url", type: "photo", label: "The photo", folder: "games", frame: "photo_frame", shapes: [{ a: 1, label: "On the card" }],
         help: "The photo with your cue arrows drawn on it, square, at least 800 pixels wide. No words on it: those show when the pair is matched." },
+      { name: "photo_credit", type: "text", max: 80, label: "Photo by", help: "Only for a photo someone sent through Send a Photo who asked to be credited: type the name exactly as they gave it. It shows under the photo in the game and in the thank-you list on the Send a Photo page. Leave it empty for any other photo." },
       { name: "wanted", type: "toggle", label: "Ask for photos of this", help: "While it has no photo, the Send a Photo page lists it, so visitors can send one in. What they send is never shown on the site: it waits at the top of Matching for you to look at." },
       { name: "tile", type: "textarea", rows: 2, max: 400, label: "What's in the photo", help: "Read out for people who can't see it." },
       { name: "cue", type: "text", max: 300, label: "What to notice", help: "The cue your arrow points to, like “Ears pinned back: she's scared.”" },
@@ -1203,11 +1204,12 @@ async function showGamePhoto(id) {
     <figure class="fa-big"><img src="${h(url)}" alt="The photo they sent"></figure>
     <dl class="mdet">
       <dt>What they say it shows</dt><dd>${h(s.pair_title || "Something not on the list")}</dd>
+      <dt>Credit them as</dt><dd>${s.credit ? h(s.credit) : "They didn't give a name, so no credit."}</dd>
       ${s.note ? `<dt>Their note</dt><dd class="mbody">${h(s.note)}</dd>` : ""}
       <dt>Email</dt><dd>${h(s.email)}</dd>
     </dl>
-    <p class="small">When they sent it, they said they took the photo and it's their pet (or the owner said it's OK), that it's OK to use it in the games with arrows drawn on it, and that they're 13 or older or a parent or guardian.</p>
-    <p class="note">This photo isn't on the site, and nothing on this screen can put it there. To use it, download it, draw your arrows on it, and add it to the pair under Matching, like any other photo. Check first that nothing in it shows a person or where someone lives.</p>
+    <p class="small">When they sent it, they said they took the photo and it's their pet (or the owner said it's OK), that it's OK to use it in the games with arrows drawn on it, credited with the name they gave, and that they're 13 or older or a parent or guardian.</p>
+    <p class="note">This photo isn't on the site, and nothing on this screen can put it there. To use it, download it, draw your arrows on it, and add it to the pair under Matching, like any other photo${s.credit ? `. Type “${h(s.credit)}” into the pair's Photo by box so they're credited` : ""}. Check first that nothing in it shows a person or where someone lives.</p>
     <div class="btns"><a class="btn royal" href="${h(url)}" download="${h(file)}">Download the photo</a>
       ${s.pair_id ? `<a class="btn ghost" href="#/pairs/${h(s.pair_id)}">Open the pair</a>` : ""}
       <a class="btn ghost" href="mailto:${h(mail)}?subject=${encodeURIComponent("Your photo for the Animal Guardian Alliance games")}">Ask them a question</a></div>

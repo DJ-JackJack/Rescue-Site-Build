@@ -997,6 +997,17 @@ async function renderGamePhotoWishlist(el) {
     if (sel) { sel.value = b.dataset.pick; sel.closest("form").scrollIntoView({ behavior: "smooth", block: "start" }); }
   });
 }
+// the thank-you list: names people asked to be credited as, for photos that are in the game now (switched on, with a
+// photo). Taea types each name into the pair herself, so nothing shows that she didn't put there.
+async function renderGamePhotoThanks(el) {
+  let rows = [];
+  try { rows = await q("match_pairs", "select=id,title,photo_credit&photo_credit=not.is.null&photo_url=not.is.null&order=level.asc,sort.asc"); } catch { return; }
+  rows = rows.filter(r => String(r.photo_credit || "").trim());
+  if (!rows.length) return;
+  await wordingReady;
+  el.innerHTML = rows.map(r => `<li${ed("pairs", r.id, r.title)}><b>${h(r.photo_credit)}</b><small>${h(r.title)}</small></li>`).join("");
+  el.closest("[data-show-when-filled]")?.removeAttribute("hidden");
+}
 function setupGamePhotoForm(form) {
   setupSendForm(form, {
     endpoint: "submit-game-photo", fields: ["pair", "note", "credit", "email", "mine", "ok", "age"],
@@ -1346,6 +1357,7 @@ $$("[data-supporters]").forEach(renderSupporters);
 $$("[data-fanart]").forEach(renderFanart);
 $$("form[data-fanart-form]").forEach(setupFanartForm);
 $$("[data-gamephoto-wishlist]").forEach(renderGamePhotoWishlist);
+$$("[data-gamephoto-thanks]").forEach(renderGamePhotoThanks);
 $$("form[data-gamephoto-form]").forEach(setupGamePhotoForm);
 countView();
 })();

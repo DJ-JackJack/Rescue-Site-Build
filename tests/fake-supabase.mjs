@@ -109,10 +109,10 @@ export function seed() {
     game_situations: [], game_questions: [], game_art: [],
     // Matching pairs: two the Send a Photo page asks for (one hidden), one it doesn't, and one that already has a photo
     match_pairs: [
-      { id: "mp1", level: 2, title: "The Whale Eye" + XSS, species: "Dog", tile: "A dog showing the whites of his eyes", cue: null, question: "What do you do?", choices: ["Step back", "Pet him"], answer: 1, reward: "Safe choice!", photo_url: null, photo_frame: null, wanted: true, published: false, publish_at: null, sort: 140 },
+      { id: "mp1", level: 2, title: "The Whale Eye" + XSS, species: "Dog", tile: "A dog showing the whites of his eyes", cue: null, question: "What do you do?", choices: ["Step back", "Pet him"], answer: 1, reward: "Safe choice!", photo_url: null, photo_frame: null, photo_credit: "Hidden Helper", wanted: true, published: false, publish_at: null, sort: 140 },
       { id: "mp2", level: 3, title: "The Skin Ripple", species: "Cat", tile: "A cat whose back twitches when petted", cue: null, question: "What is she saying?", choices: ["Stop, please", "More!"], answer: 1, reward: "Yes!", photo_url: null, photo_frame: null, wanted: true, published: true, publish_at: null, sort: 280 },
       { id: "mp3", level: 1, title: "The Head Tilt", species: "Dog", tile: "A dog tilting his head", cue: null, question: "What is he doing?", choices: ["Listening", "Sleeping"], answer: 1, reward: "Yes!", photo_url: null, photo_frame: null, wanted: false, published: false, publish_at: null, sort: 90 },
-      { id: "mp4", level: 1, title: "The Play Bow", species: "Dog", tile: "A dog in a play bow", cue: "Bottom up", question: "What is he asking?", choices: ["Play!", "Go away"], answer: 1, reward: "Yes!", photo_url: "assets/games/pair-01-play-bow.jpg", photo_frame: null, wanted: true, published: true, publish_at: null, sort: 10 },
+      { id: "mp4", level: 1, title: "The Play Bow", species: "Dog", tile: "A dog in a play bow", cue: "Bottom up", question: "What is he asking?", choices: ["Play!", "Go away"], answer: 1, reward: "Yes!", photo_url: "assets/games/pair-01-play-bow.jpg", photo_frame: null, photo_credit: "Jamie" + XSS, wanted: true, published: true, publish_at: null, sort: 10 },
     ],
     game_photo_submissions: [
       { id: "gp1", image_path: "g1.jpg", w: 64, h: 48, pair_id: "mp1", pair_title: "The Whale Eye" + XSS, note: "She'd just heard thunder " + XSS, credit: "Robin" + XSS, email: "robin@example.com", created_at: iso(Date.now() - 7200e3), notified_at: null },
