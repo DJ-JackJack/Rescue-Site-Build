@@ -1,6 +1,8 @@
-/* The Animal Guardian Alliance games, on the Alliance page: Go on Green, Baby Steps, Matching and the level quizzes.
-   - What they show comes from the database (game_situations, game_questions, match_pairs, game_art), published rows
-     only, read with the public key. Taea changes it on the edit page; nothing needs rebuilding.
+/* The Animal Guardian Alliance games, on the Alliance page: Go on Green, Baby Steps, What Would You Do? (the scenario
+   game), the level quizzes, and Matching, which is on the shelf for now: its card only shows once 2 pairs are on.
+   - What they show comes from the database (game_situations, game_questions, game_scenarios, match_pairs, game_art,
+     and checked_by for the "Checked by" credits), published rows only, read with the public key. Taea changes it on
+     the edit page; nothing needs rebuilding.
    - Nothing about the child is sent anywhere. Players are an animal picture, never a name, and their scores, levels and
      badges are kept in this browser's storage on this device. A grown-up can copy a move code to carry a player to
      another device; the code holds only that progress.
@@ -33,7 +35,7 @@ const PET_NAMES = () => ({ fox: t("js.games.pet-fox", "Fox"), owl: t("js.games.p
   butterfly: t("js.games.pet-butterfly", "Butterfly"), frog: t("js.games.pet-frog", "Frog"), bee: t("js.games.pet-bee", "Bee"),
   hedgehog: t("js.games.pet-hedgehog", "Hedgehog"), penguin: t("js.games.pet-penguin", "Penguin") });
 const petName = id => PET_NAMES()[petOf(id)[0]];
-const fresh = () => ({ gog: { level: 1, best: {}, bones: 0 }, bs: { level: 1, best: {} }, match: { level: 1, seen: [], best: {} }, quiz: { best: {} }, badges: [] });
+const fresh = () => ({ gog: { level: 1, best: {}, bones: 0 }, bs: { level: 1, best: {} }, sc: { level: 1, seen: [], best: {} }, match: { level: 1, seen: [], best: {} }, quiz: { best: {} }, badges: [] });
 let saving = true;
 let state = { v: 1, players: [], current: null, muted: false, prog: {} };
 try {
@@ -45,7 +47,7 @@ const player = () => state.players.find(p => p.id === state.current) || null;
 // a player's progress, with anything missing filled in (for progress saved by an older version)
 const prog = (id = state.current) => {
   const f = fresh(), p = state.prog[id] || {};
-  return (state.prog[id] = { ...f, ...p, gog: { ...f.gog, ...p.gog }, bs: { ...f.bs, ...p.bs }, match: { ...f.match, ...p.match }, quiz: { ...f.quiz, ...p.quiz }, badges: Array.isArray(p.badges) ? p.badges : [] });
+  return (state.prog[id] = { ...f, ...p, gog: { ...f.gog, ...p.gog }, bs: { ...f.bs, ...p.bs }, sc: { ...f.sc, ...p.sc }, match: { ...f.match, ...p.match }, quiz: { ...f.quiz, ...p.quiz }, badges: Array.isArray(p.badges) ? p.badges : [] });
 };
 function addPlayer(pet, from) {
   const id = Math.random().toString(36).slice(2, 10);
@@ -93,9 +95,13 @@ const loadContent = () => (loading ??= Promise.all([
   q("game_questions", "select=id,level,kind,question,choices,answer,hint,why,reward,sort&order=level.asc,sort.asc"),
   q("match_pairs", "select=id,level,title,tile,cue,question,choices,answer,reward,photo_url,photo_frame,photo_credit,sort&photo_url=not.is.null&order=level.asc,sort.asc"),
   q("game_art", "select=id,kind,photo_url,photo_alt&order=sort.asc"),
-]).then(([situations, questions, pairs, art]) => ({
+  q("game_scenarios", "select=id,level,topic,scenario,question,choices,answer,hint,why,reward,sort&order=level.asc,sort.asc"),
+  q("checked_by", "select=id,place,name,link_url,sort&order=sort.asc,name.asc").catch(() => []), // the credits never stop a game
+]).then(([situations, questions, pairs, art, scenarios, checks]) => ({
   situations: situations.filter(s => s.situation && ["green", "yellow", "red"].includes(s.light)),
   questions: questions.filter(x => Array.isArray(x.choices) && x.choices.length >= 2 && x.answer >= 1 && x.answer <= x.choices.length),
+  scenarios: scenarios.filter(x => x.scenario && Array.isArray(x.choices) && x.choices.length >= 2 && x.answer >= 1 && x.answer <= x.choices.length),
+  checks: (Array.isArray(checks) ? checks : []).filter(c => c.name && c.place),
   pairs: pairs.filter(p => photoUrl(p.photo_url) && Array.isArray(p.choices) && p.choices.length >= 2 && p.answer >= 1 && p.answer <= p.choices.length),
   art: art.filter(a => photoUrl(a.photo_url)),
 })).then(d => (data = d)).catch(e => { loading = null; throw e; }));
@@ -171,8 +177,9 @@ const stopSpeaking = () => { if (canSpeak) speechSynthesis.cancel(); };
 const GAMES = {
   gog: { icon: "🚦", name: () => t("js.games.gog", "Go on Green"), blurb: () => t("js.games.gog-blurb", "Read the animal, then choose: go, slow down, or stop.") },
   bs: { icon: "🐾", name: () => t("js.games.bs", "Baby Steps"), blurb: () => t("js.games.bs-blurb", "Collect bones, take baby steps, and wait for a yes before you pet.") },
-  match: { icon: "🃏", name: () => t("js.games.match", "Matching"), blurb: () => t("js.games.match-blurb", "Find the pairs and learn what each animal is telling you.") },
+  sc: { icon: "🧭", name: () => t("js.games.sc", "What Would You Do?"), blurb: () => t("js.games.sc-blurb", "Read what's happening, then pick the best thing to do. For ages 8 to 12.") },
   quiz: { icon: "❓", name: () => t("js.games.quiz", "Quizzes"), blurb: () => t("js.games.quiz-blurb", "Questions about caring for pets, from easy to hard.") },
+  match: { icon: "🃏", name: () => t("js.games.match", "Matching"), blurb: () => t("js.games.match-blurb", "Find the pairs and learn what each animal is telling you.") },
 };
 document.body.insertAdjacentHTML("beforeend", `<dialog class="gbox" aria-labelledby="gtitle">
   <div class="ghead"><span class="gwho" aria-hidden="true"></span><h2 id="gtitle"></h2><span class="gscore" aria-live="polite"></span>
@@ -195,7 +202,7 @@ function openGame(key) {
   body.innerHTML = `<p class="gwait">${h(t("js.games.loading", "Getting the game ready…"))}</p>`;
   if (!box.open) box.showModal();
   history.replaceState(null, "", location.pathname + location.search + "#play-" + key);
-  loadContent().then(() => ({ gog: playGoOnGreen, bs: playBabySteps, match: playMatching, quiz: playQuizzes })[key]())
+  loadContent().then(() => ({ gog: playGoOnGreen, bs: playBabySteps, sc: playScenarios, match: playMatching, quiz: playQuizzes })[key]())
     .catch(() => { body.innerHTML = `<p class="gwait">${h(t("js.games.failed", "The game couldn't load. Check the connection and try again."))}</p>`; });
 }
 // a card that pops up over the game (a question, a dice roll, a choice); resolves with what the child picked
@@ -208,11 +215,12 @@ function popUp(html, { say = "" } = {}) {
 const closePop = () => { layer.hidden = true; layer.innerHTML = ""; stopSpeaking(); };
 
 // One question, with tries (another go after a wrong answer, then the answer explained). Resolves { right, first }.
-function ask(qn, { tries = 2, title = t("js.games.question", "Question") } = {}) {
+// scene: a situation shown (and read out) before the question, for What Would You Do?
+function ask(qn, { tries = 2, title = t("js.games.question", "Question"), scene = "" } = {}) {
   return new Promise(done => {
     const letters = ["A", "B", "C", "D", "E"];
-    const say = `${qn.question} ${qn.kind === "tf" ? "" : qn.choices.map((c, i) => `${letters[i]}: ${c}.`).join(" ")}`;
-    popUp(`<p class="gkicker">${h(title)}</p><h3 class="gq">${h(qn.question)}</h3>${readBtn()}
+    const say = `${scene ? scene + " " : ""}${qn.question} ${qn.kind === "tf" ? "" : qn.choices.map((c, i) => `${letters[i]}: ${c}.`).join(" ")}`;
+    popUp(`<p class="gkicker">${h(title)}</p>${scene ? `<p class="gscene">${h(scene)}</p>` : ""}<h3 class="gq">${h(qn.question)}</h3>${readBtn()}
       <div class="gchoices${qn.kind === "tf" ? " tf" : ""}">${qn.choices.map((c, i) => `<button type="button" class="gchoice" data-i="${i + 1}">${qn.kind === "tf" ? "" : `<b>${letters[i]}</b> `}${h(c)}</button>`).join("")}</div>
       <p class="gfeed" aria-live="polite"></p><div class="gbtns"></div>`, { say });
     let attempt = 0;
@@ -549,6 +557,46 @@ function askPair(p, qn) {
   });
 }
 
+/* ---------- What Would You Do? ----------
+   The scenario game, for ages 8 to 12: a situation in words (a pet, wildlife you find, basic first aid, staying aware)
+   and the best thing to do. A second try after a wrong answer, then the answer, and why it's best, either way.
+   2 points on the first try, 1 on the second. Rounds of 5, in Taea's order, new ones each round until every
+   scenario of the level has been seen; then a badge and the next level, and after Level 3, round again. */
+const TOPICS = () => ({ pets: ["🐾", t("js.games.topic-pets", "Pets")], wildlife: ["🦉", t("js.games.topic-wildlife", "Wildlife")],
+  firstaid: ["🩹", t("js.games.topic-firstaid", "First aid")], aware: ["👀", t("js.games.topic-aware", "Staying aware")] });
+const SC_ROUND = 5;
+async function playScenarios() {
+  const m = prog().sc, all = data.scenarios;
+  if (all.length < 3) { body.innerHTML = `<p class="gwait">${h(t("js.games.soon", "This game is coming soon."))}</p>`; return; }
+  const usable = LEVELS.filter(l => all.some(s => s.level === l));
+  let level = Math.min(3, Math.max(1, m.level || 1));
+  if (!usable.includes(level)) level = usable.find(l => l > level) || usable[0]; // skip a level with none yet
+  const pool = all.filter(s => s.level === level);
+  const round = [...pool.filter(s => !m.seen.includes(s.id)), ...shuffle(pool.filter(s => m.seen.includes(s.id)))].slice(0, SC_ROUND);
+  setScore(0);
+  for (let i = 0; i < round.length; i++) {
+    const s = round[i], [icon, topic] = TOPICS()[s.topic] || TOPICS().pets;
+    body.innerHTML = `<p class="gstep">${h(t("js.games.of", "{n} of {total}", { n: i + 1, total: round.length }))} · ${h(t("js.games.level", "Level {n}", { n: level }))}</p>`;
+    // right: their well-done line and why; wrong twice: the answer and why
+    const why = [s.reward, s.why].filter(Boolean).join(" ");
+    const r = await ask({ kind: "mc", question: s.question || t("js.games.sc-question", "What would you do?"), choices: s.choices, answer: s.answer, hint: s.hint, reward: why || null, why: s.why || s.reward || null },
+      { tries: 2, title: `${icon} ${topic}`, scene: s.scenario });
+    if (r.right) setScore(score + (r.first ? 2 : 1));
+    if (!m.seen.includes(s.id)) { m.seen.push(s.id); save(); }
+  }
+  const lines = [t("js.games.sc-done-why", "Knowing what to do, and why, is what keeps animals and people safe.")];
+  let badgeId = null;
+  if (pool.every(s => m.seen.includes(s.id))) {
+    badgeId = `sc-${level}`;
+    m.seen = m.seen.filter(id => !pool.some(s => s.id === id));
+    if (level < 3) { m.level = level + 1; if (all.some(s => s.level > level)) lines.push(t("js.games.level-up", "On to Level {n}!", { n: level + 1 })); }
+    else { m.level = 1; lines.push(t("js.games.sc-all-seen", "You've done every scenario! Let's go round again.")); }
+  }
+  save();
+  await finish({ title: t("js.games.round-done", "Round done!"), lines, badgeId, game: "sc", level, next: t("js.games.next-round", "Next round") });
+  playScenarios();
+}
+
 /* ---------- the level quizzes ----------
    The question bank for one level, in order (easy to hard), with a second try after a wrong answer. 2 points on the
    first try, 1 on the second. A badge for finishing each level. */
@@ -590,14 +638,23 @@ function choosePet(then) {
   };
 }
 // whether a game has enough switched on to play (until the content has loaded, it's assumed it does)
-const ready = k => !data || (k === "gog" ? data.situations.length >= 3 : k === "match" ? data.pairs.length >= 2 : data.questions.length >= 1);
+const ready = k => !data || (k === "gog" ? data.situations.length >= 3 : k === "sc" ? data.scenarios.length >= 3 : k === "match" ? data.pairs.length >= 2 : data.questions.length >= 1);
+// Matching is on the shelf until Taea has the photos: its card only shows once 2 pairs are on (no "Coming soon")
+const shown = k => k !== "match" || (!!data && data.pairs.length >= 2);
+// "Checked by …": the people or businesses who checked a game for Taea, linked to them where there's a link
+function checkedHTML(place) {
+  const names = (data?.checks || []).filter(c => c.place === place).map(c => { const u = safeUrl(c.link_url || ""); return u ? `<a href="${h(u)}" rel="noopener" target="_blank">${h(c.name)}</a>` : h(c.name); });
+  if (!names.length) return "";
+  const and = h(t("js.games.and", "and")), list = names.length === 1 ? names[0] : `${names.slice(0, -1).join(", ")} ${and} ${names[names.length - 1]}`;
+  return `<p class="gchecked"><span aria-hidden="true">✔</span> ${h(t("js.games.checked-by", "Checked by {names}")).replace("{names}", () => list)}</p>`;
+}
 function drawLauncher() {
   const p = player(), pg = p ? prog() : null;
   const stars = key => LEVELS.map(l => `<span class="${pg?.badges.includes(`${key}-${l}`) ? "on" : ""}" title="${h(t("js.games.level", "Level {n}", { n: l }))}">★</span>`).join("");
   root.innerHTML = `<div class="gplayers"><p class="glabel">${h(t("js.games.who", "Who's playing?"))}</p><div class="gpetrow">
     ${state.players.map(x => `<button type="button" class="gpet${x.id === state.current ? " on" : ""}" data-player="${h(x.id)}" aria-pressed="${x.id === state.current}"><span aria-hidden="true">${petOf(x.pet)[1]}</span>${h(petName(x.pet))}</button>`).join("")}
     ${freePets().length ? `<button type="button" class="gpet add" data-new><span aria-hidden="true">＋</span>${h(t("js.games.new-player", "New player"))}</button>` : ""}</div></div>
-    <ul class="gcardsl">${Object.entries(GAMES).map(([k, g]) => `<li class="gcardl"><span class="gic" aria-hidden="true">${g.icon}</span><h3>${h(g.name())}</h3><p>${h(g.blurb())}</p>
+    <ul class="gcardsl">${Object.entries(GAMES).filter(([k]) => shown(k)).map(([k, g]) => `<li class="gcardl"><span class="gic" aria-hidden="true">${g.icon}</span><h3>${h(g.name())}</h3><p>${h(g.blurb())}</p>${checkedHTML(k)}
       ${p ? `<p class="gstars" aria-label="${h(t("js.games.badges-of", "Badges: {n} of 3", { n: LEVELS.filter(l => pg.badges.includes(`${k}-${l}`)).length }))}">${stars(k)}</p>` : ""}
       ${ready(k) ? `<button type="button" class="btn royal" data-play="${k}">${h(t("js.games.play", "Play"))}</button>` : `<span class="gsoon">${h(t("js.games.soon-card", "Coming soon"))}</span>`}</li>`).join("")}</ul>
     <details class="ggrown"><summary>${h(t("js.games.grownups", "For grown-ups: saving and moving progress"))}</summary>
@@ -636,6 +693,6 @@ root.addEventListener("click", e => {
 if (!player() && state.players.length) { state.current = state.players[0].id; save(); }
 drawLauncher();
 loadContent().then(() => { if (!box.open && !$(".gpets", root)) drawLauncher(); }, () => {}); // so a game with nothing to play yet says "Coming soon"
-const asked0 = location.hash.match(/^#play-(gog|bs|match|quiz)$/);
+const asked0 = location.hash.match(/^#play-(gog|bs|sc|match|quiz)$/);
 if (asked0) openGame(asked0[1]);
 })();

@@ -372,6 +372,9 @@ const LIGHT_CHOICES = [["green", "Green: go"], ["yellow", "Yellow: slow down"], 
 const GAME_SPECIES = [["dog", "Dog"], ["cat", "Cat"], ["bunny", "Bunny"]];
 const QUESTION_KINDS = [["mc", "Multiple choice"], ["tf", "True or false"], ["scenario", "Scenario"]];
 const ART_KINDS = [["dog", "Dog"], ["cat", "Cat"], ["bunny", "Bunny"], ["bone", "Bone"], ["bowl", "Food bowl"]];
+const SC_TOPICS = [["pets", "Pets"], ["wildlife", "Wildlife"], ["firstaid", "First aid"], ["aware", "Staying aware"]];
+const SC_ICONS = { pets: "🐾", wildlife: "🦉", firstaid: "🩹", aware: "👀" };
+const CHECK_PLACES = [["sc", "What Would You Do?"], ["gog", "Go on Green"], ["bs", "Baby Steps"], ["quiz", "The quizzes"], ["match", "Matching"], ["aga", "The whole Alliance page"]];
 const SHOW = { name: "published", type: "toggle", label: "Show on the site", help: "Turn this off to hide it without losing anything.", dflt: true, onSite: true };
 const SORT = { name: "sort", type: "number", label: "Order", help: "Lower numbers show first. The ↑ ↓ arrows on the list set this for you.", dflt: 100, more: true };
 // When it goes live: as soon as it's saved, or on its own at a set time (publish_at). The database keeps it from visitors
@@ -710,9 +713,35 @@ const SECTIONS = {
       SHOW, SORT,
     ],
   },
+  scenarios: {
+    table: "game_scenarios", title: "What Would You Do?", short: "Scenarios", one: "scenario", icon: "🧭",
+    intro: "The scenario game on the Animal Guardian Alliance page, for ages 8 to 12, in Matching's spot while Matching is on the shelf. Each scenario is a situation in words and the best thing to do. A round is 5, in your order, new ones first. The game shows on the site once 3 scenarios are on.",
+    query: "select=*&order=level.asc,sort.asc",
+    reorder: { group: r => r.level },
+    filters: [["all", "All"], ...SC_TOPICS, ["hidden", "Hidden"]],
+    tokens: r => [r.topic, r.published ? "" : "hidden"],
+    titleOf: r => r.scenario,
+    row: r => ({ title: r.scenario, emoji: SC_ICONS[r.topic] || "🧭", sub: `Level ${r.level} · ${label(SC_TOPICS, r.topic)}`, flags: [!r.published && "Hidden"] }),
+    fields: [
+      { name: "level", type: "choice", label: "Level", options: LEVEL_CHOICES, dflt: 1, num: true },
+      { name: "topic", type: "choice", label: "What's it about?", options: SC_TOPICS, dflt: "pets" },
+      { name: "scenario", type: "textarea", rows: 4, max: 800, label: "What's happening", required: true,
+        help: "The situation, in words an 8 to 12 year old reads easily, like “You find a baby bird on the sidewalk, and there's no nest in sight.”" },
+      { name: "question", type: "text", max: 300, label: "The question", help: "Optional. Leave it empty for “What would you do?”" },
+      { name: "choices", type: "lines", rows: 4, label: "The answers to pick from", help: "One answer per line, 2 to 5 of them.",
+        validate: v => (v.length < 2 || v.length > 5 ? "Add between 2 and 5 answers, one per line." : "") },
+      { name: "answer", type: "number", label: "Which one is best?", dflt: 1, help: "Its line number: 1 for the first answer, 2 for the second, and so on.",
+        validate: (v, vals) => (!(v >= 1 && v <= (vals.choices || []).length) ? "Pick the line number of the best answer." : "") },
+      { name: "hint", type: "textarea", rows: 2, max: 400, label: "Hint after a wrong answer", help: "Optional. Shown before they try again." },
+      { name: "why", type: "textarea", rows: 3, max: 600, label: "Why it's best", help: "Shown with the answer, whether they got it or not." },
+      { name: "reward", type: "textarea", rows: 2, max: 400, label: "When they get it right", help: "Optional. Your well-done line, shown before why it's best." },
+      { ...SHOW, dflt: false, help: "Starts off, so nothing shows until you're happy with it (and it's been checked, if you're having it checked). The game shows on the site once 3 scenarios are on." },
+      SORT,
+    ],
+  },
   pairs: {
     table: "match_pairs", title: "Matching pairs", short: "Matching", one: "pair", icon: "🃏", canAdd: true,
-    intro: "The cards in Matching, on the Animal Guardian Alliance page. Each pair is one photo shown on two cards; a match asks what the animal is telling us. A pair only shows once it has a photo and “Show on the site” is on.",
+    intro: "The cards in Matching. Matching is on the shelf for now: its card isn't on the Animal Guardian Alliance page until 2 pairs are on, and then it comes back by itself. Each pair is one photo shown on two cards; a match asks what the animal is telling us. A pair only shows once it has a photo and “Show on the site” is on.",
     query: "select=*&order=level.asc,sort.asc",
     // photos sent through the Send a Photo page, waiting for a look, above the pairs (none of them are on the site)
     load: () => api.list("game_photo_submissions", "select=id,image_path,pair_title,credit,created_at&order=created_at.asc"),
@@ -779,6 +808,21 @@ const SECTIONS = {
       { name: "photo_url", type: "photo", label: "The picture", folder: "games", alpha: true, required: true,
         help: "A PNG with a see-through background looks best on the games' colors." },
       { name: "photo_alt", type: "text", max: 300, label: "What's in it", help: "A few words for people who can't see it, like “A golden puppy sitting”." },
+      SHOW, SORT,
+    ],
+  },
+  checks: {
+    table: "checked_by", title: "Checked by", one: "credit", icon: "✔️",
+    intro: "Credits for the people or businesses who checked part of the Alliance for you, like a trainer who reviewed a game. Each one shows as “Checked by …”: under that game's card, or at the top of the Alliance page for the whole page. Add someone only once they've agreed to be named.",
+    query: "select=*&order=place.asc,sort.asc,name.asc",
+    reorder: { group: r => r.place },
+    titleOf: r => r.name,
+    row: r => ({ title: r.name, emoji: "✔️", sub: [label(CHECK_PLACES, r.place), r.place === "aga" ? r.note : ""].filter(Boolean).join(" · "), flags: [!r.published && "Hidden"] }),
+    fields: [
+      { name: "place", type: "choice", label: "What did they check?", options: CHECK_PLACES, dflt: "sc" },
+      { name: "name", type: "text", label: "Their name or business", required: true, max: 120, help: "Exactly as they'd like it shown." },
+      { name: "link_url", type: "url", label: "Link to them", help: "Optional. Their website or page.", check: [/^https:\/\//, "Links need to start with https://"] },
+      { name: "note", type: "text", label: "What they checked", max: 200, help: "Optional. Shown in brackets after their name, like “the dog safety scenarios”.", when: v => v.place === "aga" },
       SHOW, SORT,
     ],
   },
@@ -1011,7 +1055,9 @@ async function showHome() {
   badge(msgs.length);
   recheckSub();
   tidyPhotosNow();
+  setTimeout(showPushNag); // once the screen is drawn
   render(`<h1>Hi! What needs updating?</h1>
+    <div id="pushnag"></div>
     <h2 class="sub">Needs attention</h2>
     ${todo.length ? `<ul class="todo">${todo.join("")}</ul>` : `<p class="allgood">All caught up ✓</p>`}
     ${GROUPS.map(([name, where, keys]) => `<section class="tgroup"><h2 class="sub">${h(name)}</h2><p class="small where">${h(where)}</p>
@@ -1026,7 +1072,7 @@ const GROUPS = [
   ["Shelters and rescues", "The Rescues page, Shelter Goals and the Foster page", ["partners", "goals", "events", "collabs", "fosters"]],
   ["Rescues on Sniffari", "The Rescues on Sniffari page", ["montage", "sniffari", "adventures", "videos", "places"]],
   ["Fans and supporters", "The Fan Art and Supporters pages", ["fanart", "supporters"]],
-  ["Animal Guardian Alliance games", "The games on the Alliance page", ["situations", "pairs", "questions", "gameart"]],
+  ["Animal Guardian Alliance games", "The games on the Alliance page", ["situations", "scenarios", "questions", "gameart", "checks", "pairs"]],
   ["Every page", "The words and photos on any page", ["text", "photos"]],
   ["Help pages", "Help keeping your pet, Caring for Yourself and Wildlife", ["help"]],
   ["Inbox and settings", "Behind the scenes", ["messages", "visitors", "deleted", "settings"]],
@@ -1903,6 +1949,25 @@ async function showPushLine() {
   el.innerHTML = on ? `🔔 Notifications are on for this device. <a href="#/settings">Settings</a>`
     : `🔔 Get a notification on this device for new messages and things going live: <a href="#/settings">turn them on in Settings</a>.`;
 }
+// On the start screen, while this device isn't getting notifications, a reminder to set them up in Settings (each
+// phone needs its own, so a new phone starts without them). "Not on this device" hides it on this device, and so does
+// turning them off in Settings on purpose; turning them on clears that.
+const NAG_OFF = "tt-push-nag-off";
+const nagOff = on => { try { on ? localStorage.setItem(NAG_OFF, "1") : localStorage.removeItem(NAG_OFF); } catch {} };
+async function showPushNag() {
+  const el = $("#pushnag", app);
+  if (!el) return;
+  try { if (localStorage.getItem(NAG_OFF)) return; } catch {}
+  let text;
+  if (canPush()) {
+    if (Notification.permission === "granted" && (await currentSub().catch(() => null))) return;
+    text = Notification.permission === "denied" ? "Notifications are blocked on this device, so new messages won't show up here." : "This device isn't getting notifications for new messages.";
+  } else if (apple() && !onHomeScreen()) text = "To get notifications for new messages on this iPhone or iPad, add the editor to your Home Screen first.";
+  else return; // this browser can't show them at all
+  if (!el.isConnected) return;
+  el.innerHTML = `<div class="card pushnag"><p><b>🔔 ${h(text)}</b> Each phone needs its own, so a new phone starts without them.</p>
+    <div class="btns"><a class="btn royal sm" href="#/settings">Set them up in Settings</a><button class="linkbtn" type="button" data-act="push-nag-off">Not on this device</button></div></div>`;
+}
 // The number of new messages on the app icon, where the phone supports it.
 const badge = n => { try { (n ? navigator.setAppBadge?.(n) : navigator.clearAppBadge?.())?.catch?.(() => {}); } catch {} };
 navigator.serviceWorker?.addEventListener("message", e => { if (["#/messages", "#/scheduled"].includes(e.data?.go)) go(e.data.go); });
@@ -2061,7 +2126,7 @@ const KIND = {
   foster_programs: ["Foster program", r => r.program_name || r.shelter_name], adventures: ["Day out", r => r.title],
   videos: ["Day-out video", r => r.title], places: ["Dog-friendly place", r => r.name], page_photos: ["Photo on a page", r => SECTIONS.photos.titleOf(r)],
   help_resources: ["Help listing", r => r.name], articles: ["Twin Squawk post", r => r.title], fanart: ["Fan art", r => r.title || `By ${r.credit}`], supporters: ["Supporter", r => r.name],
-  game_situations: ["Go on Green situation", r => r.situation], match_pairs: ["Matching pair", r => r.title], game_questions: ["Game question", r => r.question], game_art: ["Game picture", r => r.photo_alt || r.kind], messages: ["Message", r => (r.name ? `From ${r.name}` : `From ${r.email}`)],
+  game_situations: ["Go on Green situation", r => r.situation], match_pairs: ["Matching pair", r => r.title], game_questions: ["Game question", r => r.question], game_scenarios: ["What Would You Do? scenario", r => r.scenario], checked_by: ["Checked by credit", r => r.name], game_art: ["Game picture", r => r.photo_alt || r.kind], messages: ["Message", r => (r.name ? `From ${r.name}` : `From ${r.email}`)],
 };
 async function showDeleted() {
   const rows = await api.list("content_history", "select=id,at,tx,tbl,row_key,data,by_email&op=eq.delete&restored_at=is.null&order=at.desc&limit=300");
@@ -2141,7 +2206,7 @@ async function showVisitors(range) {
 /* ---------- one-tap actions ---------- */
 app.addEventListener("click", async e => {
   const b = e.target.closest("[data-act]");
-  if (!b || !["checked", "adopted", "live-now", "msg-done", "msg-undo", "msg-delete", "restore", "forget", "nocount", "clear-counts", "push-on", "push-off", "push-test", "w-clear", "signout"].includes(b.dataset.act)) return;
+  if (!b || !["checked", "adopted", "live-now", "msg-done", "msg-undo", "msg-delete", "restore", "forget", "nocount", "clear-counts", "push-on", "push-off", "push-test", "push-nag-off", "w-clear", "signout"].includes(b.dataset.act)) return;
   const id = b.dataset.id;
   try {
     switch (b.dataset.act) {
@@ -2163,8 +2228,9 @@ app.addEventListener("click", async e => {
         if (!r?.length) throw new Error(NOT_SAVED);
         toast("Removed for good"); break;
       }
-      case "push-on": b.disabled = true; await turnOnPush(); toast("Notifications are on ✓"); break;
-      case "push-off": await turnOffPush(); toast("Notifications are off on this device"); break;
+      case "push-on": b.disabled = true; await turnOnPush(); nagOff(false); toast("Notifications are on ✓"); break;
+      case "push-off": await turnOffPush(); nagOff(true); toast("Notifications are off on this device"); break;
+      case "push-nag-off": nagOff(true); toast("Okay, no reminder on this device. You can still turn them on in Settings."); break;
       case "push-test": {
         const sub = await currentSub();
         if (!sub) throw new Error("This device isn't signed up for notifications. Turn them on first.");

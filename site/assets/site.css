@@ -684,6 +684,10 @@ h2.eyebrow{font-family:var(--f-body);line-height:1.55}
 .gcardl p{margin:0;color:var(--ink2)}
 .gcardl .btn,.gsoon{margin-top:auto;align-self:flex-start}
 .gsoon{font-weight:800;color:var(--royal);background:#fff;border-radius:999px;padding:8px 14px}
+.gcardl .gchecked,.gchecked{font-size:.85rem;font-weight:700;color:var(--ink2);overflow-wrap:anywhere}
+.gchecked a{color:var(--royal)}
+.gchecked span[aria-hidden]{color:#2E9E5B}
+.gscene{margin:4px 0 10px;font-size:1.08rem;line-height:1.5}
 .gic{font-size:2rem;line-height:1}
 .gstars span{color:#CFC6E3;font-size:1.2rem;margin-right:2px}
 .gstars span.on{color:#F2B705}

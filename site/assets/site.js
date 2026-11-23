@@ -972,20 +972,23 @@ function setupFanartForm(form) {
 /* ---------- Send a Photo: photos for the Matching game ----------
    The page lists the behaviors still needing a photo (game_photo_wishlist: the pairs Taea marked "Ask for photos of
    this" that have none yet), and its form sends a photo to submit-game-photo. Sent photos stay private: they never
-   show on the site unless Taea adds one to a pair herself. */
+   show on the site unless Taea adds one to a pair herself. While the list loads the page says so; if it can't load,
+   it says that (never "I have photos for everything", which is only for a list that really is empty). */
 async function renderGamePhotoWishlist(el) {
-  let rows = [];
+  const say = which => ["loading", "failed", "empty"].forEach(k => $$(`[data-gamephoto-wishlist-${k}]`).forEach(x => { x.hidden = k !== which; }));
+  let rows = null;
   try {
     const r = await fetch(`${S.supabaseUrl}/rest/v1/rpc/game_photo_wishlist`, { method: "POST", headers: { apikey: S.supabaseKey, "Content-Type": "application/json" }, body: "{}" });
     if (!r.ok) throw new Error(r.status);
     rows = await r.json();
-  } catch { return; }
-  if (!Array.isArray(rows) || !rows.length) return;
+  } catch {}
+  if (!Array.isArray(rows)) return say("failed");
+  if (!rows.length) return say("empty");
   await wordingReady;
+  say("");
   el.innerHTML = rows.map(p => `<li><b>${h(p.title)}</b>${p.species ? `<small>${h(p.species)}</small>` : ""}${p.tile ? `<span>${h(p.tile)}</span>` : ""}
     <button type="button" class="linkbtn" data-pick="${h(p.id)}">${h(t("js.gamephoto.send-one", "I have one of these"))}</button></li>`).join("");
   el.hidden = false;
-  $$("[data-gamephoto-wishlist-empty]").forEach(x => { x.hidden = true; });
   $$("select[data-gamephoto-pairs]").forEach(sel => {
     sel.insertAdjacentHTML("afterbegin", rows.map(p => `<option value="${h(p.id)}">${h(p.title)}${p.species ? ` (${h(p.species)})` : ""}</option>`).join(""));
     sel.selectedIndex = 0;
@@ -1007,6 +1010,22 @@ async function renderGamePhotoThanks(el) {
   await wordingReady;
   el.innerHTML = rows.map(r => `<li${ed("pairs", r.id, r.title)}><b>${h(r.photo_credit)}</b><small>${h(r.title)}</small></li>`).join("");
   el.closest("[data-show-when-filled]")?.removeAttribute("hidden");
+}
+/* ---------- "Checked by" ----------
+   Under a part of a page (data-checked-by="aga", the whole Alliance page): the people or businesses who checked it for
+   Taea (checked_by), each linked to them where there's a link, and what they checked if she said. Hidden until there's
+   one. The games show their own under each game's card (games.js). */
+async function renderCheckedBy(el) {
+  let rows = [];
+  try { rows = await q("checked_by", `select=id,name,link_url,note&place=eq.${encodeURIComponent(el.dataset.checkedBy)}&order=sort.asc,name.asc`); } catch { return; }
+  rows = rows.filter(r => String(r.name || "").trim());
+  if (!rows.length) return;
+  await wordingReady;
+  const names = rows.map(r => { const u = safeUrl(r.link_url || ""), n = u ? `<a href="${h(u)}" rel="noopener" target="_blank">${h(r.name)}</a>` : h(r.name);
+    return `<span${ed("checks", r.id, r.name)}>${n}${r.note ? ` (${h(r.note)})` : ""}</span>`; });
+  const and = h(t("js.checked.and", "and")), list = names.length === 1 ? names[0] : `${names.slice(0, -1).join(", ")} ${and} ${names[names.length - 1]}`;
+  el.innerHTML = `<span aria-hidden="true">✔</span> ${h(t("js.checked.by", "Checked by {names}")).replace("{names}", () => list)}`;
+  el.hidden = false;
 }
 function setupGamePhotoForm(form) {
   setupSendForm(form, {
@@ -1219,12 +1238,12 @@ document.addEventListener("click", e => {
 const EDIT_LISTS = { squawk: "Twin Squawk posts", animals: "Animals", goals: "Shelter goals", partners: "Rescues and shelters", events: "Events",
   collabs: "Working together", fosters: "Foster programs", sniffari: "Sniffari programs", adventures: "Our day outs", videos: "Day-out videos",
   places: "Dog-friendly places", help: "Help listings", supporters: "Supporters", fanart: "Fan art",
-  situations: "Go on Green situations", pairs: "Matching pairs", questions: "Game questions", gameart: "Game pictures" };
+  situations: "Go on Green situations", scenarios: "What Would You Do? scenarios", pairs: "Matching pairs", questions: "Game questions", gameart: "Game pictures", checks: "Checked by" };
 // the lists each page shows, so the menu offers them even while the page has none yet
 const PAGE_LISTS = { home: ["animals", "goals"], animals: ["animals"], stories: ["animals"], "willow-woods": ["animals", "goals", "events", "collabs"],
   rescues: ["partners", "animals", "events", "collabs"], "shelter-goals": ["goals"], sniffari: ["sniffari", "adventures", "videos", "places"],
   foster: ["fosters"], help: ["help"], "care-for-yourself": ["help"], wildlife: ["help"], "twin-squawk": ["squawk"],
-  supporters: ["supporters"], "fan-art": ["fanart"], "animal-guardian-alliance": ["situations", "pairs", "questions", "gameart"], "send-a-photo": ["pairs"] };
+  supporters: ["supporters"], "fan-art": ["fanart"], "animal-guardian-alliance": ["situations", "scenarios", "questions", "gameart", "checks", "pairs"], "send-a-photo": ["pairs"] };
 let editor = false;
 try { editor = !!localStorage.getItem("tt-editor-session"); } catch {}
 if (editor && S.scope) {
@@ -1359,5 +1378,6 @@ $$("form[data-fanart-form]").forEach(setupFanartForm);
 $$("[data-gamephoto-wishlist]").forEach(renderGamePhotoWishlist);
 $$("[data-gamephoto-thanks]").forEach(renderGamePhotoThanks);
 $$("form[data-gamephoto-form]").forEach(setupGamePhotoForm);
+$$("[data-checked-by]").forEach(renderCheckedBy);
 countView();
 })();

@@ -17,7 +17,7 @@ const iso = ms => new Date(ms).toISOString();
 const PRIVATE = ["messages", "content_history", "page_views", "visit_sources", "missed_pages", "push_subscriptions", "fanart_submissions", "game_photo_submissions"];
 // tables whose deletes land in Recently deleted (content_history), as the keep_history trigger does
 const HISTORY = ["animals", "goals", "goal_bars", "events", "collabs", "partners", "sniffari_programs", "foster_programs", "adventures", "videos", "places",
-  "page_photos", "help_resources", "articles", "fanart", "supporters", "messages", "game_situations", "match_pairs", "game_questions", "game_art"];
+  "page_photos", "help_resources", "articles", "fanart", "supporters", "messages", "game_situations", "match_pairs", "game_questions", "game_art", "game_scenarios", "checked_by"];
 
 // A made-up world: a shelter, the horse sanctuary, a rescue that hasn't said yes yet, animals in every state, and
 // something with script in it nearly everywhere, which must only ever show as text.
@@ -107,6 +107,16 @@ export function seed() {
       { id: "fs1", image_path: "f1.jpg", w: 64, h: 48, title: "My drawing" + XSS, credit: "Jo" + XSS, credit_url: "https://example.org/jo", note: "For the twins!", email: "jo@example.com", created_at: iso(Date.now() - 3600e3), notified_at: null },
     ],
     game_situations: [], game_questions: [], game_art: [],
+    game_scenarios: [
+      { id: "sc1", level: 1, topic: "wildlife", scenario: "You find a baby bird on the sidewalk" + XSS, question: null, choices: ["Pick it up", "Tell a grown-up and leave it be"], answer: 2, hint: null, why: "Its parents are often close by.", reward: null, published: true, publish_at: null, sort: 1 },
+      { id: "sc2", level: 1, topic: "firstaid", scenario: "Your dog cut his paw on a walk.", question: "What first?", choices: ["Tell a grown-up", "Ignore it"], answer: 1, hint: null, why: "A grown-up can call the vet.", reward: null, published: false, publish_at: null, sort: 2 },
+    ],
+    // "Checked by": one shown under a game, one at the top of the Alliance page (with a bad link that must not link), one hidden
+    checked_by: [
+      { id: "cb1", place: "sc", name: "Good Dog Training" + XSS, link_url: "https://example.org/gooddog", note: null, published: true, publish_at: null, sort: 1 },
+      { id: "cb2", place: "aga", name: "Paws Vet Care", link_url: "javascript:alert(1)", note: "the first-aid scenarios" + XSS, published: true, publish_at: null, sort: 1 },
+      { id: "cb3", place: "aga", name: "Hidden Helper", link_url: null, note: null, published: false, publish_at: null, sort: 2 },
+    ],
     // Matching pairs: two the Send a Photo page asks for (one hidden), one it doesn't, and one that already has a photo
     match_pairs: [
       { id: "mp1", level: 2, title: "The Whale Eye" + XSS, species: "Dog", tile: "A dog showing the whites of his eyes", cue: null, question: "What do you do?", choices: ["Step back", "Pet him"], answer: 1, reward: "Safe choice!", photo_url: null, photo_frame: null, photo_credit: "Hidden Helper", wanted: true, published: false, publish_at: null, sort: 140 },
