@@ -266,8 +266,36 @@ async function clean(p, what) {
   await ctx.close();
 }
 {
+  // while the list loads, the page says so; never "I have photos for everything" before it knows
+  const { ctx, p } = await newPage(browser);
+  await p.route("**/rest/v1/rpc/game_photo_wishlist", async r => { await new Promise(ok => setTimeout(ok, 1500)); await r.fallback(); });
+  await p.goto(B + "send-a-photo/"); await wait(p, 500);
+  ok(await p.locator("[data-gamephoto-wishlist-loading]").isVisible() && !(await p.locator("[data-gamephoto-wishlist-empty]").isVisible()), "while the list loads, Send a Photo says so, not that it has everything");
+  await wait(p, 1800);
+  ok(!(await p.locator("[data-gamephoto-wishlist-loading]").isVisible()) && await p.locator("[data-gamephoto-wishlist]").isVisible(), "then the list shows");
+  await ctx.close();
+}
+{
+  const { ctx, p } = await newPage(browser);
+  await p.route("**/rest/v1/rpc/game_photo_wishlist", r => r.abort());
+  await p.goto(B + "send-a-photo/"); await wait(p, 900);
+  ok(await p.locator("[data-gamephoto-wishlist-failed]").isVisible() && !(await p.locator("[data-gamephoto-wishlist-empty]").isVisible()) && !(await p.locator("[data-gamephoto-wishlist-loading]").isVisible()),
+    "if the list can't load, the page says to refresh, and never that it has photos for everything");
+  ok((await p.$$eval("select[data-gamephoto-pairs] option", os => os.map(o => o.value))).join() === "other", "and the form still takes a photo");
+  await ctx.close();
+}
+{
   const { ctx, p } = await open("animal-guardian-alliance/");
-  ok((await p.locator('#games a[href="/send-a-photo/"]').count()) === 1, "the games section links to Send a Photo");
+  ok((await p.locator('a[href="/send-a-photo/"]').count()) === 0, "the Alliance page no longer links to Send a Photo (the page itself stays up)");
+  const top = p.locator('.phead [data-checked-by="aga"]');
+  ok(await top.isVisible() && (await top.innerText()).includes("Checked by Paws Vet Care (the first-aid scenarios<img") && !(await top.innerText()).includes("Hidden Helper") && (await top.locator("a").count()) === 0,
+    "the top of the Alliance page says who checked it, and what, as plain text: a bad link isn't linked, and a hidden credit doesn't show: " + (await top.innerText()));
+  await wait(p, 600);
+  const cards = await p.$$eval(".gcardl h3", hs => hs.map(x => x.innerText));
+  ok(!cards.includes("Matching") && cards.includes("What Would You Do?"), "Matching is on the shelf (fewer than 2 pairs on), and What Would You Do? is in its spot: " + cards.join(" | "));
+  const sc = p.locator(".gcardl", { hasText: "What Would You Do?" });
+  ok(/Coming soon/.test(await sc.innerText()) && (await sc.locator(".gchecked a").getAttribute("href")) === "https://example.org/gooddog", "with only 1 scenario on it says Coming soon, with who checked it");
+  await clean(p, "Alliance page");
   await ctx.close();
 }
 

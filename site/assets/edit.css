@@ -215,6 +215,9 @@
 .vdev h2{font-size:1.1rem;margin:0 0 6px}
 /* notifications */
 .pushbox{margin:12px 0 16px}
+.pushnag{margin:12px 0 4px}
+.pushnag p{margin:0;overflow-wrap:anywhere}
+.pushnag .btns{margin-top:10px;align-items:center}
 .pushbox h2{font-size:1.1rem;margin:0 0 6px}
 .pushbox .btns{margin-top:10px;align-items:center}
 /* page wording */

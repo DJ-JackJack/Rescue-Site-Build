@@ -54,6 +54,30 @@ async function signIn(p, password = "right-pass") {
   await ctx.close();
 }
 
+// ---------- the start screen reminds a device that isn't getting notifications ----------
+{
+  const { ctx, p } = await newPage(browser);
+  await signIn(p); await wait(p, 400);
+  const nag = p.locator("#pushnag .pushnag");
+  ok(await nag.isVisible() && /(isn't getting notifications|blocked)/.test(await nag.innerText()) && /new phone/.test(await nag.innerText()) && (await nag.locator('a[href="#/settings"]').count()) === 1,
+    "on a device without notifications, the start screen says so (a new phone needs its own), with a link to Settings");
+  await nag.locator('[data-act="push-nag-off"]').click(); await wait(p, 500);
+  ok(!(await p.locator("#pushnag .pushnag").count()), "Not on this device hides it");
+  await p.reload(); await wait(p, 900);
+  ok((await h1(p)) === "Hi! What needs updating?" && !(await p.locator("#pushnag .pushnag").count()), "and it stays hidden on this device");
+  await ctx.close();
+}
+{
+  // a device that's already signed up (a stand-in push service): no reminder
+  const init = `Object.defineProperty(Notification, "permission", { get: () => "granted" });
+    const sub = { endpoint: "https://push.example.org/x", toJSON: () => ({ endpoint: "https://push.example.org/x", keys: { p256dh: "k", auth: "a" } }), unsubscribe: async () => true };
+    navigator.serviceWorker.register = async () => ({ pushManager: { getSubscription: async () => sub, subscribe: async () => sub } });`;
+  const { ctx, p } = await newPage(browser, { init });
+  await signIn(p); await wait(p, 600);
+  ok((await h1(p)) === "Hi! What needs updating?" && !(await p.locator("#pushnag .pushnag").count()), "a device that gets notifications has no reminder");
+  await ctx.close();
+}
+
 // ---------- an old sign-in is refreshed; a revoked one asks to sign in again ----------
 {
   const sb = fakeSupabase(), s = sb.session();

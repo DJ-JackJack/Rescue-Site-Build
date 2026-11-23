@@ -38,6 +38,20 @@ const DATA = () => ({
     { id: "p4", level: 2, title: "Whale Eye", tile: "A dog showing the whites of his eyes", cue: null, question: "What do you do?", choices: ["Step back", "Take the bone"], answer: 1, reward: "Safe choice!", photo_url: "assets/games/pair-04-puffed-up-tail.jpg", photo_frame: null, sort: 1 },
   ],
   game_art: [],
+  // What Would You Do?: three at Level 1 (in Taea's order), one at Level 2, and a broken one that never shows
+  game_scenarios: [
+    { id: "sc1", level: 1, topic: "pets", scenario: "Your friend's dog is eating, and you want to say hi." + XSS, question: null, choices: ["Pet him while he eats", "Wait until he's done eating"], answer: 2, hint: "How would you feel if someone grabbed your plate?", why: "Dogs can guard their food.", reward: "Great call!", sort: 1 },
+    { id: "sc2", level: 1, topic: "wildlife", scenario: "You find a baby bunny alone in the grass.", question: "What's the best thing to do?", choices: ["Take it home", "Leave it and tell a grown-up", "Give it milk"], answer: 2, hint: null, why: "Its mom comes back at night.", reward: null, sort: 2 },
+    { id: "sc3", level: 1, topic: "firstaid", scenario: "Your cat is limping.", question: null, choices: ["Tell a grown-up so they can call the vet", "Pull on her leg to check"], answer: 1, hint: null, why: null, reward: "Yes!", sort: 3 },
+    { id: "sc4", level: 2, topic: "aware", scenario: "A dog you don't know runs toward you, barking.", question: null, choices: ["Run away", "Stand still like a tree"], answer: 2, hint: null, why: "Running can make a dog chase.", reward: null, sort: 1 },
+    { id: "scbad", level: 1, topic: "pets", scenario: "Broken: answer out of range", question: null, choices: ["A", "B"], answer: 5, sort: 9 },
+  ],
+  // "Checked by": a linked one, one with a bad link (shown, but never as a link), and three on one game
+  checked_by: [
+    { id: "c1", place: "sc", name: "Good Dog Training" + XSS, link_url: "https://example.org/gooddog", sort: 1 },
+    { id: "c2", place: "gog", name: "Bad Link Vets", link_url: "javascript:alert(1)", sort: 1 },
+    ...["A", "B", "C"].map((n, i) => ({ id: "c3" + i, place: "quiz", name: n, link_url: null, sort: i })),
+  ],
 });
 
 function fakeSupabase(data, log) {
@@ -102,12 +116,17 @@ async function answerPop(p, data, wrong = false) {
   return qn;
 }
 
-// ---------- the Alliance page: who's playing and the four games ----------
+// ---------- the Alliance page: who's playing and the games ----------
 {
   const { ctx, p, data, log } = await newPage();
   await p.goto(B + "animal-guardian-alliance/"); await wait(p, 600);
-  ok(await p.locator("#games").isVisible() && (await p.locator(".gcardl").count()) === 4, "the Alliance page has a games section with four games");
-  ok((await p.locator(".gcardl h3").allInnerTexts()).join("|") === "Go on Green|Baby Steps|Matching|Quizzes", "Go on Green, Baby Steps, Matching and Quizzes");
+  ok(await p.locator("#games").isVisible() && (await p.locator(".gcardl").count()) === 5, "the Alliance page has a games section with five games");
+  ok((await p.locator(".gcardl h3").allInnerTexts()).join("|") === "Go on Green|Baby Steps|What Would You Do?|Quizzes|Matching", "Go on Green, Baby Steps, What Would You Do?, Quizzes, and Matching (back from the shelf, with 2 or more pairs on)");
+  const sc = p.locator(".gcardl", { hasText: "What Would You Do?" }), gog = p.locator(".gcardl", { hasText: "Go on Green" }), quiz = p.locator(".gcardl", { hasText: "Quizzes" });
+  ok((await sc.locator(".gchecked").innerText()).includes("Checked by Good Dog Training<img") && (await sc.locator(".gchecked a").getAttribute("href")) === "https://example.org/gooddog",
+    "a game's card says who checked it, as plain text, linked to them");
+  ok((await gog.locator(".gchecked").innerText()).includes("Checked by Bad Link Vets") && (await gog.locator(".gchecked a").count()) === 0, "a credit with a bad link shows, but not as a link");
+  ok((await quiz.locator(".gchecked").innerText()).includes("Checked by A, B and C") && (await p.locator(".gcardl", { hasText: "Baby Steps" }).locator(".gchecked").count()) === 0, "several are listed with commas and “and”; a game nobody checked has no line");
   ok(await p.locator(".gpet.add").isVisible() && (await p.locator(".gpet[data-player]").count()) === 0, "nobody's playing yet: a New player button");
   ok((await p.locator('.phead a[href="#games"]').count()) === 1, "the top of the page links to the games");
   ok(!(await overflow(p)) && !p.errs.length, "the page fits the phone, no errors" + (p.errs.length ? ": " + p.errs.join(" | ") : ""));
@@ -217,13 +236,46 @@ async function answerPop(p, data, wrong = false) {
   await ctx.close();
 }
 
-// ---------- a game with nothing switched on yet says "Coming soon" ----------
+// ---------- a game with nothing switched on yet says "Coming soon"; Matching stays on the shelf ----------
 {
   const { ctx, p, data } = await newPage();
-  data.game_situations.length = 0; data.match_pairs.length = 1;
+  data.game_situations.length = 0; data.match_pairs.length = 1; data.game_scenarios.length = 2;
   await p.goto(B + "animal-guardian-alliance/"); await wait(p, 700);
   const cards = await p.$$eval(".gcardl", cs => cs.map(c => c.querySelector("h3").innerText + ":" + (c.querySelector("[data-play]") ? "Play" : c.querySelector(".gsoon")?.innerText)));
-  ok(cards.join("|") === "Go on Green:Coming soon|Baby Steps:Play|Matching:Coming soon|Quizzes:Play", "games with too little switched on say Coming soon instead of Play " + cards.join("|"));
+  ok(cards.join("|") === "Go on Green:Coming soon|Baby Steps:Play|What Would You Do?:Coming soon|Quizzes:Play", "games with too little switched on say Coming soon instead of Play, and Matching (under 2 pairs) isn't shown at all: " + cards.join("|"));
+  await ctx.close();
+}
+
+// ---------- What Would You Do? ----------
+{
+  const { ctx, p, data, log } = await newPage();
+  await p.goto(B + "animal-guardian-alliance/#play-sc"); await wait(p, 600);
+  await p.click('.gpets [data-pet="owl"]'); await wait(p, 600);
+  ok((await p.locator("#gtitle").innerText()) === "What Would You Do?" && /1 of 3 · Level 1/.test(await p.locator(".gstep").innerText()), "What Would You Do? opens on a round of Level 1 (the broken one left out)");
+  ok(/pets/i.test(await p.locator(".gpop .gkicker").innerText()) && (await p.locator(".gpop .gscene").innerText()) === data.game_scenarios[0].scenario && (await p.locator(".gpop .gq").innerText()) === "What would you do?",
+    "each card shows its topic, what's happening (as plain text), and “What would you do?” when there's no question of its own");
+  await p.click("[data-read]"); await wait(p, 100);
+  ok((await p.evaluate(() => window.__said)).some(s => s.startsWith("Your friend's dog is eating") && s.includes("What would you do?") && s.includes("B: Wait until he's done eating")), "Read it to me reads what's happening, the question and the answers");
+  await p.click('.gpop .gchoice[data-i="1"]'); await wait(p, 120);
+  ok((await p.locator(".gpop .gfeed").innerText()).startsWith("How would you feel") && (await p.locator(".gpop [data-next]").count()) === 0, "a wrong answer gets the hint and another try");
+  await p.click('.gpop .gchoice[data-i="2"]'); await wait(p, 120);
+  ok((await p.locator(".gpop .gfeed").innerText()) === "Great call! Dogs can guard their food.", "the right answer gets the well-done line and why it's best");
+  await p.click(".gpop [data-next]"); await wait(p, 200);
+  ok((await p.locator(".gpop .gq").innerText()) === "What's the best thing to do?" && /wildlife/i.test(await p.locator(".gpop .gkicker").innerText()), "the next card, in Taea's order, with its own question");
+  await p.click('.gpop .gchoice[data-i="1"]'); await wait(p, 100); await p.click('.gpop .gchoice[data-i="3"]'); await wait(p, 120);
+  ok((await p.locator(".gpop .gfeed").innerText()) === "The answer is: Leave it and tell a grown-up. Its mom comes back at night." && (await p.locator(".gpop .gchoice.right").count()) === 1, "two wrong answers: the best one is shown, with why");
+  await p.click(".gpop [data-next]"); await wait(p, 200);
+  await p.click('.gpop .gchoice[data-i="1"]'); await wait(p, 120);
+  ok((await p.locator(".gpop .gfeed").innerText()) === "Yes!", "a scenario with no why says its well-done line");
+  await p.click(".gpop [data-next]"); await wait(p, 400);
+  const done = (await p.locator(".gdone").innerText()).replace(/\s+/g, " ");
+  let st = await saved(p);
+  ok(/3 points/.test(done) && /New badge: What Would You Do\?, Level 1!/.test(done) && /On to Level 2!/.test(done), "3 points (1 + 0 + 2), a badge for every Level 1 scenario seen, and on to Level 2: " + done);
+  ok(st.prog[st.current].sc.level === 2 && st.prog[st.current].badges.includes("sc-1") && st.prog[st.current].sc.best[1] === 3, "the owl's level, badge and best are saved on this device");
+  await p.click("[data-again]"); await wait(p, 400);
+  ok(/1 of 1 · Level 2/.test(await p.locator(".gstep").innerText()) && /staying aware/i.test(await p.locator(".gpop .gkicker").innerText()), "the next round is Level 2");
+  ok(!p.errs.length && !(await pwned(p)) && !(await overflow(p)), "no errors, nothing from the data runs, and it fits the phone" + (p.errs.length ? ": " + p.errs.join(" | ") : ""));
+  ok(!log.some(l => l.m !== "GET" && l.m !== "OPTIONS" && l.path !== "/rest/v1/rpc/count_view"), "playing sends nothing");
   await ctx.close();
 }
 
@@ -334,7 +386,7 @@ async function answerPop(p, data, wrong = false) {
   await p.goto(B + "edit/"); await wait(p, 500);
   await p.fill("input[name=email]", "editor@example.com"); await p.fill("input[name=password]", "x"); await p.click("#signin button"); await wait(p, 700);
   const groups = await p.$$eval(".tgroup", g => g.map(x => x.querySelector("h2").innerText + ": " + [...x.querySelectorAll(".tile b")].map(b => b.innerText).join(", ")));
-  ok(groups.includes("Animal Guardian Alliance games: Go on Green, Matching, Questions, Pictures"), "the start screen has the games: " + groups.join(" | "));
+  ok(groups.includes("Animal Guardian Alliance games: Go on Green, Scenarios, Questions, Pictures, Checked by, Matching"), "the start screen has the games: " + groups.join(" | "));
   await p.goto(B + "edit/#/situations"); await wait(p, 500);
   ok((await p.locator(".rows li[data-s]").count()) === 7, "Go on Green lists its situations");
   await p.goto(B + "edit/#/situations/new"); await wait(p, 400);
@@ -354,6 +406,27 @@ async function answerPop(p, data, wrong = false) {
   ok(qpost && JSON.parse(qpost.body).choices.join("|") === "True|False" && JSON.parse(qpost.body).answer === 1, "a question saves its answers as a list " + (qpost && qpost.body));
   await p.goto(B + "edit/#/pairs"); await wait(p, 500);
   ok((await p.locator(".rows li", { hasText: "Whale Eye" }).innerText()).toLowerCase().includes("needs “what to notice”"), "Matching pairs flag what's still missing");
+  ok(/on the shelf/.test(await p.locator("#app").innerText()), "Matching says it's on the shelf until 2 pairs are on");
+  await p.goto(B + "edit/#/scenarios"); await wait(p, 500);
+  ok((await p.locator(".rows li[data-s]").count()) === 5, "What Would You Do? lists its scenarios");
+  await p.goto(B + "edit/#/scenarios/new"); await wait(p, 400);
+  ok(!(await p.locator('input[name=published]').isChecked()), "a new scenario starts switched off");
+  await p.check('input[name=topic][value="wildlife"]');
+  await p.fill("textarea[name=scenario]", "You see a turtle crossing the road."); await p.fill("textarea[name=choices]", "Pick it up and keep it\nTell a grown-up"); await p.fill("input[name=answer]", "2");
+  await p.fill("textarea[name=why]", "A grown-up can help it across safely.");
+  await p.click(".savebar button"); await wait(p, 500);
+  const spost = log.find(l => l.m === "POST" && l.path === "/rest/v1/game_scenarios"), sbody = spost && JSON.parse(spost.body);
+  ok(sbody && sbody.topic === "wildlife" && sbody.level === 1 && sbody.answer === 2 && sbody.choices.join("|") === "Pick it up and keep it|Tell a grown-up" && sbody.published === false, "a scenario saves its topic, answers and why, switched off " + (spost && spost.body));
+  await p.goto(B + "edit/#/checks/new"); await wait(p, 400);
+  ok((await p.locator('input[name=place]').count()) === 6 && !(await p.locator('[name=note]').isVisible()), "Checked by: pick the game they checked, or the whole Alliance page");
+  await p.check('input[name=place][value="aga"]'); await wait(p, 100);
+  ok(await p.locator('[name=note]').isVisible(), "for the whole page, a line for what they checked");
+  await p.fill("input[name=name]", "Good Dog Training"); await p.fill("input[name=link_url]", "http://example.org"); await p.fill("input[name=note]", "the dog safety scenarios");
+  await p.click(".savebar button"); await wait(p, 300);
+  ok(await p.locator('[data-f="link_url"] .err').isVisible(), "a link must start with https://");
+  await p.fill("input[name=link_url]", "https://example.org/gooddog"); await p.click(".savebar button"); await wait(p, 500);
+  const cpost = log.find(l => l.m === "POST" && l.path === "/rest/v1/checked_by"), cbody = cpost && JSON.parse(cpost.body);
+  ok(cbody && cbody.place === "aga" && cbody.name === "Good Dog Training" && cbody.link_url === "https://example.org/gooddog" && cbody.note === "the dog safety scenarios", "a credit saves " + (cpost && cpost.body));
   await p.goto(B + "edit/#/gameart/new"); await wait(p, 400);
   ok((await p.locator('input[name=kind][value="bowl"]').count()) === 1 && (await p.locator('[data-f="photo_url"]').innerText()).includes("see-through"), "Game pictures: dog, cat, bunny, bone or food bowl, with a see-through background");
   const cfg = await p.evaluate(() => JSON.parse(document.getElementById("config").textContent));
