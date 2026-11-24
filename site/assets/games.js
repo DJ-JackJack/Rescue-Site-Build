@@ -95,7 +95,7 @@ const loadContent = () => (loading ??= Promise.all([
   q("game_questions", "select=id,level,kind,question,choices,answer,hint,why,reward,sort&order=level.asc,sort.asc"),
   q("match_pairs", "select=id,level,title,tile,cue,question,choices,answer,reward,photo_url,photo_frame,photo_credit,sort&photo_url=not.is.null&order=level.asc,sort.asc"),
   q("game_art", "select=id,kind,photo_url,photo_alt&order=sort.asc"),
-  q("game_scenarios", "select=id,level,topic,scenario,question,choices,answer,hint,why,reward,sort&order=level.asc,sort.asc"),
+  q("game_scenarios", "select=id,level,topic,scenario,question,choices,answer,line_1,line_2,line_3,line_4,line_5,hint,why,reward,sort&order=level.asc,sort.asc"),
   q("checked_by", "select=id,place,name,link_url,sort&order=sort.asc,name.asc").catch(() => []), // the credits never stop a game
 ]).then(([situations, questions, pairs, art, scenarios, checks]) => ({
   situations: situations.filter(s => s.situation && ["green", "yellow", "red"].includes(s.light)),
@@ -215,7 +215,8 @@ function popUp(html, { say = "" } = {}) {
 const closePop = () => { layer.hidden = true; layer.innerHTML = ""; stopSpeaking(); };
 
 // One question, with tries (another go after a wrong answer, then the answer explained). Resolves { right, first }.
-// scene: a situation shown (and read out) before the question, for What Would You Do?
+// scene: a situation shown (and read out) before the question, for What Would You Do?; qn.lines: what to say for each
+// answer when it's picked (a wrong one's own line comes before the hint)
 function ask(qn, { tries = 2, title = t("js.games.question", "Question"), scene = "" } = {}) {
   return new Promise(done => {
     const letters = ["A", "B", "C", "D", "E"];
@@ -235,7 +236,7 @@ function ask(qn, { tries = 2, title = t("js.games.question", "Question"), scene 
         sound("right");
       } else {
         b.classList.add("notthis"); b.disabled = true;
-        if (attempt < tries) { feed.textContent = qn.hint || t("js.games.try-again", "Not quite. Have another look and try again."); return; }
+        if (attempt < tries) { feed.textContent = qn.lines?.[Number(b.dataset.i) - 1] || qn.hint || t("js.games.try-again", "Not quite. Have another look and try again."); return; }
         $$(".gchoice", layer).forEach(x => { x.disabled = true; if (Number(x.dataset.i) === qn.answer) x.classList.add("right"); });
         feed.textContent = `${t("js.games.answer-is", "The answer is: {answer}.", { answer: qn.choices[qn.answer - 1] })} ${qn.why || qn.reward || ""}`.trim();
       }
@@ -559,7 +560,8 @@ function askPair(p, qn) {
 
 /* ---------- What Would You Do? ----------
    The scenario game, for ages 8 to 12: a situation in words (a pet, wildlife you find, basic first aid, staying aware)
-   and the best thing to do. A second try after a wrong answer, then the answer, and why it's best, either way.
+   and the best thing to do. A second try after a wrong answer (with Taea's line for the answer they picked, or the
+   hint), then the answer, and why it's best, either way.
    2 points on the first try, 1 on the second. Rounds of 5, in Taea's order, new ones each round until every
    scenario of the level has been seen; then a badge and the next level, and after Level 3, round again. */
 const TOPICS = () => ({ pets: ["🐾", t("js.games.topic-pets", "Pets")], wildlife: ["🦉", t("js.games.topic-wildlife", "Wildlife")],
@@ -579,7 +581,8 @@ async function playScenarios() {
     body.innerHTML = `<p class="gstep">${h(t("js.games.of", "{n} of {total}", { n: i + 1, total: round.length }))} · ${h(t("js.games.level", "Level {n}", { n: level }))}</p>`;
     // right: their well-done line and why; wrong twice: the answer and why
     const why = [s.reward, s.why].filter(Boolean).join(" ");
-    const r = await ask({ kind: "mc", question: s.question || t("js.games.sc-question", "What would you do?"), choices: s.choices, answer: s.answer, hint: s.hint, reward: why || null, why: s.why || s.reward || null },
+    const r = await ask({ kind: "mc", question: s.question || t("js.games.sc-question", "What would you do?"), choices: s.choices, answer: s.answer, hint: s.hint, reward: why || null, why: s.why || s.reward || null,
+      lines: [s.line_1, s.line_2, s.line_3, s.line_4, s.line_5] },
       { tries: 2, title: `${icon} ${topic}`, scene: s.scenario });
     if (r.right) setScore(score + (r.first ? 2 : 1));
     if (!m.seen.includes(s.id)) { m.seen.push(s.id); save(); }

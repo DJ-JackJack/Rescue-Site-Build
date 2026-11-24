@@ -732,7 +732,10 @@ const SECTIONS = {
         validate: v => (v.length < 2 || v.length > 5 ? "Add between 2 and 5 answers, one per line." : "") },
       { name: "answer", type: "number", label: "Which one is best?", dflt: 1, help: "Its line number: 1 for the first answer, 2 for the second, and so on.",
         validate: (v, vals) => (!(v >= 1 && v <= (vals.choices || []).length) ? "Pick the line number of the best answer." : "") },
-      { name: "hint", type: "textarea", rows: 2, max: 400, label: "Hint after a wrong answer", help: "Optional. Shown before they try again." },
+      // a box for each wrong answer (the best one has none), shown as the answers are typed in
+      ...[1, 2, 3, 4, 5].map(n => ({ name: `line_${n}`, type: "textarea", rows: 2, max: 400, label: `If they pick answer ${n} (${"ABCDE"[n - 1]})`,
+        help: "What the game says before they try again. Gentle, and it's fine to end with a question to think about.", when: v => (v.choices || []).length >= n && v.answer !== n })),
+      { name: "hint", type: "textarea", rows: 2, max: 400, label: "Hint after a wrong answer", help: "Optional. Shown after a wrong answer that has no line of its own above.", more: true },
       { name: "why", type: "textarea", rows: 3, max: 600, label: "Why it's best", help: "Shown with the answer, whether they got it or not." },
       { name: "reward", type: "textarea", rows: 2, max: 400, label: "When they get it right", help: "Optional. Your well-done line, shown before why it's best." },
       { ...SHOW, dflt: false, help: "Starts off, so nothing shows until you're happy with it (and it's been checked, if you're having it checked). The game shows on the site once 3 scenarios are on." },

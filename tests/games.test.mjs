@@ -40,7 +40,7 @@ const DATA = () => ({
   game_art: [],
   // What Would You Do?: three at Level 1 (in Taea's order), one at Level 2, and a broken one that never shows
   game_scenarios: [
-    { id: "sc1", level: 1, topic: "pets", scenario: "Your friend's dog is eating, and you want to say hi." + XSS, question: null, choices: ["Pet him while he eats", "Wait until he's done eating"], answer: 2, hint: "How would you feel if someone grabbed your plate?", why: "Dogs can guard their food.", reward: "Great call!", sort: 1 },
+    { id: "sc1", level: 1, topic: "pets", scenario: "Your friend's dog is eating, and you want to say hi." + XSS, question: null, choices: ["Pet him while he eats", "Wait until he's done eating"], answer: 2, line_1: "How would you feel if someone grabbed your plate?", line_2: null, hint: "The hint, under the line", why: "Dogs can guard their food.", reward: "Great call!", sort: 1 },
     { id: "sc2", level: 1, topic: "wildlife", scenario: "You find a baby bunny alone in the grass.", question: "What's the best thing to do?", choices: ["Take it home", "Leave it and tell a grown-up", "Give it milk"], answer: 2, hint: null, why: "Its mom comes back at night.", reward: null, sort: 2 },
     { id: "sc3", level: 1, topic: "firstaid", scenario: "Your cat is limping.", question: null, choices: ["Tell a grown-up so they can call the vet", "Pull on her leg to check"], answer: 1, hint: null, why: null, reward: "Yes!", sort: 3 },
     { id: "sc4", level: 2, topic: "aware", scenario: "A dog you don't know runs toward you, barking.", question: null, choices: ["Run away", "Stand still like a tree"], answer: 2, hint: null, why: "Running can make a dog chase.", reward: null, sort: 1 },
@@ -257,12 +257,14 @@ async function answerPop(p, data, wrong = false) {
   await p.click("[data-read]"); await wait(p, 100);
   ok((await p.evaluate(() => window.__said)).some(s => s.startsWith("Your friend's dog is eating") && s.includes("What would you do?") && s.includes("B: Wait until he's done eating")), "Read it to me reads what's happening, the question and the answers");
   await p.click('.gpop .gchoice[data-i="1"]'); await wait(p, 120);
-  ok((await p.locator(".gpop .gfeed").innerText()).startsWith("How would you feel") && (await p.locator(".gpop [data-next]").count()) === 0, "a wrong answer gets the hint and another try");
+  ok((await p.locator(".gpop .gfeed").innerText()).startsWith("How would you feel") && (await p.locator(".gpop [data-next]").count()) === 0, "a wrong answer gets Taea's line for that answer (before the hint) and another try");
   await p.click('.gpop .gchoice[data-i="2"]'); await wait(p, 120);
   ok((await p.locator(".gpop .gfeed").innerText()) === "Great call! Dogs can guard their food.", "the right answer gets the well-done line and why it's best");
   await p.click(".gpop [data-next]"); await wait(p, 200);
   ok((await p.locator(".gpop .gq").innerText()) === "What's the best thing to do?" && /wildlife/i.test(await p.locator(".gpop .gkicker").innerText()), "the next card, in Taea's order, with its own question");
-  await p.click('.gpop .gchoice[data-i="1"]'); await wait(p, 100); await p.click('.gpop .gchoice[data-i="3"]'); await wait(p, 120);
+  await p.click('.gpop .gchoice[data-i="1"]'); await wait(p, 100);
+  ok((await p.locator(".gpop .gfeed").innerText()) === "Not quite. Have another look and try again.", "a wrong answer with no line or hint gets the gentle try-again line");
+  await p.click('.gpop .gchoice[data-i="3"]'); await wait(p, 120);
   ok((await p.locator(".gpop .gfeed").innerText()) === "The answer is: Leave it and tell a grown-up. Its mom comes back at night." && (await p.locator(".gpop .gchoice.right").count()) === 1, "two wrong answers: the best one is shown, with why");
   await p.click(".gpop [data-next]"); await wait(p, 200);
   await p.click('.gpop .gchoice[data-i="1"]'); await wait(p, 120);
@@ -413,10 +415,14 @@ async function answerPop(p, data, wrong = false) {
   ok(!(await p.locator('input[name=published]').isChecked()), "a new scenario starts switched off");
   await p.check('input[name=topic][value="wildlife"]');
   await p.fill("textarea[name=scenario]", "You see a turtle crossing the road."); await p.fill("textarea[name=choices]", "Pick it up and keep it\nTell a grown-up"); await p.fill("input[name=answer]", "2");
+  ok(await p.locator('[data-f="line_1"]').isVisible() && !(await p.locator('[data-f="line_2"]').isVisible()) && !(await p.locator('[data-f="line_3"]').isVisible()),
+    "a box for each wrong answer: none for the best one, none past the last answer");
+  await p.fill("textarea[name=line_1]", "Turtles are wild. What does it need instead?");
   await p.fill("textarea[name=why]", "A grown-up can help it across safely.");
   await p.click(".savebar button"); await wait(p, 500);
   const spost = log.find(l => l.m === "POST" && l.path === "/rest/v1/game_scenarios"), sbody = spost && JSON.parse(spost.body);
-  ok(sbody && sbody.topic === "wildlife" && sbody.level === 1 && sbody.answer === 2 && sbody.choices.join("|") === "Pick it up and keep it|Tell a grown-up" && sbody.published === false, "a scenario saves its topic, answers and why, switched off " + (spost && spost.body));
+  ok(sbody && sbody.topic === "wildlife" && sbody.level === 1 && sbody.answer === 2 && sbody.choices.join("|") === "Pick it up and keep it|Tell a grown-up" && sbody.published === false
+    && sbody.line_1 === "Turtles are wild. What does it need instead?", "a scenario saves its topic, answers, the line for its wrong answer and why, switched off " + (spost && spost.body));
   await p.goto(B + "edit/#/checks/new"); await wait(p, 400);
   ok((await p.locator('input[name=place]').count()) === 6 && !(await p.locator('[name=note]').isVisible()), "Checked by: pick the game they checked, or the whole Alliance page");
   await p.check('input[name=place][value="aga"]'); await wait(p, 100);
